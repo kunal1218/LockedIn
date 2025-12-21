@@ -1,0 +1,46 @@
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0px);
+  }
+}
+
+@keyframes soft-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 134, 88, 0.18);
+  }
+  70% {
+    box-shadow: 0 0 0 18px rgba(255, 134, 88, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 134, 88, 0);
+  }
+}
+
+.reveal-up {
+  animation: fade-up 0.6s ease both;
+}
+
+.float-slow {
+  animation: float 10s ease-in-out infinite;
+}
+
+.pulse-soft {
+  animation: soft-pulse 2.8s ease-out infinite;
+}

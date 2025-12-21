@@ -1,0 +1,18 @@
+@import "tailwindcss";
+@import "../styles/theme.css";
+@import "../styles/animations.css";
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: inherit;
+}
