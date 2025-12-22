@@ -33,16 +33,6 @@ type ProfileAnswersContextValue = {
 
 const ProfileAnswersContext = createContext<ProfileAnswersContextValue | null>(null);
 
-const emptyAnswers: ProfileAnswers = {
-  career: "",
-  madlib: {
-    when: "",
-    focus: "",
-    action: "",
-  },
-  memory: "",
-};
-
 const storageKey = (userId: string) => `lockedin_profile_answers:${userId}`;
 
 const sanitizeAnswers = (value: ProfileAnswers): ProfileAnswers => ({
@@ -178,4 +168,12 @@ export const useProfileAnswers = () => {
   return context;
 };
 
-export const getEmptyProfileAnswers = () => ({ ...emptyAnswers });
+export const getEmptyProfileAnswers = (): ProfileAnswers => ({
+  career: "",
+  madlib: {
+    when: "",
+    focus: "",
+    action: "",
+  },
+  memory: "",
+});

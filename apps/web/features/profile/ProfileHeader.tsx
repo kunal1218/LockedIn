@@ -84,7 +84,7 @@ export const ProfileHeader = ({
                   Absolute
                 </button>
               </div>
-              <Button variant="profile" onClick={onSaveLayout}>
+              <Button variant="profile" requiresAuth={false} onClick={onSaveLayout}>
                 Save layout
               </Button>
               <Button variant="outline" requiresAuth={false} onClick={onCancelLayout}>
@@ -101,7 +101,7 @@ export const ProfileHeader = ({
           )}
         </div>
       </div>
-      {layoutError && (
+      {isEditing && layoutError && (
         <p className="mt-4 text-xs font-semibold text-accent">{layoutError}</p>
       )}
     </Card>
