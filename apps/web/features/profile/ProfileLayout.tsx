@@ -472,7 +472,7 @@ const ProfileLayoutInner = () => {
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-2">
       <div
         ref={containerRef}
-        className="relative"
+        className="relative pointer-events-none"
         style={{ height: canvasHeight }}
       >
         {isEditing && movementMode === "relative" && gridStep > 0 && (
@@ -502,7 +502,7 @@ const ProfileLayoutInner = () => {
               key={block.id}
               className={`absolute transition ${
                 isEditing ? "cursor-grab select-none" : ""
-              } ${draggingId === block.id ? "z-30" : "z-10"}`}
+              } ${draggingId === block.id ? "z-30" : "z-10"} pointer-events-auto`}
               style={style}
               onPointerDown={
                 isEditing ? (event) => handlePointerDown(block.id, event) : undefined
