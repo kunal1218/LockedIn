@@ -7,7 +7,30 @@ import { Tag } from "@/components/Tag";
 import { useAuth } from "@/features/auth";
 import { profile } from "./mock";
 
-export const ProfileHeader = () => {
+type MovementMode = "relative" | "absolute";
+
+type ProfileHeaderProps = {
+  isEditing?: boolean;
+  movementMode?: MovementMode;
+  onEditToggle?: () => void;
+  onSaveLayout?: () => void;
+  onCancelLayout?: () => void;
+  onMovementModeChange?: (mode: MovementMode) => void;
+  layoutError?: string | null;
+};
+
+const toggleBaseClasses =
+  "rounded-full px-3 py-1 text-xs font-semibold transition";
+
+export const ProfileHeader = ({
+  isEditing = false,
+  movementMode = "relative",
+  onEditToggle,
+  onSaveLayout,
+  onCancelLayout,
+  onMovementModeChange,
+  layoutError,
+}: ProfileHeaderProps) => {
   const { user } = useAuth();
   const displayName = user?.name ?? profile.name;
   const displayHandle = user?.handle ?? profile.handle;
@@ -35,10 +58,52 @@ export const ProfileHeader = () => {
           </div>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Button variant="profile">Edit profile</Button>
-          <Button variant="profile">Share vibe</Button>
+          {isEditing ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center rounded-full border border-card-border/70 bg-white/80 p-1">
+                <button
+                  type="button"
+                  className={`${toggleBaseClasses} ${
+                    movementMode === "relative"
+                      ? "bg-accent/15 text-ink"
+                      : "text-muted hover:text-ink"
+                  }`}
+                  onClick={() => onMovementModeChange?.("relative")}
+                >
+                  Relative
+                </button>
+                <button
+                  type="button"
+                  className={`${toggleBaseClasses} ${
+                    movementMode === "absolute"
+                      ? "bg-accent/15 text-ink"
+                      : "text-muted hover:text-ink"
+                  }`}
+                  onClick={() => onMovementModeChange?.("absolute")}
+                >
+                  Absolute
+                </button>
+              </div>
+              <Button variant="profile" onClick={onSaveLayout}>
+                Save layout
+              </Button>
+              <Button variant="outline" requiresAuth={false} onClick={onCancelLayout}>
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <>
+              <Button variant="profile" onClick={onEditToggle}>
+                Edit profile
+              </Button>
+              <Button variant="profile">Share vibe</Button>
+            </>
+          )}
         </div>
       </div>
+      {layoutError && (
+        <p className="mt-4 text-xs font-semibold text-accent">{layoutError}</p>
+      )}
     </Card>
   );
 };
