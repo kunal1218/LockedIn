@@ -27,6 +27,7 @@ API (`apps/api/.env`)
 ```
 PORT=4001
 DATABASE_URL=postgresql://user:password@localhost:5432/lockedin
+REDIS_URL=redis://localhost:6379
 ```
 
 ## Deployment
@@ -37,9 +38,11 @@ Frontend (Vercel)
 
 Backend + DB (Railway)
 - Add a Postgres service and set `DATABASE_URL`
+- Add a Redis service and set `REDIS_URL`
 - Start command: `npm run start -w apps/api`
 - Build command: `npm run build -w apps/api`
 
 ## Notes
-- Chat, map provider, and auth are intentionally stubbed for MVP speed.
+- Chat and map provider data are intentionally stubbed for MVP speed.
 - Mock data lives in `apps/web/features/*/mock.ts` and `apps/api/src/services/mockData.ts`.
+- Auth uses a `users` table in Postgres and stores sessions in Redis.

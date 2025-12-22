@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google";
 import { BackgroundDecor } from "@/components/BackgroundDecor";
 import { SiteHeader } from "@/components/SiteHeader";
+import { AuthModal, AuthProvider } from "@/features/auth";
 import "./globals.css";
 
 const display = Space_Grotesk({
@@ -28,11 +29,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${display.variable} ${body.variable} font-sans antialiased`}>
-        <div className="relative min-h-screen overflow-hidden">
-          <BackgroundDecor />
-          <SiteHeader />
-          <main className="relative z-10">{children}</main>
-        </div>
+        <AuthProvider>
+          <div className="relative min-h-screen overflow-hidden">
+            <BackgroundDecor />
+            <SiteHeader />
+            <main className="relative z-10">{children}</main>
+          </div>
+          <AuthModal />
+        </AuthProvider>
       </body>
     </html>
   );

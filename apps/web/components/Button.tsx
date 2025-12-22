@@ -1,7 +1,10 @@
-import type { ButtonHTMLAttributes } from "react";
+"use client";
+
+import type { ButtonHTMLAttributes, MouseEvent } from "react";
+import { useAuth } from "@/features/auth/AuthProvider";
 
 const baseClasses =
-  "inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition duration-200";
+  "inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed disabled:opacity-70";
 
 const variantClasses = {
   primary:
@@ -13,17 +16,39 @@ const variantClasses = {
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: keyof typeof variantClasses;
+  requiresAuth?: boolean;
+  authMode?: "login" | "signup";
 };
 
 export const Button = ({
   variant = "primary",
   className,
+  requiresAuth = true,
+  authMode,
+  onClick,
   ...props
 }: ButtonProps) => {
+  const { isAuthenticated, openAuthModal } = useAuth();
+
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    if (props.disabled) {
+      return;
+    }
+
+    if (requiresAuth && !isAuthenticated) {
+      event.preventDefault();
+      openAuthModal(authMode);
+      return;
+    }
+
+    onClick?.(event);
+  };
+
   return (
     <button
       type={props.type ?? "button"}
       className={`${baseClasses} ${variantClasses[variant]} ${className ?? ""}`}
+      onClick={handleClick}
       {...props}
     />
   );

@@ -33,10 +33,16 @@ export const SiteHeader = () => {
           ))}
         </nav>
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="hidden sm:inline-flex">
+          <Button
+            variant="outline"
+            className="hidden sm:inline-flex"
+            authMode="login"
+          >
             Drop a post
           </Button>
-          <Button className="pulse-soft">Join today</Button>
+          <Button className="pulse-soft" authMode="signup">
+            Join today
+          </Button>
         </div>
       </div>
     </header>
