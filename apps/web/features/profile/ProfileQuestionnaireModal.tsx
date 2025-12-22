@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/Button";
 import {
   getEmptyProfileAnswers,
@@ -76,8 +77,12 @@ export const ProfileQuestionnaireModal = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center px-4 py-8">
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">
       <div
         className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
         aria-hidden="true"
@@ -228,6 +233,7 @@ export const ProfileQuestionnaireModal = ({
           </form>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
