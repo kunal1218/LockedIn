@@ -16,6 +16,7 @@ type ProfileHeaderProps = {
   onSaveLayout?: () => void;
   onCancelLayout?: () => void;
   onMovementModeChange?: (mode: MovementMode) => void;
+  onEditAnswers?: () => void;
   layoutError?: string | null;
 };
 
@@ -29,6 +30,7 @@ export const ProfileHeader = ({
   onSaveLayout,
   onCancelLayout,
   onMovementModeChange,
+  onEditAnswers,
   layoutError,
 }: ProfileHeaderProps) => {
   const { user } = useAuth();
@@ -84,6 +86,15 @@ export const ProfileHeader = ({
                   Absolute
                 </button>
               </div>
+              {onEditAnswers && (
+                <Button
+                  variant="outline"
+                  requiresAuth={false}
+                  onClick={onEditAnswers}
+                >
+                  Edit answers
+                </Button>
+              )}
               <Button variant="profile" requiresAuth={false} onClick={onSaveLayout}>
                 Save layout
               </Button>

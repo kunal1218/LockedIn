@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Button } from "@/components/Button";
-import { getEmptyProfileAnswers, useProfileAnswers } from "./ProfileAnswersContext";
+import {
+  getEmptyProfileAnswers,
+  useProfileAnswers,
+} from "./ProfileAnswersContext";
 
 const inputBaseClasses =
   "w-full rounded-2xl border border-card-border/80 bg-white/80 px-4 py-3 text-sm text-ink placeholder:text-muted/60 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20";
@@ -11,12 +14,22 @@ const stackedInputClasses = `mt-2 ${inputBaseClasses}`;
 
 const labelClasses = "text-xs font-semibold uppercase tracking-[0.2em] text-muted";
 
-export const ProfileQuestionnaireModal = () => {
-  const { needsQuestionnaire, saveAnswers } = useProfileAnswers();
+type ProfileQuestionnaireModalProps = {
+  isOpen?: boolean;
+  onClose?: () => void;
+};
+
+export const ProfileQuestionnaireModal = ({
+  isOpen = false,
+  onClose,
+}: ProfileQuestionnaireModalProps) => {
+  const { answers, needsQuestionnaire, saveAnswers } = useProfileAnswers();
   const [formState, setFormState] = useState(getEmptyProfileAnswers());
+  const isVisible = needsQuestionnaire || isOpen;
+  const isEditing = Boolean(isOpen) && !needsQuestionnaire;
 
   useEffect(() => {
-    if (!needsQuestionnaire) {
+    if (!isVisible) {
       return;
     }
 
@@ -26,21 +39,25 @@ export const ProfileQuestionnaireModal = () => {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [needsQuestionnaire]);
+  }, [isVisible]);
 
   useEffect(() => {
-    if (needsQuestionnaire) {
-      setFormState(getEmptyProfileAnswers());
+    if (!isVisible) {
+      return;
     }
-  }, [needsQuestionnaire]);
+    setFormState(answers ?? getEmptyProfileAnswers());
+  }, [answers, isVisible]);
 
-  if (!needsQuestionnaire) {
+  if (!isVisible) {
     return null;
   }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     saveAnswers(formState);
+    if (!needsQuestionnaire) {
+      onClose?.();
+    }
   };
 
   return (
@@ -64,10 +81,12 @@ export const ProfileQuestionnaireModal = () => {
               id="profile-questions-title"
               className="mt-3 font-display text-2xl font-semibold text-ink"
             >
-              Answer three quick questions
+              {isEditing ? "Update your answers" : "Answer three quick questions"}
             </h2>
             <p className="mt-2 text-sm text-muted">
-              Quick answers only. We’ll turn them into your headline cards.
+              {isEditing
+                ? "Tweak your responses and we’ll refresh your headline cards."
+                : "Quick answers only. We’ll turn them into your headline cards."}
             </p>
           </div>
 
@@ -159,9 +178,25 @@ export const ProfileQuestionnaireModal = () => {
               />
             </label>
 
-            <Button type="submit" requiresAuth={false} className="w-full">
-              Save my answers
-            </Button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+              {isEditing && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  requiresAuth={false}
+                  onClick={onClose}
+                >
+                  Cancel
+                </Button>
+              )}
+              <Button
+                type="submit"
+                requiresAuth={false}
+                className="w-full sm:w-auto"
+              >
+                {isEditing ? "Save changes" : "Save my answers"}
+              </Button>
+            </div>
           </form>
         </div>
       </div>

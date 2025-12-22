@@ -147,6 +147,7 @@ const ProfileLayoutInner = () => {
   const [layoutError, setLayoutError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [movementMode, setMovementMode] = useState<MovementMode>("relative");
+  const [isAnswerEditorOpen, setAnswerEditorOpen] = useState(false);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
 
   const gridStep = useMemo(() => gridUnit + gridGap, [gridUnit, gridGap]);
@@ -421,6 +422,7 @@ const ProfileLayoutInner = () => {
             onSaveLayout={() => handleSave()}
             onCancelLayout={() => handleCancel()}
             onMovementModeChange={(mode) => handleMovementMode(mode)}
+            onEditAnswers={() => setAnswerEditorOpen(true)}
             layoutError={layoutError}
           />
         );
@@ -509,6 +511,10 @@ const ProfileLayoutInner = () => {
           );
         })}
       </div>
+      <ProfileQuestionnaireModal
+        isOpen={isAnswerEditorOpen}
+        onClose={() => setAnswerEditorOpen(false)}
+      />
     </div>
   );
 };
@@ -548,7 +554,6 @@ export const ProfileLayout = () => {
   return (
     <ProfileAnswersProvider>
       <ProfileLayoutInner />
-      <ProfileQuestionnaireModal />
     </ProfileAnswersProvider>
   );
 };
