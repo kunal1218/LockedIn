@@ -10,6 +10,7 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { useAuth } from "@/features/auth";
+import { apiGet, apiPost } from "@/lib/api";
 
 type MadlibAnswers = {
   when: string;
@@ -25,7 +26,7 @@ export type ProfileAnswers = {
 
 type ProfileAnswersContextValue = {
   answers: ProfileAnswers | null;
-  saveAnswers: (answers: ProfileAnswers) => void;
+  saveAnswers: (answers: ProfileAnswers) => Promise<void>;
   needsQuestionnaire: boolean;
   isLoaded: boolean;
   madlibAnswer: string;
@@ -107,32 +108,88 @@ const buildMadlibAnswer = (answers: ProfileAnswers | null) => {
 };
 
 export const ProfileAnswersProvider = ({ children }: { children: ReactNode }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, token } = useAuth();
   const [answers, setAnswers] = useState<ProfileAnswers | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    if (!user?.id) {
-      setAnswers(null);
-      setIsLoaded(true);
-      return;
-    }
+    let isActive = true;
 
-    const stored = readStoredAnswers(user.id);
-    setAnswers(stored);
-    setIsLoaded(true);
-  }, [user?.id]);
+    const loadAnswers = async () => {
+      if (!user?.id || !token) {
+        if (isActive) {
+          setAnswers(null);
+          setIsLoaded(true);
+        }
+        return;
+      }
+
+      setIsLoaded(false);
+
+      try {
+        const response = await apiGet<{ answers: ProfileAnswers | null }>(
+          "/profile/answers",
+          token
+        );
+
+        if (!isActive) {
+          return;
+        }
+
+        if (response?.answers) {
+          setAnswers(response.answers);
+          writeStoredAnswers(user.id, response.answers);
+          setIsLoaded(true);
+          return;
+        }
+
+        const stored = readStoredAnswers(user.id);
+        if (stored && hasCompleteAnswers(stored)) {
+          setAnswers(stored);
+          writeStoredAnswers(user.id, stored);
+          setIsLoaded(true);
+          await apiPost<{ answers: ProfileAnswers }>(
+            "/profile/answers",
+            stored,
+            token
+          );
+          return;
+        }
+
+        setAnswers(response?.answers ?? null);
+        setIsLoaded(true);
+      } catch (error) {
+        console.error("Profile answers fetch failed:", error);
+        const stored = user?.id ? readStoredAnswers(user.id) : null;
+        if (isActive) {
+          setAnswers(stored);
+          setIsLoaded(true);
+        }
+      }
+    };
+
+    loadAnswers();
+    return () => {
+      isActive = false;
+    };
+  }, [token, user?.id]);
 
   const saveAnswers = useCallback(
-    (next: ProfileAnswers) => {
-      if (!user?.id) {
+    async (next: ProfileAnswers) => {
+      if (!user?.id || !token) {
         return;
       }
       const sanitized = sanitizeAnswers(next);
-      setAnswers(sanitized);
-      writeStoredAnswers(user.id, sanitized);
+      const response = await apiPost<{ answers: ProfileAnswers }>(
+        "/profile/answers",
+        sanitized,
+        token
+      );
+      const saved = response?.answers ?? sanitized;
+      setAnswers(saved);
+      writeStoredAnswers(user.id, saved);
     },
-    [user?.id]
+    [token, user?.id]
   );
 
   const needsQuestionnaire =

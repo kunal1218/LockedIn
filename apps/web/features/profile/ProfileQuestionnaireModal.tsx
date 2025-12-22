@@ -25,6 +25,8 @@ export const ProfileQuestionnaireModal = ({
 }: ProfileQuestionnaireModalProps) => {
   const { answers, needsQuestionnaire, saveAnswers } = useProfileAnswers();
   const [formState, setFormState] = useState(getEmptyProfileAnswers());
+  const [isSaving, setIsSaving] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const isVisible = needsQuestionnaire || isOpen;
   const isEditing = Boolean(isOpen) && !needsQuestionnaire;
 
@@ -46,17 +48,31 @@ export const ProfileQuestionnaireModal = ({
       return;
     }
     setFormState(answers ?? getEmptyProfileAnswers());
+    setSubmitError(null);
   }, [answers, isVisible]);
 
   if (!isVisible) {
     return null;
   }
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    saveAnswers(formState);
-    if (!needsQuestionnaire) {
-      onClose?.();
+    setIsSaving(true);
+    setSubmitError(null);
+
+    try {
+      await saveAnswers(formState);
+      if (!needsQuestionnaire) {
+        onClose?.();
+      }
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : "Unable to save your answers."
+      );
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -178,6 +194,12 @@ export const ProfileQuestionnaireModal = ({
               />
             </label>
 
+            {submitError && (
+              <p className="rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent">
+                {submitError}
+              </p>
+            )}
+
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               {isEditing && (
                 <Button
@@ -185,6 +207,7 @@ export const ProfileQuestionnaireModal = ({
                   variant="outline"
                   requiresAuth={false}
                   onClick={onClose}
+                  disabled={isSaving}
                 >
                   Cancel
                 </Button>
@@ -193,8 +216,13 @@ export const ProfileQuestionnaireModal = ({
                 type="submit"
                 requiresAuth={false}
                 className="w-full sm:w-auto"
+                disabled={isSaving}
               >
-                {isEditing ? "Save changes" : "Save my answers"}
+                {isSaving
+                  ? "Saving..."
+                  : isEditing
+                  ? "Save changes"
+                  : "Save my answers"}
               </Button>
             </div>
           </form>
