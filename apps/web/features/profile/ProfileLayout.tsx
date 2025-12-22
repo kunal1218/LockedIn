@@ -131,7 +131,7 @@ const buildDefaultPositions = (mode: "default" | "compact") => {
 };
 
 const ProfileLayoutInner = () => {
-  const { user } = useAuth();
+  const { user, isAuthenticated, openAuthModal } = useAuth();
   const { answers, madlibAnswer } = useProfileAnswers();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [gridUnit, setGridUnit] = useState(0);
@@ -149,6 +149,14 @@ const ProfileLayoutInner = () => {
   const [movementMode, setMovementMode] = useState<MovementMode>("relative");
   const [isAnswerEditorOpen, setAnswerEditorOpen] = useState(false);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
+
+  const handleAnswerEdit = useCallback(() => {
+    if (!isAuthenticated) {
+      openAuthModal();
+      return;
+    }
+    setAnswerEditorOpen(true);
+  }, [isAuthenticated, openAuthModal]);
 
   const gridStep = useMemo(() => gridUnit + gridGap, [gridUnit, gridGap]);
 
@@ -422,7 +430,6 @@ const ProfileLayoutInner = () => {
             onSaveLayout={() => handleSave()}
             onCancelLayout={() => handleCancel()}
             onMovementModeChange={(mode) => handleMovementMode(mode)}
-            onEditAnswers={() => setAnswerEditorOpen(true)}
             layoutError={layoutError}
           />
         );
@@ -431,6 +438,7 @@ const ProfileLayoutInner = () => {
           <ProfileQuestionCard
             title="If you guaranteed success, what career would you chose?"
             answer={answers?.career}
+            onEdit={isEditing ? undefined : handleAnswerEdit}
           />
         );
       case "question-madlib":
@@ -438,6 +446,7 @@ const ProfileLayoutInner = () => {
           <ProfileQuestionCard
             title="Whenever I'm ____, my ____ stop and ____."
             answer={madlibAnswer}
+            onEdit={isEditing ? undefined : handleAnswerEdit}
           />
         );
       case "question-memory":
@@ -445,6 +454,7 @@ const ProfileLayoutInner = () => {
           <ProfileQuestionCard
             title="What's your favorite memory?"
             answer={answers?.memory}
+            onEdit={isEditing ? undefined : handleAnswerEdit}
           />
         );
       case "currently":
