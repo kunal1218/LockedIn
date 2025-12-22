@@ -68,7 +68,7 @@ const handleExists = async (handle: string) => {
   const result = await db.query("SELECT 1 FROM users WHERE handle = $1", [
     handle,
   ]);
-  return result.rowCount > 0;
+  return (result.rowCount ?? 0) > 0;
 };
 
 const generateHandle = async (name: string) => {
@@ -125,7 +125,7 @@ export const signUpUser = async (params: {
   const existing = await db.query("SELECT 1 FROM users WHERE email = $1", [
     email,
   ]);
-  if (existing.rowCount > 0) {
+  if ((existing.rowCount ?? 0) > 0) {
     throw new AuthError("Email is already in use", 409);
   }
 
