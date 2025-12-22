@@ -504,7 +504,9 @@ const ProfileLayoutInner = () => {
                 isEditing ? "cursor-grab select-none" : ""
               } ${draggingId === block.id ? "z-30" : "z-10"}`}
               style={style}
-              onPointerDown={(event) => handlePointerDown(block.id, event)}
+              onPointerDown={
+                isEditing ? (event) => handlePointerDown(block.id, event) : undefined
+              }
             >
               <BlockSizer
                 blockId={block.id}
