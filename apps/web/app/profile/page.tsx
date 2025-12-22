@@ -1,4 +1,9 @@
-import { ProfileDetails, ProfileHeader, ProfileSidePanel } from "@/features/profile";
+import {
+  ProfileDetails,
+  ProfileHeader,
+  ProfileLogout,
+  ProfileSidePanel,
+} from "@/features/profile";
 
 export default function ProfilePage() {
   return (
@@ -9,6 +14,7 @@ export default function ProfilePage() {
           <ProfileDetails />
           <ProfileSidePanel />
         </div>
+        <ProfileLogout />
       </div>
     </div>
   );

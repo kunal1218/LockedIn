@@ -12,6 +12,8 @@ const variantClasses = {
   outline:
     "border border-card-border bg-white/80 text-ink hover:border-accent/60",
   ghost: "text-ink/80 hover:text-ink",
+  profile:
+    "rounded-2xl border border-ink/10 bg-gradient-to-br from-white via-white to-accent-4/40 px-5 py-2.5 text-ink shadow-[0_12px_28px_rgba(27,26,23,0.08)] hover:translate-y-[-1px] hover:border-accent/40 hover:shadow-[0_16px_32px_rgba(255,134,88,0.16)]",
 } as const;
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
