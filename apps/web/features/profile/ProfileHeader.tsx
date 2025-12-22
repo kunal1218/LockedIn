@@ -1,10 +1,22 @@
+"use client";
+
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
+import { useAuth } from "@/features/auth";
+import { useRouter } from "next/navigation";
 import { profile } from "./mock";
 
 export const ProfileHeader = () => {
+  const { isAuthenticated, logout } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    logout();
+    router.push("/");
+  };
+
   return (
     <Card className="relative overflow-hidden">
       <div className="absolute -right-16 -top-12 h-32 w-32 rounded-full bg-accent/20 blur-2xl" />
@@ -30,6 +42,15 @@ export const ProfileHeader = () => {
         <div className="flex flex-wrap gap-3">
           <Button variant="outline">Edit profile</Button>
           <Button>Share vibe</Button>
+          {isAuthenticated && (
+            <Button
+              variant="outline"
+              requiresAuth={false}
+              onClick={handleLogout}
+            >
+              Log out
+            </Button>
+          )}
         </div>
       </div>
     </Card>
