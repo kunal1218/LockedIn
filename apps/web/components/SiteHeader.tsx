@@ -99,44 +99,45 @@ export const SiteHeader = () => {
           ))}
         </nav>
         <div className="flex items-center justify-self-end gap-3">
-          {!isAuthenticated && (
+          {!isAuthenticated ? (
             <Button className="pulse-soft" authMode="signup">
               Join today
             </Button>
-          )}
-          {isAuthenticated && (
-            <Link
-              href="/notifications"
-              onClick={handleNavClick("/notifications")}
-              aria-label="Notifications"
-              className="relative rounded-full border border-card-border/70 bg-white/80 p-2 text-ink/80 shadow-sm transition hover:-translate-y-0.5 hover:border-accent/50 hover:text-ink"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+          ) : (
+            <>
+              <Link
+                href="/notifications"
+                onClick={handleNavClick("/notifications")}
+                aria-label="Notifications"
+                className="relative rounded-full border border-card-border/70 bg-white/80 p-2 text-ink/80 shadow-sm transition hover:-translate-y-0.5 hover:border-accent/50 hover:text-ink"
               >
-                <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 0 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
-                <path d="M9 17a3 3 0 0 0 6 0" />
-              </svg>
-              {unreadCount > 0 && (
-                <span className="absolute -right-2 -top-2 flex min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                  {badgeCount}
-                </span>
-              )}
-            </Link>
-            <Link
-              href="/profile"
-              onClick={handleNavClick("/profile")}
-              aria-label="Profile"
-              className="rounded-full border border-card-border/70 bg-white/80 p-1 shadow-sm transition hover:-translate-y-0.5 hover:border-accent/50"
-            >
-              <Avatar name={profileName} size={32} />
-            </Link>
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 0 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+                  <path d="M9 17a3 3 0 0 0 6 0" />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute -right-2 -top-2 flex min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                    {badgeCount}
+                  </span>
+                )}
+              </Link>
+              <Link
+                href="/profile"
+                onClick={handleNavClick("/profile")}
+                aria-label="Profile"
+                className="rounded-full border border-card-border/70 bg-white/80 p-1 shadow-sm transition hover:-translate-y-0.5 hover:border-accent/50"
+              >
+                <Avatar name={profileName} size={32} />
+              </Link>
+            </>
           )}
         </div>
       </div>
