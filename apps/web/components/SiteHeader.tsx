@@ -31,7 +31,7 @@ export const SiteHeader = () => {
 
   return (
     <header className="relative z-[70] pointer-events-auto">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-6">
+      <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-6">
         <Link href="/" className="flex items-center gap-3" onClick={handleNavClick("/")}>
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent/20 text-lg font-bold text-accent">
             L
@@ -41,7 +41,7 @@ export const SiteHeader = () => {
             <p className="text-xs text-muted">Campus social, zero awkwardness</p>
           </div>
         </Link>
-        <nav className="hidden items-center gap-6 text-sm font-semibold text-muted md:flex">
+        <nav className="hidden items-center gap-6 text-sm font-semibold text-muted md:flex md:justify-self-center">
           {navItems.map((item) => (
             <Link
               key={item.href}
@@ -53,7 +53,7 @@ export const SiteHeader = () => {
             </Link>
           ))}
         </nav>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-self-end gap-3">
           {!isAuthenticated && (
             <Button className="pulse-soft" authMode="signup">
               Join today
