@@ -267,13 +267,19 @@ const ProfileLayoutInner = () => {
         }
       }
 
-      const chosenPositions = remotePositions ?? localPositions ?? {};
+      const chosenPositions = localPositions ?? remotePositions ?? {};
       const merged = {
         ...defaultPositions,
         ...chosenPositions,
       };
 
-      if (!remotePositions && localPositions && token) {
+      const shouldSync =
+        token &&
+        localPositions &&
+        (!remotePositions ||
+          JSON.stringify(remotePositions) !== JSON.stringify(localPositions));
+
+      if (shouldSync) {
         apiPost(
           "/profile/layout",
           { positions: localPositions, mode: layoutMode },
