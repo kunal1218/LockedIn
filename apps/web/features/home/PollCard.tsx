@@ -69,19 +69,6 @@ export const PollCard = ({
       tabIndex={isClickable ? 0 : undefined}
     >
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-            post.likedByUser
-              ? "border-accent/40 bg-accent/15 text-accent"
-              : "border-card-border/70 bg-white/80 text-ink/80 hover:border-accent/40 hover:text-ink"
-          }`}
-          onClick={handleActionClick(onLike)}
-          disabled={!onLike || isLiking}
-          aria-pressed={post.likedByUser}
-        >
-          Like {likeCount}
-        </button>
         <Avatar name={post.author.name} />
         <div>
           <p className="text-sm font-semibold text-ink">{post.author.name}</p>
@@ -109,6 +96,19 @@ export const PollCard = ({
             </button>
           )}
           <Tag tone="mint">Poll</Tag>
+          <button
+            type="button"
+            className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+              post.likedByUser
+                ? "border-accent/40 bg-accent/15 text-accent"
+                : "border-card-border/70 bg-white/80 text-ink/80 hover:border-accent/40 hover:text-ink"
+            }`}
+            onClick={handleActionClick(onLike)}
+            disabled={!onLike || isLiking}
+            aria-pressed={post.likedByUser}
+          >
+            Like {likeCount}
+          </button>
         </div>
       </div>
       <div>

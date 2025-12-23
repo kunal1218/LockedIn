@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { FeedComment, FeedPost } from "@lockedin/shared";
-import { useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
@@ -19,11 +19,13 @@ const inputClasses =
   "w-full rounded-2xl border border-card-border/80 bg-white/80 px-4 py-3 text-sm text-ink placeholder:text-muted/60 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20";
 
 type PostDetailProps = {
-  postId: string;
+  postId?: string;
 };
 
 export const PostDetail = ({ postId }: PostDetailProps) => {
   const router = useRouter();
+  const params = useParams();
+  const pathname = usePathname();
   const { user, token, openAuthModal } = useAuth();
   const [post, setPost] = useState<FeedPost | null>(null);
   const [comments, setComments] = useState<FeedComment[]>([]);
@@ -37,6 +39,18 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
   const commentsRef = useRef<HTMLDivElement | null>(null);
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const pathSegments = pathname?.split("/").filter(Boolean) ?? [];
+  const pathPostId =
+    pathSegments[pathSegments.length - 2] === "posts"
+      ? pathSegments[pathSegments.length - 1]
+      : "";
+
+  const resolvedPostId =
+    postId ??
+    (Array.isArray(params?.postId) ? params.postId[0] : params?.postId) ??
+    pathPostId ??
+    "";
+
   useEffect(() => {
     let isActive = true;
 
@@ -46,16 +60,19 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
       setPost(null);
       setComments([]);
 
-      if (!postId) {
+      if (!resolvedPostId) {
         setError("This post link is missing an ID.");
         setIsLoading(false);
         return;
       }
       try {
         const [postResponse, commentResponse] = await Promise.all([
-          apiGet<{ post: FeedPost }>(`/feed/${postId}`, token ?? undefined),
+          apiGet<{ post: FeedPost }>(
+            `/feed/${resolvedPostId}`,
+            token ?? undefined
+          ),
           apiGet<{ comments: FeedComment[] }>(
-            `/feed/${postId}/comments`,
+            `/feed/${resolvedPostId}/comments`,
             token ?? undefined
           ),
         ]);
@@ -87,7 +104,7 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
     return () => {
       isActive = false;
     };
-  }, [postId, token]);
+  }, [resolvedPostId, token]);
 
   const handleDeletePost = async (_post?: FeedPost) => {
     if (!post) {
@@ -179,6 +196,11 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
     event.preventDefault();
     setCommentError(null);
 
+    if (!resolvedPostId) {
+      setCommentError("This post link is missing an ID.");
+      return;
+    }
+
     if (!token) {
       openAuthModal();
       return;
@@ -194,7 +216,7 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
 
     try {
       const response = await apiPost<{ comment: FeedComment }>(
-        `/feed/${postId}/comments`,
+        `/feed/${resolvedPostId}/comments`,
         { content: trimmed },
         token
       );
