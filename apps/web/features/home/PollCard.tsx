@@ -111,16 +111,14 @@ export const PollCard = ({
         </button>
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-semibold text-ink">{post.author.name}</p>
+            <p className="text-sm font-semibold text-ink">{post.author.handle}</p>
             {collegeLabel && (
               <span className="text-xs font-semibold text-muted">
                 {collegeLabel}
               </span>
             )}
           </div>
-          <p className="text-xs text-muted">
-            {post.author.handle} · {formatRelativeTime(post.createdAt)}
-          </p>
+          <p className="text-xs text-muted">{formatRelativeTime(post.createdAt)}</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
           {isOwnPost && onEdit && (
