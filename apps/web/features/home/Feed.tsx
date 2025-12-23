@@ -259,9 +259,9 @@ export const Feed = () => {
             type="button"
             onClick={openCreateComposer}
             aria-label="Create post"
-            className="inline-flex h-7 items-center justify-center rounded-full border border-card-border/70 bg-white/80 px-3 text-base font-semibold leading-none text-ink/80 transition hover:border-accent/50 hover:bg-accent/15 hover:text-accent"
+            className="inline-flex h-7 items-center justify-center rounded-full border border-card-border/70 bg-white/80 px-3 text-lg font-semibold leading-none text-ink/80 transition hover:border-accent/50 hover:bg-accent/15 hover:text-accent"
           >
-            +
+            <span className="relative top-[1px]">+</span>
           </button>
         </div>
       </div>
