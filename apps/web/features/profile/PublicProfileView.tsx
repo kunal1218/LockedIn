@@ -339,7 +339,7 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
   useEffect(() => {
     const layout = profile?.layout;
     const merged =
-      layout?.positions && layout.mode === layoutMode
+      layout?.positions
         ? { ...defaultPositions, ...layout.positions }
         : defaultPositions;
     setPositions(merged);

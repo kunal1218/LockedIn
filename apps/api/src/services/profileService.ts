@@ -65,10 +65,16 @@ export const fetchPublicProfileByHandle = async (
   }
 
   const row = result.rows[0] as PublicProfileUserRow;
-  const [answers, layout] = await Promise.all([
+  const requestedMode = mode ?? "default";
+  const fallbackMode = requestedMode === "compact" ? "default" : "compact";
+
+  const [answers, primaryLayout, fallbackLayout] = await Promise.all([
     getProfileAnswers(row.id),
-    fetchProfileLayout({ userId: row.id, mode }),
+    fetchProfileLayout({ userId: row.id, mode: requestedMode }),
+    fetchProfileLayout({ userId: row.id, mode: fallbackMode }),
   ]);
+
+  const layout = primaryLayout ?? fallbackLayout;
 
   return {
     user: {
