@@ -34,7 +34,7 @@ export class AuthError extends Error {
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 
-const ensureUsersTable = async () => {
+export const ensureUsersTable = async () => {
   await db.query(`
     CREATE TABLE IF NOT EXISTS users (
       id uuid PRIMARY KEY,

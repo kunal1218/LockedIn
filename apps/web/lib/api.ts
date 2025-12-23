@@ -36,6 +36,10 @@ const apiRequest = async <T>(
     throw new Error(message);
   }
 
+  if (response.status === 204) {
+    return {} as T;
+  }
+
   return response.json() as Promise<T>;
 };
 
@@ -47,3 +51,12 @@ export const apiPost = async <T>(
   body: unknown,
   token?: string
 ): Promise<T> => apiRequest<T>(path, { method: "POST", body, token });
+
+export const apiPatch = async <T>(
+  path: string,
+  body: unknown,
+  token?: string
+): Promise<T> => apiRequest<T>(path, { method: "PATCH", body, token });
+
+export const apiDelete = async <T>(path: string, token?: string): Promise<T> =>
+  apiRequest<T>(path, { method: "DELETE", token });

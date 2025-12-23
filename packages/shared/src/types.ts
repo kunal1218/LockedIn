@@ -24,6 +24,16 @@ export type FeedPost = {
   createdAt: string;
   tags?: string[];
   pollOptions?: PollOption[];
+  likeCount: number;
+  likedByUser?: boolean;
+};
+
+export type FeedComment = {
+  id: string;
+  postId: string;
+  author: User;
+  content: string;
+  createdAt: string;
 };
 
 export type DailyChallenge = {

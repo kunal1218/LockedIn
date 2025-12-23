@@ -17,7 +17,10 @@ export const getPool = () => {
 };
 
 export const db = {
-  query: async (text: string, params?: Array<string | number>) => {
+  query: async (
+    text: string,
+    params?: Array<string | number | string[] | number[] | null>
+  ) => {
     const activePool = getPool();
     if (!activePool) {
       throw new Error("DATABASE_URL is not configured");

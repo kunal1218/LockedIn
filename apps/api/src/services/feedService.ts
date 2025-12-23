@@ -1,5 +1,504 @@
-import { feedPosts } from "./mockData";
+import { randomUUID } from "crypto";
+import type {
+  FeedComment,
+  FeedPost,
+  FeedPostType,
+  PollOption,
+} from "@lockedin/shared";
+import { db } from "../db";
+import { ensureUsersTable } from "./authService";
 
-export const fetchFeed = async () => {
-  return feedPosts;
+type FeedSort = "fresh" | "top";
+
+type FeedPostRow = {
+  id: string;
+  author_id: string;
+  author_name: string;
+  author_handle: string;
+  type: FeedPostType;
+  content: string;
+  created_at: string | Date;
+  tags: string[] | null;
+  like_count: number | string;
+  liked_by_user?: boolean;
+};
+
+type PollOptionRow = {
+  id: string;
+  post_id: string;
+  label: string;
+  votes: number | string;
+  position: number;
+};
+
+type CommentRow = {
+  id: string;
+  post_id: string;
+  author_id: string;
+  author_name: string;
+  author_handle: string;
+  content: string;
+  created_at: string | Date;
+};
+
+export class FeedError extends Error {
+  status: number;
+
+  constructor(message: string, status = 400) {
+    super(message);
+    this.status = status;
+  }
+}
+
+const ensureFeedTables = async () => {
+  await ensureUsersTable();
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS feed_posts (
+      id uuid PRIMARY KEY,
+      author_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type text NOT NULL,
+      content text NOT NULL,
+      tags text[] NOT NULL DEFAULT ARRAY[]::text[],
+      like_count integer NOT NULL DEFAULT 0,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS feed_poll_options (
+      id uuid PRIMARY KEY,
+      post_id uuid NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
+      label text NOT NULL,
+      votes integer NOT NULL DEFAULT 0,
+      position integer NOT NULL
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS feed_post_likes (
+      post_id uuid NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (post_id, user_id)
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS feed_comments (
+      id uuid PRIMARY KEY,
+      post_id uuid NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
+      author_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      content text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS feed_posts_created_at_idx
+      ON feed_posts (created_at DESC);
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS feed_posts_like_count_idx
+      ON feed_posts (like_count DESC);
+  `);
+};
+
+const normalizeTags = (tags: string[]) => {
+  const cleaned = tags
+    .map((tag) => tag.trim().replace(/^#/, "").toLowerCase())
+    .filter(Boolean);
+
+  return Array.from(new Set(cleaned)).slice(0, 10);
+};
+
+const toIsoString = (value: string | Date) =>
+  value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+
+const mapPollOptions = (rows: PollOptionRow[]): Map<string, PollOption[]> => {
+  const map = new Map<string, PollOption[]>();
+  rows.forEach((row) => {
+    const list = map.get(row.post_id) ?? [];
+    list.push({
+      id: row.id,
+      label: row.label,
+      votes: Number(row.votes ?? 0),
+    });
+    map.set(row.post_id, list);
+  });
+  return map;
+};
+
+const mapPost = (
+  row: FeedPostRow,
+  pollOptionsByPostId: Map<string, PollOption[]>
+): FeedPost => ({
+  id: row.id,
+  author: {
+    id: row.author_id,
+    name: row.author_name,
+    handle: row.author_handle,
+  },
+  type: row.type,
+  content: row.content,
+  createdAt: toIsoString(row.created_at),
+  tags: row.tags && row.tags.length > 0 ? row.tags : undefined,
+  pollOptions: pollOptionsByPostId.get(row.id),
+  likeCount: Number(row.like_count ?? 0),
+  likedByUser: Boolean(row.liked_by_user),
+});
+
+const mapComment = (row: CommentRow): FeedComment => ({
+  id: row.id,
+  postId: row.post_id,
+  author: {
+    id: row.author_id,
+    name: row.author_name,
+    handle: row.author_handle,
+  },
+  content: row.content,
+  createdAt: toIsoString(row.created_at),
+});
+
+const fetchPollOptionsForPosts = async (postIds: string[]) => {
+  if (postIds.length === 0) {
+    return new Map<string, PollOption[]>();
+  }
+
+  const result = await db.query(
+    `SELECT id, post_id, label, votes, position
+     FROM feed_poll_options
+     WHERE post_id = ANY($1::uuid[])
+     ORDER BY post_id, position`,
+    [postIds]
+  );
+
+  return mapPollOptions(result.rows as PollOptionRow[]);
+};
+
+const insertPollOptions = async (postId: string, options: string[]) => {
+  if (options.length === 0) {
+    return;
+  }
+
+  const values: string[] = [];
+  const params: Array<string | number> = [];
+
+  options.forEach((label, index) => {
+    const id = randomUUID();
+    const position = index;
+    params.push(id, postId, label, position);
+    const start = params.length - 3;
+    values.push(
+      `($${start}, $${start + 1}, $${start + 2}, $${start + 3})`
+    );
+  });
+
+  await db.query(
+    `INSERT INTO feed_poll_options (id, post_id, label, position)
+     VALUES ${values.join(", ")}`,
+    params
+  );
+};
+
+export const fetchFeed = async (params: {
+  sort?: FeedSort;
+  viewerId?: string | null;
+} = {}): Promise<FeedPost[]> => {
+  await ensureFeedTables();
+
+  const sort = params.sort ?? "fresh";
+  const orderBy =
+    sort === "top"
+      ? "posts.like_count DESC, posts.created_at DESC"
+      : "posts.created_at DESC";
+
+  const result = await db.query(
+    `SELECT posts.id,
+            posts.author_id,
+            posts.type,
+            posts.content,
+            posts.created_at,
+            posts.tags,
+            posts.like_count,
+            users.name AS author_name,
+            users.handle AS author_handle,
+            (likes.user_id IS NOT NULL) AS liked_by_user
+     FROM feed_posts posts
+     JOIN users ON users.id = posts.author_id
+     LEFT JOIN feed_post_likes likes
+       ON likes.post_id = posts.id AND likes.user_id = $1
+     ORDER BY ${orderBy}`,
+    [params.viewerId ?? null]
+  );
+
+  const rows = result.rows as FeedPostRow[];
+  const pollIds = rows.filter((row) => row.type === "poll").map((row) => row.id);
+  const pollOptionsByPostId = await fetchPollOptionsForPosts(pollIds);
+
+  return rows.map((row) => mapPost(row, pollOptionsByPostId));
+};
+
+export const fetchPostById = async (
+  postId: string,
+  viewerId?: string | null
+): Promise<FeedPost | null> => {
+  await ensureFeedTables();
+
+  const result = await db.query(
+    `SELECT posts.id,
+            posts.author_id,
+            posts.type,
+            posts.content,
+            posts.created_at,
+            posts.tags,
+            posts.like_count,
+            users.name AS author_name,
+            users.handle AS author_handle,
+            (likes.user_id IS NOT NULL) AS liked_by_user
+     FROM feed_posts posts
+     JOIN users ON users.id = posts.author_id
+     LEFT JOIN feed_post_likes likes
+       ON likes.post_id = posts.id AND likes.user_id = $2
+     WHERE posts.id = $1`,
+    [postId, viewerId ?? null]
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    return null;
+  }
+
+  const row = result.rows[0] as FeedPostRow;
+  const pollOptionsByPostId = await fetchPollOptionsForPosts([postId]);
+
+  return mapPost(row, pollOptionsByPostId);
+};
+
+export const createPost = async (params: {
+  userId: string;
+  type: FeedPostType;
+  content: string;
+  tags?: string[];
+  pollOptions?: string[];
+}): Promise<FeedPost> => {
+  await ensureFeedTables();
+
+  const postId = randomUUID();
+  const tags = normalizeTags(params.tags ?? []);
+
+  if (params.type === "poll" && (params.pollOptions ?? []).length < 2) {
+    throw new FeedError("Polls need at least two options", 400);
+  }
+
+  await db.query(
+    `INSERT INTO feed_posts (id, author_id, type, content, tags)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [postId, params.userId, params.type, params.content, tags]
+  );
+
+  if (params.type === "poll") {
+    await insertPollOptions(postId, params.pollOptions ?? []);
+  }
+
+  const post = await fetchPostById(postId, params.userId);
+  if (!post) {
+    throw new FeedError("Unable to create post", 500);
+  }
+
+  return post;
+};
+
+export const updatePost = async (params: {
+  userId: string;
+  postId: string;
+  content: string;
+  tags?: string[];
+  pollOptions?: string[];
+}): Promise<FeedPost> => {
+  await ensureFeedTables();
+
+  const current = await db.query(
+    "SELECT author_id, type, tags FROM feed_posts WHERE id = $1",
+    [params.postId]
+  );
+
+  if ((current.rowCount ?? 0) === 0) {
+    throw new FeedError("Post not found", 404);
+  }
+
+  const {
+    author_id: authorId,
+    type,
+    tags: existingTags,
+  } = current.rows[0] as {
+    author_id: string;
+    type: FeedPostType;
+    tags: string[] | null;
+  };
+
+  if (authorId !== params.userId) {
+    throw new FeedError("You can only edit your own posts", 403);
+  }
+
+  const tags = normalizeTags(
+    params.tags ?? (existingTags ?? [])
+  );
+
+  await db.query(
+    `UPDATE feed_posts
+     SET content = $2,
+         tags = $3,
+         updated_at = now()
+     WHERE id = $1`,
+    [params.postId, params.content, tags]
+  );
+
+  if (type === "poll" && params.pollOptions) {
+    if (params.pollOptions.length < 2) {
+      throw new FeedError("Polls need at least two options", 400);
+    }
+
+    await db.query("DELETE FROM feed_poll_options WHERE post_id = $1", [
+      params.postId,
+    ]);
+    await insertPollOptions(params.postId, params.pollOptions);
+  }
+
+  const post = await fetchPostById(params.postId, params.userId);
+  if (!post) {
+    throw new FeedError("Post not found", 404);
+  }
+
+  return post;
+};
+
+export const deletePost = async (params: { userId: string; postId: string }) => {
+  await ensureFeedTables();
+
+  const current = await db.query(
+    "SELECT author_id FROM feed_posts WHERE id = $1",
+    [params.postId]
+  );
+
+  if ((current.rowCount ?? 0) === 0) {
+    throw new FeedError("Post not found", 404);
+  }
+
+  const { author_id: authorId } = current.rows[0] as { author_id: string };
+  if (authorId !== params.userId) {
+    throw new FeedError("You can only delete your own posts", 403);
+  }
+
+  await db.query("DELETE FROM feed_posts WHERE id = $1", [params.postId]);
+};
+
+export const toggleLike = async (params: {
+  userId: string;
+  postId: string;
+}): Promise<{ likeCount: number; liked: boolean }> => {
+  await ensureFeedTables();
+
+  const postExists = await db.query("SELECT 1 FROM feed_posts WHERE id = $1", [
+    params.postId,
+  ]);
+  if ((postExists.rowCount ?? 0) === 0) {
+    throw new FeedError("Post not found", 404);
+  }
+
+  const existing = await db.query(
+    "SELECT 1 FROM feed_post_likes WHERE post_id = $1 AND user_id = $2",
+    [params.postId, params.userId]
+  );
+
+  if ((existing.rowCount ?? 0) > 0) {
+    await db.query(
+      "DELETE FROM feed_post_likes WHERE post_id = $1 AND user_id = $2",
+      [params.postId, params.userId]
+    );
+    const updated = await db.query(
+      "UPDATE feed_posts SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1 RETURNING like_count",
+      [params.postId]
+    );
+    return {
+      likeCount: Number(updated.rows[0]?.like_count ?? 0),
+      liked: false,
+    };
+  }
+
+  await db.query(
+    "INSERT INTO feed_post_likes (post_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    [params.postId, params.userId]
+  );
+  const updated = await db.query(
+    "UPDATE feed_posts SET like_count = like_count + 1 WHERE id = $1 RETURNING like_count",
+    [params.postId]
+  );
+  return {
+    likeCount: Number(updated.rows[0]?.like_count ?? 0),
+    liked: true,
+  };
+};
+
+export const fetchComments = async (postId: string): Promise<FeedComment[]> => {
+  await ensureFeedTables();
+
+  const result = await db.query(
+    `SELECT comments.id,
+            comments.post_id,
+            comments.author_id,
+            comments.content,
+            comments.created_at,
+            users.name AS author_name,
+            users.handle AS author_handle
+     FROM feed_comments comments
+     JOIN users ON users.id = comments.author_id
+     WHERE comments.post_id = $1
+     ORDER BY comments.created_at ASC`,
+    [postId]
+  );
+
+  return (result.rows as CommentRow[]).map(mapComment);
+};
+
+export const addComment = async (params: {
+  userId: string;
+  postId: string;
+  content: string;
+}): Promise<FeedComment> => {
+  await ensureFeedTables();
+
+  const postExists = await db.query("SELECT 1 FROM feed_posts WHERE id = $1", [
+    params.postId,
+  ]);
+  if ((postExists.rowCount ?? 0) === 0) {
+    throw new FeedError("Post not found", 404);
+  }
+
+  const commentId = randomUUID();
+  await db.query(
+    `INSERT INTO feed_comments (id, post_id, author_id, content)
+     VALUES ($1, $2, $3, $4)`,
+    [commentId, params.postId, params.userId, params.content]
+  );
+
+  const result = await db.query(
+    `SELECT comments.id,
+            comments.post_id,
+            comments.author_id,
+            comments.content,
+            comments.created_at,
+            users.name AS author_name,
+            users.handle AS author_handle
+     FROM feed_comments comments
+     JOIN users ON users.id = comments.author_id
+     WHERE comments.id = $1`,
+    [commentId]
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new FeedError("Unable to save comment", 500);
+  }
+
+  return mapComment(result.rows[0] as CommentRow);
 };

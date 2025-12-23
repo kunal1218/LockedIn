@@ -45,6 +45,7 @@ export const feedPosts: FeedPost[] = [
       "Looking for a cofounder to build a campus hangout radar. We ship fast, we eat snacks, we actually finish things.",
     createdAt: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
     tags: ["build", "cofounder", "web"],
+    likeCount: 12,
   },
   {
     id: "post-2",
@@ -53,6 +54,7 @@ export const feedPosts: FeedPost[] = [
     content: "Best spontaneous hangout?",
     createdAt: new Date(Date.now() - 1000 * 60 * 40).toISOString(),
     tags: ["chaos", "social"],
+    likeCount: 22,
     pollOptions: [
       { id: "opt-1", label: "Late-night diner run", votes: 18 },
       { id: "opt-2", label: "Grass field picnic", votes: 26 },
@@ -66,6 +68,7 @@ export const feedPosts: FeedPost[] = [
     content: "Need a gym buddy for 6am tomorrow. I bribe with coffee.",
     createdAt: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
     tags: ["fitness", "accountability"],
+    likeCount: 8,
   },
   {
     id: "post-4",
@@ -75,6 +78,7 @@ export const feedPosts: FeedPost[] = [
       "We just shipped a roommate swap spreadsheet. It is chaotic but it works. Anyone wanna help make it pretty?",
     createdAt: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
     tags: ["project", "help"],
+    likeCount: 17,
   },
 ];
 
