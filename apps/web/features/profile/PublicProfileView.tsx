@@ -226,13 +226,16 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
   }, []);
 
   useEffect(() => {
+    if (!containerRef.current) {
+      return;
+    }
+
     updateGridUnit();
     const observer = new ResizeObserver(() => updateGridUnit());
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
+    observer.observe(containerRef.current);
+
     return () => observer.disconnect();
-  }, [updateGridUnit]);
+  }, [profile?.user?.id, updateGridUnit]);
 
   const getBlockWidth = useCallback(
     (block: BlockTemplate) => {
