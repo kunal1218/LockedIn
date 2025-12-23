@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -78,9 +79,13 @@ const persistAuth = (payload: AuthPayload | null) => {
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [auth, setAuth] = useState<AuthPayload | null>(() => readStoredAuth());
+  const [auth, setAuth] = useState<AuthPayload | null>(null);
   const [isAuthModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<AuthModalMode>("signup");
+
+  useEffect(() => {
+    setAuth(readStoredAuth());
+  }, []);
 
   const updateAuth = useCallback((payload: AuthPayload | null) => {
     setAuth(payload);
