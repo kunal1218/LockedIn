@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import type { FeedPost } from "@lockedin/shared";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
 import { useAuth } from "@/features/auth";
@@ -240,17 +239,24 @@ export const Feed = () => {
               ))}
             </div>
           </Card>
-          <Button className="w-full sm:w-auto" onClick={openCreateComposer}>
-            Create post
-          </Button>
         </div>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {filterTags.map((tag) => (
-          <Tag key={tag} tone={tag === "All" ? "accent" : "default"}>
-            {tag}
-          </Tag>
-        ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap gap-2">
+          {filterTags.map((tag) => (
+            <Tag key={tag} tone={tag === "All" ? "accent" : "default"}>
+              {tag}
+            </Tag>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={openCreateComposer}
+          aria-label="Create post"
+          className="ml-auto inline-flex items-center rounded-full bg-card-border/40 px-3 py-1 text-xs font-semibold text-ink/80 transition hover:bg-accent/15 hover:text-accent"
+        >
+          +
+        </button>
       </div>
       {error && (
         <Card className="border border-accent/30 bg-accent/10 py-4">
