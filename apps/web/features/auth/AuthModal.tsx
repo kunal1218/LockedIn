@@ -135,7 +135,7 @@ export const AuthModal = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 py-8">
       <div
         className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
         onClick={closeAuthModal}

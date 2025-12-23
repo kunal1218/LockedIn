@@ -82,13 +82,13 @@ export const ProfileQuestionnaireModal = ({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 py-[8vh]">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center px-4 py-[10vh]">
       <div
         className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
         aria-hidden="true"
       />
       <div
-        className="relative z-10 w-full max-w-2xl max-h-[84vh] overflow-y-auto rounded-[28px] border border-card-border/70 bg-white/95 shadow-[0_32px_80px_rgba(27,26,23,0.18)]"
+        className="relative z-10 w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-[28px] border border-card-border/70 bg-white/95 shadow-[0_32px_80px_rgba(27,26,23,0.18)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="profile-questions-title"

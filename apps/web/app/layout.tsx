@@ -33,7 +33,7 @@ export default function RootLayout({
           <div className="relative min-h-screen overflow-hidden">
             <BackgroundDecor />
             <SiteHeader />
-            <main className="relative z-10 isolate">{children}</main>
+            <main className="relative z-0">{children}</main>
           </div>
           <AuthModal />
         </AuthProvider>
