@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import adminRoutes from "./adminRoutes";
 import challengeRoutes from "./challengeRoutes";
 import chatRoutes from "./chatRoutes";
 import authRoutes from "./authRoutes";
@@ -14,6 +15,7 @@ export const registerRoutes = (app: Express) => {
   });
 
   app.use("/auth", authRoutes);
+  app.use("/admin", adminRoutes);
   app.use("/challenge", challengeRoutes);
   app.use("/chat", chatRoutes);
   app.use("/events", eventsRoutes);

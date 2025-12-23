@@ -2,11 +2,8 @@ import type { Request, Response } from "express";
 import { AuthError, getUserFromToken } from "../services/authService";
 import {
   ChallengeAttemptError,
-  createChallengeAttempt,
+  fetchChallengeAttempts,
 } from "../services/challengeAttemptService";
-import { fetchDailyChallenge } from "../services/challengeService";
-
-const asString = (value: unknown) => (typeof value === "string" ? value : "");
 
 const getToken = (req: Request) => {
   const header = req.header("authorization");
@@ -36,35 +33,29 @@ const requireUser = async (req: Request) => {
   return user;
 };
 
+const requireAdmin = async (req: Request) => {
+  const user = await requireUser(req);
+  if (!user.isAdmin) {
+    throw new AuthError("Admin access required", 403);
+  }
+  return user;
+};
+
 const handleError = (res: Response, error: unknown) => {
   if (error instanceof AuthError || error instanceof ChallengeAttemptError) {
     res.status(error.status).json({ error: error.message });
     return;
   }
 
-  console.error("Challenge error:", error);
-  res.status(500).json({ error: "Unable to process challenge attempt" });
+  console.error("Admin error:", error);
+  res.status(500).json({ error: "Unable to load admin dashboard" });
 };
 
-export const getDailyChallenge = async (_req: Request, res: Response) => {
-  const challenge = await fetchDailyChallenge();
-  res.json(challenge);
-};
-
-export const postChallengeAttempt = async (req: Request, res: Response) => {
+export const getChallengeAttemptsAdmin = async (req: Request, res: Response) => {
   try {
-    const user = await requireUser(req);
-    const challenge = await fetchDailyChallenge();
-    const imageData = asString(req.body?.imageData);
-
-    const attempt = await createChallengeAttempt({
-      userId: user.id,
-      challengeId: challenge.id,
-      challengeTitle: challenge.title,
-      imageData,
-    });
-
-    res.status(201).json(attempt);
+    await requireAdmin(req);
+    const submissions = await fetchChallengeAttempts();
+    res.json({ submissions });
   } catch (error) {
     handleError(res, error);
   }

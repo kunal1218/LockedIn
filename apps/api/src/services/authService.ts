@@ -20,6 +20,7 @@ export type AuthUser = {
   email: string;
   collegeName?: string | null;
   collegeDomain?: string | null;
+  isAdmin?: boolean;
 };
 
 export type AuthPayload = {
@@ -38,6 +39,24 @@ export class AuthError extends Error {
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 let didBackfillHandles = false;
+let cachedAdminEmails: Set<string> | null = null;
+
+const getAdminEmails = () => {
+  if (cachedAdminEmails) {
+    return cachedAdminEmails;
+  }
+
+  const raw = process.env.LOCKEDIN_ADMIN_EMAILS ?? "";
+  const emails = raw
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  cachedAdminEmails = new Set(emails);
+  return cachedAdminEmails;
+};
+
+const isAdminEmail = (email: string) =>
+  getAdminEmails().has(email.trim().toLowerCase());
 
 export const ensureUsersTable = async () => {
   await db.query(`
@@ -147,6 +166,7 @@ const mapUser = (
   email: row.email,
   collegeName: row.college_name ?? null,
   collegeDomain: row.college_domain ?? null,
+  isAdmin: isAdminEmail(row.email),
 });
 
 const handleExists = async (handle: string) => {

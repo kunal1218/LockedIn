@@ -7,7 +7,7 @@ import { useAuth } from "@/features/auth";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "./Button";
 
-const navItems = [
+const baseNavItems = [
   { href: "/", label: "Home" },
   { href: "/friends", label: "Friends" },
   { href: "/map", label: "Map" },
@@ -18,6 +18,9 @@ export const SiteHeader = () => {
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
   const profileName = user?.name ?? "Profile";
+  const navItems = user?.isAdmin
+    ? [...baseNavItems, { href: "/admin", label: "Admin" }]
+    : baseNavItems;
 
   const handleNavClick =
     (href: string) => (event: MouseEvent<HTMLAnchorElement>) => {

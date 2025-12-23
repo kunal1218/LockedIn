@@ -19,6 +19,7 @@ export type AuthUser = {
   email: string;
   collegeName?: string | null;
   collegeDomain?: string | null;
+  isAdmin?: boolean;
 };
 
 type AuthPayload = {
@@ -102,11 +103,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (collegeSyncTokenRef.current === auth.token) {
-      return;
-    }
-
-    if (auth.user.collegeName && auth.user.collegeDomain) {
-      collegeSyncTokenRef.current = auth.token;
       return;
     }
 
