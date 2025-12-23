@@ -6,7 +6,7 @@ import type {
   PollOption,
 } from "@lockedin/shared";
 import { db } from "../db";
-import { ensureUsersTable } from "./authService";
+import { deriveCollegeFromEmail, ensureUsersTable } from "./authService";
 
 type FeedSort = "fresh" | "top";
 
@@ -304,6 +304,27 @@ export const createPost = async (params: {
   pollOptions?: string[];
 }): Promise<FeedPost> => {
   await ensureFeedTables();
+
+  const authorResult = await db.query(
+    "SELECT email, college_name, college_domain FROM users WHERE id = $1",
+    [params.userId]
+  );
+  const authorRow = authorResult.rows[0] as
+    | { email: string; college_name?: string | null; college_domain?: string | null }
+    | undefined;
+
+  if (
+    authorRow &&
+    (!authorRow.college_name || !authorRow.college_domain)
+  ) {
+    const college = deriveCollegeFromEmail(authorRow.email);
+    if (college) {
+      await db.query(
+        "UPDATE users SET college_name = $2, college_domain = $3 WHERE id = $1",
+        [params.userId, college.name, college.domain]
+      );
+    }
+  }
 
   const postId = randomUUID();
   const tags = normalizeTags(params.tags ?? []);

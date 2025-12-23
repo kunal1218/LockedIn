@@ -66,13 +66,6 @@ export const ensureUsersTable = async () => {
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
-const secondaryEducationTlds = new Set([
-  "ac.uk",
-  "edu.au",
-  "edu.in",
-  "edu.ca",
-]);
-
 const toCollegeName = (slug: string) => {
   const cleaned = slug.replace(/[-_]+/g, " ").trim();
   if (!cleaned) {
@@ -90,7 +83,7 @@ const toCollegeName = (slug: string) => {
     .join(" ");
 };
 
-const deriveCollegeFromEmail = (email: string) => {
+export const deriveCollegeFromEmail = (email: string) => {
   const domain = email.split("@")[1]?.toLowerCase() ?? "";
   const parts = domain.split(".").filter(Boolean);
   if (parts.length < 2) {
@@ -98,14 +91,17 @@ const deriveCollegeFromEmail = (email: string) => {
   }
 
   const tld = parts[parts.length - 1];
-  const lastTwo = parts.slice(-2).join(".");
+  const secondLevel = parts[parts.length - 2];
   let collegeDomain = "";
   let slug = "";
 
   if (tld === "edu" && parts.length >= 2) {
     slug = parts[parts.length - 2];
     collegeDomain = parts.slice(-2).join(".");
-  } else if (secondaryEducationTlds.has(lastTwo) && parts.length >= 3) {
+  } else if (secondLevel === "edu" && tld.length === 2 && parts.length >= 3) {
+    slug = parts[parts.length - 3];
+    collegeDomain = parts.slice(-3).join(".");
+  } else if (secondLevel === "ac" && tld.length === 2 && parts.length >= 3) {
     slug = parts[parts.length - 3];
     collegeDomain = parts.slice(-3).join(".");
   } else {
@@ -268,7 +264,7 @@ export const signInUser = async (params: {
     throw new AuthError("Invalid email or password", 401);
   }
 
-  if (!row.college_domain) {
+  if (!row.college_domain || !row.college_name) {
     const college = deriveCollegeFromEmail(row.email);
     if (college) {
       const refreshed = await db.query(
@@ -316,7 +312,7 @@ export const getUserFromToken = async (
     return null;
   }
 
-  if (!row.college_domain) {
+  if (!row.college_domain || !row.college_name) {
     const college = deriveCollegeFromEmail(row.email);
     if (college) {
       const refreshed = await db.query(

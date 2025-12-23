@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
@@ -84,6 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [auth, setAuth] = useState<AuthPayload | null>(null);
   const [isAuthModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<AuthModalMode>("signup");
+  const collegeSyncTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     setAuth(readStoredAuth());
@@ -94,14 +96,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    if (
-      auth.user.collegeName !== undefined ||
-      auth.user.collegeDomain !== undefined
-    ) {
+    if (collegeSyncTokenRef.current === auth.token) {
+      return;
+    }
+
+    if (auth.user.collegeName && auth.user.collegeDomain) {
+      collegeSyncTokenRef.current = auth.token;
       return;
     }
 
     let isActive = true;
+    collegeSyncTokenRef.current = auth.token;
 
     apiGet<{ user: AuthUser }>("/auth/me", auth.token)
       .then((payload) => {
