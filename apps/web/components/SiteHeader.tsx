@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "./Button";
 
 const navItems = [
@@ -9,10 +12,25 @@ const navItems = [
 ];
 
 export const SiteHeader = () => {
+  const router = useRouter();
+
+  const handleNavClick =
+    (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
+      event.preventDefault();
+      router.push(href);
+      if (typeof window !== "undefined") {
+        window.setTimeout(() => {
+          if (window.location.pathname !== href) {
+            window.location.assign(href);
+          }
+        }, 50);
+      }
+    };
+
   return (
     <header className="relative z-[70] pointer-events-auto">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-6">
-        <Link href="/" className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3" onClick={handleNavClick("/")}>
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent/20 text-lg font-bold text-accent">
             L
           </span>
@@ -27,6 +45,7 @@ export const SiteHeader = () => {
               key={item.href}
               href={item.href}
               className="transition hover:text-ink"
+              onClick={handleNavClick(item.href)}
             >
               {item.label}
             </Link>
