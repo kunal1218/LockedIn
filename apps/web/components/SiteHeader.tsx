@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/features/auth";
 import { Button } from "./Button";
 
 const navItems = [
@@ -13,6 +14,7 @@ const navItems = [
 
 export const SiteHeader = () => {
   const router = useRouter();
+  const { isAuthenticated } = useAuth();
 
   const handleNavClick =
     (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
@@ -52,16 +54,11 @@ export const SiteHeader = () => {
           ))}
         </nav>
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            className="hidden sm:inline-flex"
-            authMode="login"
-          >
-            Drop a post
-          </Button>
-          <Button className="pulse-soft" authMode="signup">
-            Join today
-          </Button>
+          {!isAuthenticated && (
+            <Button className="pulse-soft" authMode="signup">
+              Join today
+            </Button>
+          )}
         </div>
       </div>
     </header>
