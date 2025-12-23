@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
+import { useAuth } from "@/features/auth";
+import { deriveCollegeFromDomain, deriveCollegeFromEmail } from "@/lib/college";
 import { formatRelativeTime } from "@/lib/time";
 
 const getMaxVotes = (post: FeedPost) => {
@@ -32,14 +34,26 @@ export const PollCard = ({
   onLike,
   isLiking,
 }: PollCardProps) => {
+  const { user } = useAuth();
   const router = useRouter();
   const maxVotes = getMaxVotes(post) || 1;
   const isClickable = Boolean(onOpen);
   const likeCount = post.likeCount ?? 0;
-  const collegeName = post.author.collegeName;
+  const fallbackCollege =
+    user?.id === post.author.id && user.email
+      ? deriveCollegeFromEmail(user.email)
+      : null;
+  const collegeLabel =
+    post.author.collegeName ??
+    deriveCollegeFromDomain(post.author.collegeDomain ?? "") ??
+    fallbackCollege;
   const profileSlug = post.author.handle.replace(/^@/, "");
 
-  const handleCardClick = () => {
+  const handleCardClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("[data-profile-link]")) {
+      return;
+    }
     onOpen?.(post);
   };
 
@@ -62,6 +76,11 @@ export const PollCard = ({
 
   const handleProfileClick = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
+    if (user?.id === post.author.id) {
+      router.push("/profile");
+      return;
+    }
+
     if (!profileSlug) {
       return;
     }
@@ -86,15 +105,16 @@ export const PollCard = ({
           onClick={handleProfileClick}
           className="rounded-full"
           aria-label={`View ${post.author.handle} profile`}
+          data-profile-link
         >
           <Avatar name={post.author.name} />
         </button>
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-semibold text-ink">{post.author.name}</p>
-            {collegeName && (
+            {collegeLabel && (
               <Tag tone="mint" className="px-2 py-0 text-[10px]">
-                {collegeName}
+                {collegeLabel}
               </Tag>
             )}
           </div>

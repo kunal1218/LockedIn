@@ -5,6 +5,7 @@ import { Avatar } from "@/components/Avatar";
 import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
 import { apiGet } from "@/lib/api";
+import { deriveCollegeFromDomain } from "@/lib/college";
 import { ProfileQuestionCard } from "./ProfileQuestionCard";
 
 type MadlibAnswers = {
@@ -122,6 +123,9 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
   }
 
   const { user, answers } = profile;
+  const collegeLabel =
+    user.collegeName ??
+    deriveCollegeFromDomain(user.collegeDomain ?? "");
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 pb-16 pt-2">
@@ -135,9 +139,9 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
               <p className="font-display text-2xl font-semibold text-ink">
                 {user.name}
               </p>
-              {user.collegeName && (
+              {collegeLabel && (
                 <Tag tone="mint" className="px-2 py-0 text-[10px]">
-                  {user.collegeName}
+                  {collegeLabel}
                 </Tag>
               )}
             </div>

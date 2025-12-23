@@ -5,6 +5,7 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
 import { useAuth } from "@/features/auth";
+import { deriveCollegeFromEmail } from "@/lib/college";
 import { profile } from "./mock";
 
 type MovementMode = "relative" | "absolute";
@@ -34,7 +35,8 @@ export const ProfileHeader = ({
   const { user } = useAuth();
   const displayName = user?.name ?? profile.name;
   const displayHandle = user?.handle ?? profile.handle;
-  const displayCollege = user?.collegeName ?? null;
+  const displayCollege =
+    user?.collegeName ?? (user?.email ? deriveCollegeFromEmail(user.email) : null);
 
   return (
     <Card className="relative overflow-hidden">

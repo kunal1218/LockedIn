@@ -87,6 +87,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [authModalMode, setAuthModalMode] = useState<AuthModalMode>("signup");
   const collegeSyncTokenRef = useRef<string | null>(null);
 
+  const updateAuth = useCallback((payload: AuthPayload | null) => {
+    setAuth(payload);
+    persistAuth(payload);
+  }, []);
+
   useEffect(() => {
     setAuth(readStoredAuth());
   }, []);
@@ -123,11 +128,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isActive = false;
     };
   }, [auth, updateAuth]);
-
-  const updateAuth = useCallback((payload: AuthPayload | null) => {
-    setAuth(payload);
-    persistAuth(payload);
-  }, []);
 
   const openAuthModal = useCallback((mode?: AuthModalMode) => {
     if (mode) {
