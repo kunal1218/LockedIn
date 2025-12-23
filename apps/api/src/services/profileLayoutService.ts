@@ -86,13 +86,15 @@ export const saveProfileLayout = async (params: {
   const mode = normalizeMode(params.mode);
   const positions = normalizePositions(params.positions);
 
+  const positionsJson = JSON.stringify(positions);
+
   const result = await db.query(
     `INSERT INTO profile_layouts (user_id, mode, positions)
-     VALUES ($1, $2, $3)
+     VALUES ($1, $2, $3::jsonb)
      ON CONFLICT (user_id, mode)
-     DO UPDATE SET positions = $3, updated_at = now()
+     DO UPDATE SET positions = $3::jsonb, updated_at = now()
      RETURNING mode, positions, updated_at`,
-    [params.userId, mode, positions]
+    [params.userId, mode, positionsJson]
   );
 
   const row = result.rows[0] as ProfileLayoutRow;
