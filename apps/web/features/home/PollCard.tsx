@@ -34,7 +34,7 @@ export const PollCard = ({
   onLike,
   isLiking,
 }: PollCardProps) => {
-  const { user } = useAuth();
+  const { user, isAuthenticated, openAuthModal } = useAuth();
   const router = useRouter();
   const maxVotes = getMaxVotes(post) || 1;
   const isClickable = Boolean(onOpen);
@@ -76,6 +76,11 @@ export const PollCard = ({
 
   const handleProfileClick = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
+    if (!isAuthenticated) {
+      openAuthModal("signup");
+      return;
+    }
+
     if (user?.id === post.author.id) {
       router.push("/profile");
       return;

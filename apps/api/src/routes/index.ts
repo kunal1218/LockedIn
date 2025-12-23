@@ -4,6 +4,7 @@ import chatRoutes from "./chatRoutes";
 import authRoutes from "./authRoutes";
 import eventsRoutes from "./eventsRoutes";
 import feedRoutes from "./feedRoutes";
+import friendRoutes from "./friendRoutes";
 import profileRoutes from "./profileRoutes";
 import requestsRoutes from "./requestsRoutes";
 
@@ -17,6 +18,7 @@ export const registerRoutes = (app: Express) => {
   app.use("/chat", chatRoutes);
   app.use("/events", eventsRoutes);
   app.use("/feed", feedRoutes);
+  app.use("/friends", friendRoutes);
   app.use("/requests", requestsRoutes);
   app.use("/profile", profileRoutes);
 };

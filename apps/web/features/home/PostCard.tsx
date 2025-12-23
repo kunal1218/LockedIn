@@ -29,7 +29,7 @@ export const PostCard = ({
   onLike,
   isLiking,
 }: PostCardProps) => {
-  const { user } = useAuth();
+  const { user, isAuthenticated, openAuthModal } = useAuth();
   const router = useRouter();
   const isClickable = Boolean(onOpen);
   const likeCount = post.likeCount ?? 0;
@@ -70,6 +70,11 @@ export const PostCard = ({
 
   const handleProfileClick = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
+    if (!isAuthenticated) {
+      openAuthModal("signup");
+      return;
+    }
+
     if (user?.id === post.author.id) {
       router.push("/profile");
       return;

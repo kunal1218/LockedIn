@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Avatar } from "@/components/Avatar";
+import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
-import { apiGet } from "@/lib/api";
+import { useAuth } from "@/features/auth";
+import { apiDelete, apiGet, apiPost } from "@/lib/api";
 import { deriveCollegeFromDomain } from "@/lib/college";
 import { ProfileQuestionCard } from "./ProfileQuestionCard";
 
@@ -30,6 +32,14 @@ type PublicProfilePayload = {
   answers: ProfileAnswers | null;
 };
 
+type RelationshipStatus =
+  | "none"
+  | "incoming"
+  | "outgoing"
+  | "friends"
+  | "blocked"
+  | "blocked_by";
+
 const buildMadlibAnswer = (answers: ProfileAnswers | null) => {
   if (!answers) {
     return "";
@@ -44,9 +54,13 @@ const buildMadlibAnswer = (answers: ProfileAnswers | null) => {
 };
 
 export const PublicProfileView = ({ handle }: { handle: string }) => {
+  const { user: viewer, token, isAuthenticated, openAuthModal } = useAuth();
   const [profile, setProfile] = useState<PublicProfilePayload | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [relationship, setRelationship] = useState<RelationshipStatus>("none");
+  const [isRelationshipLoading, setRelationshipLoading] = useState(false);
+  const [relationshipError, setRelationshipError] = useState<string | null>(null);
 
   const sanitizedHandle = handle.trim();
 
@@ -96,6 +110,50 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
     };
   }, [sanitizedHandle]);
 
+  useEffect(() => {
+    if (!token || !profile?.user?.handle) {
+      return;
+    }
+
+    if (viewer?.handle === profile.user.handle) {
+      return;
+    }
+
+    let isActive = true;
+    setRelationshipLoading(true);
+    setRelationshipError(null);
+
+    apiGet<{ status: RelationshipStatus }>(
+      `/friends/relationship/${encodeURIComponent(profile.user.handle)}`,
+      token
+    )
+      .then((payload) => {
+        if (!isActive) {
+          return;
+        }
+        setRelationship(payload.status);
+      })
+      .catch((relError) => {
+        if (!isActive) {
+          return;
+        }
+        setRelationshipError(
+          relError instanceof Error
+            ? relError.message
+            : "Unable to load relationship."
+        );
+      })
+      .finally(() => {
+        if (isActive) {
+          setRelationshipLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [profile?.user?.handle, token, viewer?.handle]);
+
   const madlibAnswer = useMemo(
     () => buildMadlibAnswer(profile?.answers ?? null),
     [profile?.answers]
@@ -125,15 +183,130 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
   const collegeLabel =
     user.collegeName ??
     deriveCollegeFromDomain(user.collegeDomain ?? "");
+  const isSelf = viewer?.handle === user.handle;
+
+  const runRelationshipAction = async (
+    action: () => Promise<void>,
+    nextStatus: RelationshipStatus
+  ) => {
+    setRelationshipError(null);
+    setRelationshipLoading(true);
+    try {
+      await action();
+      setRelationship(nextStatus);
+    } catch (relError) {
+      setRelationshipError(
+        relError instanceof Error
+          ? relError.message
+          : "Unable to update connection."
+      );
+    } finally {
+      setRelationshipLoading(false);
+    }
+  };
+
+  const handleConnect = () => {
+    if (!isAuthenticated) {
+      openAuthModal("signup");
+      return;
+    }
+    if (!token) {
+      return;
+    }
+    runRelationshipAction(
+      () =>
+        apiPost(
+          "/friends/requests",
+          { handle: user.handle },
+          token
+        ).then(() => undefined),
+      "outgoing"
+    );
+  };
+
+  const handleAccept = () => {
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    runRelationshipAction(
+      () =>
+        apiPost(
+          `/friends/requests/accept/${encodeURIComponent(user.handle)}`,
+          {},
+          token
+        ).then(() => undefined),
+      "friends"
+    );
+  };
+
+  const handleDecline = () => {
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    runRelationshipAction(
+      () =>
+        apiDelete(
+          `/friends/requests/with/${encodeURIComponent(user.handle)}`,
+          token
+        ).then(() => undefined),
+      "none"
+    );
+  };
+
+  const handleRemoveFriend = () => {
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    runRelationshipAction(
+      () =>
+        apiDelete(`/friends/${encodeURIComponent(user.handle)}`, token).then(
+          () => undefined
+        ),
+      "none"
+    );
+  };
+
+  const handleBlock = () => {
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    runRelationshipAction(
+      () =>
+        apiPost(
+          `/friends/block/${encodeURIComponent(user.handle)}`,
+          {},
+          token
+        ).then(() => undefined),
+      "blocked"
+    );
+  };
+
+  const handleUnblock = () => {
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    runRelationshipAction(
+      () =>
+        apiDelete(`/friends/block/${encodeURIComponent(user.handle)}`, token).then(
+          () => undefined
+        ),
+      "none"
+    );
+  };
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 pb-16 pt-2">
       <Card className="relative overflow-hidden">
         <div className="absolute -right-16 -top-12 h-32 w-32 rounded-full bg-accent/20 blur-2xl" />
         <div className="absolute -bottom-10 left-16 h-24 w-24 rounded-full bg-accent-2/20 blur-2xl" />
-        <div className="relative flex items-center gap-4">
+        <div className="relative flex flex-wrap items-center gap-4">
           <Avatar name={user.name} size={72} className="text-2xl" />
-          <div>
+          <div className="flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-display text-2xl font-semibold text-ink">
                 {user.name}
@@ -146,7 +319,99 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
             </div>
             <p className="text-sm text-muted">{user.handle}</p>
           </div>
+          {!isSelf && (
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              {relationship === "blocked" ? (
+                <Button
+                  variant="outline"
+                  requiresAuth={true}
+                  onClick={handleUnblock}
+                  disabled={isRelationshipLoading}
+                >
+                  Unblock
+                </Button>
+              ) : relationship === "blocked_by" ? (
+                <Button variant="outline" requiresAuth={false} disabled={true}>
+                  Blocked
+                </Button>
+              ) : relationship === "friends" ? (
+                <>
+                  <Button
+                    variant="outline"
+                    requiresAuth={true}
+                    onClick={handleRemoveFriend}
+                    disabled={isRelationshipLoading}
+                  >
+                    Remove friend
+                  </Button>
+                  <Button
+                    variant="outline"
+                    requiresAuth={true}
+                    onClick={handleBlock}
+                    disabled={isRelationshipLoading}
+                  >
+                    Block
+                  </Button>
+                </>
+              ) : relationship === "incoming" ? (
+                <>
+                  <Button
+                    requiresAuth={true}
+                    onClick={handleAccept}
+                    disabled={isRelationshipLoading}
+                  >
+                    Accept
+                  </Button>
+                  <Button
+                    variant="outline"
+                    requiresAuth={true}
+                    onClick={handleDecline}
+                    disabled={isRelationshipLoading}
+                  >
+                    Decline
+                  </Button>
+                </>
+              ) : relationship === "outgoing" ? (
+                <>
+                  <Button variant="outline" requiresAuth={false} disabled={true}>
+                    Pending
+                  </Button>
+                  <Button
+                    variant="outline"
+                    requiresAuth={true}
+                    onClick={handleDecline}
+                    disabled={isRelationshipLoading}
+                  >
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    requiresAuth={true}
+                    onClick={handleConnect}
+                    disabled={isRelationshipLoading}
+                  >
+                    Connect
+                  </Button>
+                  <Button
+                    variant="outline"
+                    requiresAuth={true}
+                    onClick={handleBlock}
+                    disabled={isRelationshipLoading}
+                  >
+                    Block
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
         </div>
+        {relationshipError && (
+          <p className="mt-3 text-xs font-semibold text-accent">
+            {relationshipError}
+          </p>
+        )}
       </Card>
 
       <div className="grid gap-5 md:grid-cols-3">
