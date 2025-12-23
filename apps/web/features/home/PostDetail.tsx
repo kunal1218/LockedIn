@@ -18,6 +18,11 @@ import type { PostComposerPayload } from "./PostComposerModal";
 const inputClasses =
   "w-full rounded-2xl border border-card-border/80 bg-white/80 px-4 py-3 text-sm text-ink placeholder:text-muted/60 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20";
 
+const isUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
+
 type PostDetailProps = {
   postId: string;
 };
@@ -43,6 +48,12 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
       setError(null);
       setPost(null);
       setComments([]);
+
+      if (!postId || !isUuid(postId)) {
+        setError("That post link is not valid. Try opening it again.");
+        setIsLoading(false);
+        return;
+      }
       try {
         const [postResponse, commentResponse] = await Promise.all([
           apiGet<{ post: FeedPost }>(`/feed/${postId}`, token ?? undefined),

@@ -16,6 +16,10 @@ const allowedTypes = ["text", "poll", "prompt", "update"] as const;
 type AllowedType = (typeof allowedTypes)[number];
 
 const asString = (value: unknown) => (typeof value === "string" ? value : "");
+const isUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
 
 const asStringArray = (value: unknown) => {
   if (!Array.isArray(value)) {
@@ -104,6 +108,17 @@ const parsePostType = (value: unknown): AllowedType => {
   throw new FeedError("Invalid post type", 400);
 };
 
+const requirePostId = (value: unknown) => {
+  const postId = asString(value).trim();
+  if (!postId) {
+    throw new FeedError("Post ID is required", 400);
+  }
+  if (!isUuid(postId)) {
+    throw new FeedError("Invalid post ID", 400);
+  }
+  return postId;
+};
+
 const parsePostPayload = (body: Request["body"]) => {
   const type = parsePostType(body?.type);
   const content = asString(body?.content).trim();
@@ -164,10 +179,7 @@ export const getFeed = async (req: Request, res: Response) => {
 export const getPost = async (req: Request, res: Response) => {
   try {
     const viewer = await getOptionalUser(req);
-    const postId = asString(req.params?.postId).trim();
-    if (!postId) {
-      throw new FeedError("Post ID is required", 400);
-    }
+    const postId = requirePostId(req.params?.postId);
 
     const post = await fetchPostById(postId, viewer?.id ?? null);
     if (!post) {
@@ -197,10 +209,7 @@ export const createFeedPost = async (req: Request, res: Response) => {
 export const updateFeedPost = async (req: Request, res: Response) => {
   try {
     const user = await requireUser(req);
-    const postId = asString(req.params?.postId).trim();
-    if (!postId) {
-      throw new FeedError("Post ID is required", 400);
-    }
+    const postId = requirePostId(req.params?.postId);
     const payload = parseUpdatePayload(req.body);
     const post = await updatePost({ userId: user.id, postId, ...payload });
     res.json({ post });
@@ -212,10 +221,7 @@ export const updateFeedPost = async (req: Request, res: Response) => {
 export const deleteFeedPost = async (req: Request, res: Response) => {
   try {
     const user = await requireUser(req);
-    const postId = asString(req.params?.postId).trim();
-    if (!postId) {
-      throw new FeedError("Post ID is required", 400);
-    }
+    const postId = requirePostId(req.params?.postId);
     await deletePost({ userId: user.id, postId });
     res.status(204).send();
   } catch (error) {
@@ -226,10 +232,7 @@ export const deleteFeedPost = async (req: Request, res: Response) => {
 export const likeFeedPost = async (req: Request, res: Response) => {
   try {
     const user = await requireUser(req);
-    const postId = asString(req.params?.postId).trim();
-    if (!postId) {
-      throw new FeedError("Post ID is required", 400);
-    }
+    const postId = requirePostId(req.params?.postId);
     const result = await toggleLike({ userId: user.id, postId });
     res.json(result);
   } catch (error) {
@@ -239,10 +242,7 @@ export const likeFeedPost = async (req: Request, res: Response) => {
 
 export const getComments = async (req: Request, res: Response) => {
   try {
-    const postId = asString(req.params?.postId).trim();
-    if (!postId) {
-      throw new FeedError("Post ID is required", 400);
-    }
+    const postId = requirePostId(req.params?.postId);
     const comments = await fetchComments(postId);
     res.json({ comments });
   } catch (error) {
@@ -253,10 +253,7 @@ export const getComments = async (req: Request, res: Response) => {
 export const createComment = async (req: Request, res: Response) => {
   try {
     const user = await requireUser(req);
-    const postId = asString(req.params?.postId).trim();
-    if (!postId) {
-      throw new FeedError("Post ID is required", 400);
-    }
+    const postId = requirePostId(req.params?.postId);
 
     const content = asString(req.body?.content).trim();
     if (!content) {

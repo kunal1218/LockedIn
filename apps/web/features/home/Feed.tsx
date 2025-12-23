@@ -21,6 +21,11 @@ const sortOptions = [
 
 type SortOption = (typeof sortOptions)[number]["id"];
 
+const isUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
+
 export const Feed = () => {
   const router = useRouter();
   const { user, token, openAuthModal } = useAuth();
@@ -205,6 +210,14 @@ export const Feed = () => {
     }
   };
 
+  const handleOpenPost = (target: FeedPost) => {
+    if (!target.id || !isUuid(target.id)) {
+      setError("This post link is not ready yet. Refresh and try again.");
+      return;
+    }
+    router.push(`/posts/${target.id}`);
+  };
+
   return (
     <section className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -262,15 +275,13 @@ export const Feed = () => {
           {posts.map((post) => {
             const isOwnPost = user?.id === post.author.id;
             const isLiking = pendingLikes.has(post.id);
-            const onOpen = (target: FeedPost) =>
-              router.push(`/posts/${target.id}`);
 
             return post.type === "poll" ? (
               <PollCard
                 key={post.id}
                 post={post}
                 isOwnPost={isOwnPost}
-                onOpen={onOpen}
+                onOpen={handleOpenPost}
                 onEdit={openEditComposer}
                 onDelete={handleDeletePost}
                 onLike={handleToggleLike}
@@ -281,7 +292,7 @@ export const Feed = () => {
                 key={post.id}
                 post={post}
                 isOwnPost={isOwnPost}
-                onOpen={onOpen}
+                onOpen={handleOpenPost}
                 onEdit={openEditComposer}
                 onDelete={handleDeletePost}
                 onLike={handleToggleLike}
