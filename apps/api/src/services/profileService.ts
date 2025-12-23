@@ -20,21 +20,38 @@ const normalizeHandle = (value: string) => {
   return `@${sanitized}`;
 };
 
+const isUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    value
+  );
+
 export const fetchProfile = async () => {
   return profile;
 };
 
 export const fetchPublicProfileByHandle = async (handle: string) => {
   await ensureUsersTable();
-  const normalized = normalizeHandle(handle);
-  if (!normalized) {
+  const trimmed = handle.trim();
+  if (!trimmed) {
     return null;
   }
 
-  const result = await db.query(
-    "SELECT id, name, handle, college_name, college_domain FROM users WHERE handle = $1",
-    [normalized]
-  );
+  let result;
+  if (isUuid(trimmed)) {
+    result = await db.query(
+      "SELECT id, name, handle, college_name, college_domain FROM users WHERE id = $1",
+      [trimmed]
+    );
+  } else {
+    const normalized = normalizeHandle(trimmed);
+    if (!normalized) {
+      return null;
+    }
+    result = await db.query(
+      "SELECT id, name, handle, college_name, college_domain FROM users WHERE handle = $1",
+      [normalized]
+    );
+  }
 
   if ((result.rowCount ?? 0) === 0) {
     return null;

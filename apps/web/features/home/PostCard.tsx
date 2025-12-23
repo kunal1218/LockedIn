@@ -45,6 +45,7 @@ export const PostCard = ({
     typeof post.author.handle === "string"
       ? post.author.handle.replace(/^@/, "").trim()
       : "";
+  const profileIdentifier = profileSlug || post.author.id;
 
   const handleCardClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
@@ -83,10 +84,10 @@ export const PostCard = ({
       return;
     }
 
-    if (!profileSlug) {
+    if (!profileIdentifier) {
       return;
     }
-    router.push(`/profile/${encodeURIComponent(profileSlug)}`);
+    router.push(`/profile/${encodeURIComponent(profileIdentifier)}`);
   };
 
   return (
