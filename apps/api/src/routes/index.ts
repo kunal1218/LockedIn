@@ -6,6 +6,8 @@ import authRoutes from "./authRoutes";
 import eventsRoutes from "./eventsRoutes";
 import feedRoutes from "./feedRoutes";
 import friendRoutes from "./friendRoutes";
+import messageRoutes from "./messageRoutes";
+import notificationRoutes from "./notificationRoutes";
 import profileRoutes from "./profileRoutes";
 import requestsRoutes from "./requestsRoutes";
 
@@ -21,6 +23,8 @@ export const registerRoutes = (app: Express) => {
   app.use("/events", eventsRoutes);
   app.use("/feed", feedRoutes);
   app.use("/friends", friendRoutes);
+  app.use("/messages", messageRoutes);
+  app.use("/notifications", notificationRoutes);
   app.use("/requests", requestsRoutes);
   app.use("/profile", profileRoutes);
 };

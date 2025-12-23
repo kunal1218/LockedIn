@@ -1,10 +1,12 @@
 "use client";
 
 import type { MouseEvent } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth";
 import { Avatar } from "@/components/Avatar";
+import { apiGet } from "@/lib/api";
 import { Button } from "./Button";
 
 const baseNavItems = [
@@ -16,7 +18,9 @@ const baseNavItems = [
 
 export const SiteHeader = () => {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuth();
+  const pathname = usePathname();
+  const { isAuthenticated, user, token } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
   const profileName = user?.name ?? "Profile";
   const navItems = user?.isAdmin
     ? [...baseNavItems, { href: "/admin", label: "Admin" }]
@@ -34,6 +38,41 @@ export const SiteHeader = () => {
         }, 50);
       }
     };
+
+  useEffect(() => {
+    if (!token) {
+      setUnreadCount(0);
+      return;
+    }
+
+    let isActive = true;
+
+    const loadCount = async () => {
+      try {
+        const payload = await apiGet<{ count: number }>(
+          "/notifications/unread-count",
+          token
+        );
+        if (isActive) {
+          setUnreadCount(payload.count ?? 0);
+        }
+      } catch {
+        if (isActive) {
+          setUnreadCount(0);
+        }
+      }
+    };
+
+    loadCount();
+    const interval = window.setInterval(loadCount, 15000);
+
+    return () => {
+      isActive = false;
+      window.clearInterval(interval);
+    };
+  }, [pathname, token]);
+
+  const badgeCount = unreadCount > 99 ? "99+" : `${unreadCount}`;
 
   return (
     <header className="relative z-[70] pointer-events-auto">
@@ -66,6 +105,30 @@ export const SiteHeader = () => {
             </Button>
           )}
           {isAuthenticated && (
+            <Link
+              href="/notifications"
+              onClick={handleNavClick("/notifications")}
+              aria-label="Notifications"
+              className="relative rounded-full border border-card-border/70 bg-white/80 p-2 text-ink/80 shadow-sm transition hover:-translate-y-0.5 hover:border-accent/50 hover:text-ink"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 0 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+                <path d="M9 17a3 3 0 0 0 6 0" />
+              </svg>
+              {unreadCount > 0 && (
+                <span className="absolute -right-2 -top-2 flex min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                  {badgeCount}
+                </span>
+              )}
+            </Link>
             <Link
               href="/profile"
               onClick={handleNavClick("/profile")}

@@ -12,6 +12,8 @@ import { formatRelativeTime } from "@/lib/time";
 
 const ctaClasses =
   "inline-flex items-center justify-center rounded-full border border-card-border bg-white/80 px-4 py-2 text-sm font-semibold text-ink transition hover:border-accent/60";
+const actionClasses =
+  "rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink";
 
 type FriendUser = {
   id: string;
@@ -154,12 +156,19 @@ export default function FriendsPage() {
                   const collegeLabel = getCollegeLabel(friend);
                   const slug = friend.handle.replace(/^@/, "").trim();
                   const profileIdentifier = slug || friend.id;
+                  const messageSlug =
+                    slug || friend.handle.replace(/^@/, "").trim();
                   return (
                     <div
                       key={friend.id}
                       className="flex flex-wrap items-center gap-3 rounded-2xl border border-card-border/70 bg-white/70 px-4 py-3"
                     >
-                      <Avatar name={friend.name} size={36} />
+                      <Link
+                        href={`/profile/${encodeURIComponent(profileIdentifier)}`}
+                        className="rounded-full transition hover:-translate-y-0.5 hover:shadow-sm"
+                      >
+                        <Avatar name={friend.name} size={36} />
+                      </Link>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-ink">
                           {friend.handle}
@@ -170,21 +179,21 @@ export default function FriendsPage() {
                       </div>
                       <div className="ml-auto flex flex-wrap items-center gap-2">
                         <Link
-                          href={`/profile/${encodeURIComponent(profileIdentifier)}`}
-                          className={ctaClasses}
+                          href={`/messages/${encodeURIComponent(messageSlug)}`}
+                          className={actionClasses}
                         >
-                          View profile
+                          Send message
                         </Link>
                         <button
                           type="button"
-                          className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
+                          className={actionClasses}
                           onClick={() => handleRemove(friend.handle)}
                         >
                           Remove
                         </button>
                         <button
                           type="button"
-                          className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
+                          className={actionClasses}
                           onClick={() => handleBlock(friend.handle)}
                         >
                           Block
