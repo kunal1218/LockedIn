@@ -2,6 +2,10 @@ import { profile } from "./mockData";
 import { db } from "../db";
 import { ensureUsersTable } from "./authService";
 import { getProfileAnswers } from "./profileAnswersService";
+import {
+  LayoutMode,
+  fetchProfileLayout,
+} from "./profileLayoutService";
 
 type PublicProfileUserRow = {
   id: string;
@@ -29,7 +33,10 @@ export const fetchProfile = async () => {
   return profile;
 };
 
-export const fetchPublicProfileByHandle = async (handle: string) => {
+export const fetchPublicProfileByHandle = async (
+  handle: string,
+  mode?: LayoutMode
+) => {
   await ensureUsersTable();
   const trimmed = handle.trim();
   if (!trimmed) {
@@ -58,7 +65,10 @@ export const fetchPublicProfileByHandle = async (handle: string) => {
   }
 
   const row = result.rows[0] as PublicProfileUserRow;
-  const answers = await getProfileAnswers(row.id);
+  const [answers, layout] = await Promise.all([
+    getProfileAnswers(row.id),
+    fetchProfileLayout({ userId: row.id, mode }),
+  ]);
 
   return {
     user: {
@@ -69,5 +79,6 @@ export const fetchPublicProfileByHandle = async (handle: string) => {
       collegeDomain: row.college_domain ?? null,
     },
     answers,
+    layout,
   };
 };

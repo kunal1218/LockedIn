@@ -15,6 +15,7 @@ import { ProfileAnswersProvider, useProfileAnswers } from "./ProfileAnswersConte
 import { ProfileQuestionnaireModal } from "./ProfileQuestionnaireModal";
 import { ProfileCrewCard, ProfileCurrentlyCard } from "./ProfileSidePanel";
 import { useAuth } from "@/features/auth";
+import { apiGet, apiPost } from "@/lib/api";
 
 type MovementMode = "relative" | "absolute";
 
@@ -40,6 +41,7 @@ type BlockSizes = Record<string, number>;
 const GRID_COLUMNS = 12;
 const GRID_GAP = 20;
 const GRID_SNAP = 1;
+type LayoutMode = "default" | "compact";
 
 const layoutStorageKey = (userId: string) => `lockedin_profile_layout:${userId}`;
 
@@ -131,7 +133,7 @@ const buildDefaultPositions = (mode: "default" | "compact") => {
 };
 
 const ProfileLayoutInner = () => {
-  const { user, isAuthenticated, openAuthModal } = useAuth();
+  const { user, isAuthenticated, openAuthModal, token } = useAuth();
   const { answers, madlibAnswer } = useProfileAnswers();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [gridUnit, setGridUnit] = useState(0);
@@ -194,9 +196,10 @@ const ProfileLayoutInner = () => {
     [blockHeights, blockTemplates, getBlockWidth, gridStep, positions]
   );
 
+  const layoutMode: LayoutMode = isCompact ? "compact" : "default";
   const defaultPositions = useMemo(
-    () => buildDefaultPositions(isCompact ? "compact" : "default"),
-    [isCompact]
+    () => buildDefaultPositions(layoutMode),
+    [layoutMode]
   );
 
   const updateGridUnit = useCallback(() => {
@@ -220,52 +223,112 @@ const ProfileLayoutInner = () => {
   }, [updateGridUnit]);
 
   useEffect(() => {
+    let isActive = true;
+
     if (!user?.id) {
       setPositions(defaultPositions);
       setSavedPositions(defaultPositions);
       return;
     }
 
-    const raw =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(layoutStorageKey(user.id))
-        : null;
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as {
-          positions?: Record<string, BlockPosition>;
-          mode?: "compact" | "default";
-        };
-        if (parsed?.positions && parsed.mode === (isCompact ? "compact" : "default")) {
-          const merged = { ...defaultPositions, ...parsed.positions };
-          setPositions(merged);
-          setSavedPositions(merged);
-          return;
+    const loadLayout = async () => {
+      let remotePositions: Record<string, BlockPosition> | null = null;
+
+      if (token) {
+        try {
+          const response = await apiGet<{
+            layout?: { positions: Record<string, BlockPosition>; mode: LayoutMode };
+          }>(`/profile/layout?mode=${layoutMode}`, token);
+
+          if (response.layout?.positions) {
+            remotePositions = response.layout.positions;
+          }
+        } catch {
+          remotePositions = null;
         }
-      } catch {
-        // Ignore malformed stored layouts.
       }
-    }
 
-    setPositions(defaultPositions);
-    setSavedPositions(defaultPositions);
-  }, [defaultPositions, user?.id]);
+      let localPositions: Record<string, BlockPosition> | null = null;
+      const raw =
+        typeof window !== "undefined"
+          ? window.localStorage.getItem(layoutStorageKey(user.id))
+          : null;
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as {
+            positions?: Record<string, BlockPosition>;
+            mode?: LayoutMode;
+          };
+          if (parsed?.positions && parsed.mode === layoutMode) {
+            localPositions = parsed.positions;
+          }
+        } catch {
+          // Ignore malformed stored layouts.
+        }
+      }
 
-  const saveLayout = useCallback(
-    (next: Record<string, BlockPosition>) => {
-      if (!user?.id || typeof window === "undefined") {
+      const chosenPositions = remotePositions ?? localPositions ?? {};
+      const merged = {
+        ...defaultPositions,
+        ...chosenPositions,
+      };
+
+      if (!remotePositions && localPositions && token) {
+        apiPost(
+          "/profile/layout",
+          { positions: localPositions, mode: layoutMode },
+          token
+        ).catch(() => {
+          // Ignore migration failures; local layout still works.
+        });
+      }
+
+      if (!isActive) {
         return;
       }
 
-      window.localStorage.setItem(
-        layoutStorageKey(user.id),
-        JSON.stringify({
-          positions: next,
-          mode: isCompact ? "compact" : "default",
-        })
-      );
+      setPositions(merged);
+      setSavedPositions(merged);
+    };
+
+    loadLayout();
+
+    return () => {
+      isActive = false;
+    };
+  }, [defaultPositions, layoutMode, token, user?.id]);
+
+  const saveLayout = useCallback(
+    async (next: Record<string, BlockPosition>) => {
+      if (!user?.id) {
+        return;
+      }
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          layoutStorageKey(user.id),
+          JSON.stringify({
+            positions: next,
+            mode: layoutMode,
+          })
+        );
+      }
+
+      if (!token) {
+        return;
+      }
+
+      try {
+        await apiPost(
+          "/profile/layout",
+          { positions: next, mode: layoutMode },
+          token
+        );
+      } catch {
+        // Keep local layout even if the save fails.
+      }
     },
-    [isCompact, user?.id]
+    [layoutMode, token, user?.id]
   );
 
   const handleSave = useCallback(() => {

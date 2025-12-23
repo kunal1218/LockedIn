@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { useParams, usePathname } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
@@ -8,6 +10,7 @@ import { useAuth } from "@/features/auth";
 import { apiDelete, apiGet, apiPost } from "@/lib/api";
 import { deriveCollegeFromDomain } from "@/lib/college";
 import { ProfileQuestionCard } from "./ProfileQuestionCard";
+import { ProfileCrewCard, ProfileCurrentlyCard } from "./ProfileSidePanel";
 
 type MadlibAnswers = {
   when: string;
@@ -30,6 +33,10 @@ type PublicProfilePayload = {
     collegeDomain?: string | null;
   };
   answers: ProfileAnswers | null;
+  layout?: {
+    mode: LayoutMode;
+    positions: Record<string, BlockPosition>;
+  } | null;
 };
 
 type RelationshipStatus =
@@ -39,6 +46,88 @@ type RelationshipStatus =
   | "friends"
   | "blocked"
   | "blocked_by";
+
+type LayoutMode = "default" | "compact";
+
+type BlockTemplate = {
+  id: string;
+  columns: {
+    default: number;
+    compact: number;
+  };
+  layout: {
+    default: { x: number; y: number };
+    compact: { x: number; y: number };
+  };
+};
+
+type BlockPosition = {
+  x: number;
+  y: number;
+};
+
+const GRID_COLUMNS = 12;
+const GRID_GAP = 20;
+
+const BLOCK_TEMPLATES: BlockTemplate[] = [
+  {
+    id: "profile-header",
+    columns: { default: 12, compact: 12 },
+    layout: {
+      default: { x: 0, y: 0 },
+      compact: { x: 0, y: 0 },
+    },
+  },
+  {
+    id: "question-career",
+    columns: { default: 4, compact: 12 },
+    layout: {
+      default: { x: 0, y: 3 },
+      compact: { x: 0, y: 9 },
+    },
+  },
+  {
+    id: "question-madlib",
+    columns: { default: 4, compact: 12 },
+    layout: {
+      default: { x: 4, y: 3 },
+      compact: { x: 0, y: 14 },
+    },
+  },
+  {
+    id: "question-memory",
+    columns: { default: 4, compact: 12 },
+    layout: {
+      default: { x: 8, y: 3 },
+      compact: { x: 0, y: 19 },
+    },
+  },
+  {
+    id: "currently",
+    columns: { default: 6, compact: 12 },
+    layout: {
+      default: { x: 0, y: 6 },
+      compact: { x: 0, y: 24 },
+    },
+  },
+  {
+    id: "crew",
+    columns: { default: 6, compact: 12 },
+    layout: {
+      default: { x: 6, y: 6 },
+      compact: { x: 0, y: 29 },
+    },
+  },
+];
+
+const buildDefaultPositions = (mode: LayoutMode) => {
+  const positions: Record<string, BlockPosition> = {};
+  BLOCK_TEMPLATES.forEach((block) => {
+    const layout = mode === "compact" ? block.layout.compact : block.layout.default;
+    positions[block.id] = { x: layout.x, y: layout.y };
+  });
+  return positions;
+};
 
 const buildMadlibAnswer = (answers: ProfileAnswers | null) => {
   if (!answers) {
@@ -61,20 +150,33 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
   const [relationship, setRelationship] = useState<RelationshipStatus>("none");
   const [isRelationshipLoading, setRelationshipLoading] = useState(false);
   const [relationshipError, setRelationshipError] = useState<string | null>(null);
+  const params = useParams();
+  const pathname = usePathname();
+  const rawHandle = typeof handle === "string" ? handle : "";
 
-  const fallbackHandle = useMemo(() => {
-    if (typeof window === "undefined") {
+  const paramHandle = useMemo(() => {
+    const value = params?.handle;
+    if (typeof value === "string") {
+      return value;
+    }
+    if (Array.isArray(value)) {
+      return value[0] ?? "";
+    }
+    return "";
+  }, [params]);
+
+  const pathHandle = useMemo(() => {
+    if (!pathname) {
       return "";
     }
 
     const marker = "/profile/";
-    const path = window.location.pathname;
-    const index = path.indexOf(marker);
+    const index = pathname.indexOf(marker);
     if (index === -1) {
       return "";
     }
 
-    const segment = path.slice(index + marker.length).split("/")[0] ?? "";
+    const segment = pathname.slice(index + marker.length).split("/")[0] ?? "";
     if (!segment) {
       return "";
     }
@@ -84,21 +186,70 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
     } catch {
       return segment;
     }
-  }, []);
+  }, [pathname]);
 
-  const rawHandle = typeof handle === "string" ? handle : "";
-  const sanitizedHandle = (rawHandle || fallbackHandle)
+  const sanitizedHandle = (rawHandle || paramHandle || pathHandle)
     .trim()
     .replace(/^@/, "")
     .trim();
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [gridUnit, setGridUnit] = useState(0);
+  const [gridGap, setGridGap] = useState(GRID_GAP);
+  const [positions, setPositions] = useState<Record<string, BlockPosition>>(() =>
+    buildDefaultPositions("default")
+  );
+  const [blockHeights, setBlockHeights] = useState<Record<string, number>>({});
+
+  const gridStep = useMemo(() => gridUnit + gridGap, [gridUnit, gridGap]);
+  const isCompact = useMemo(() => {
+    if (!containerRef.current) {
+      return false;
+    }
+    return containerRef.current.offsetWidth < 768;
+  }, [gridUnit]);
+  const layoutMode: LayoutMode = isCompact ? "compact" : "default";
+  const defaultPositions = useMemo(
+    () => buildDefaultPositions(layoutMode),
+    [layoutMode]
+  );
+
+  const updateGridUnit = useCallback(() => {
+    if (!containerRef.current) {
+      return;
+    }
+    const width = containerRef.current.offsetWidth;
+    const nextGap = width < 640 ? 12 : GRID_GAP;
+    const nextUnit = (width - nextGap * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
+    setGridGap(nextGap);
+    setGridUnit(Math.max(0, nextUnit));
+  }, []);
+
+  useEffect(() => {
+    updateGridUnit();
+    const observer = new ResizeObserver(() => updateGridUnit());
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+    return () => observer.disconnect();
+  }, [updateGridUnit]);
+
+  const getBlockWidth = useCallback(
+    (block: BlockTemplate) => {
+      const columns = isCompact ? block.columns.compact : block.columns.default;
+      return columns * gridUnit + (columns - 1) * gridGap;
+    },
+    [gridGap, gridUnit, isCompact]
+  );
 
   useEffect(() => {
     let isActive = true;
 
     const loadProfile = async () => {
       if (!sanitizedHandle) {
-        setError("Profile handle is missing.");
-        setIsLoading(false);
+        setProfile(null);
+        setError(null);
+        setIsLoading(true);
         return;
       }
 
@@ -107,7 +258,7 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
 
       try {
         const response = await apiGet<PublicProfilePayload>(
-          `/profile/public/${encodeURIComponent(sanitizedHandle)}`
+          `/profile/public/${encodeURIComponent(sanitizedHandle)}?mode=${layoutMode}`
         );
 
         if (!isActive) {
@@ -136,14 +287,14 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
     return () => {
       isActive = false;
     };
-  }, [sanitizedHandle]);
+  }, [layoutMode, sanitizedHandle]);
 
   useEffect(() => {
     if (!token || !profile?.user?.handle) {
       return;
     }
 
-    if (viewer?.handle === profile.user.handle) {
+    if (viewer?.id && profile?.user?.id && viewer.id === profile.user.id) {
       return;
     }
 
@@ -182,6 +333,30 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
     };
   }, [profile?.user?.handle, token, viewer?.handle]);
 
+  useEffect(() => {
+    const layout = profile?.layout;
+    const merged =
+      layout?.positions && layout.mode === layoutMode
+        ? { ...defaultPositions, ...layout.positions }
+        : defaultPositions;
+    setPositions(merged);
+  }, [defaultPositions, layoutMode, profile?.layout]);
+
+  const canvasHeight = useMemo(() => {
+    const bottoms = BLOCK_TEMPLATES.map((block) => {
+      const pos = positions[block.id] ?? { x: 0, y: 0 };
+      const height = blockHeights[block.id] ?? gridStep * 2;
+      const rectBottom = pos.y * gridStep + height;
+      return rectBottom;
+    });
+
+    if (bottoms.length === 0) {
+      return 0;
+    }
+
+    return Math.max(...bottoms, 200) + gridStep;
+  }, [blockHeights, gridStep, positions]);
+
   const madlibAnswer = useMemo(
     () => buildMadlibAnswer(profile?.answers ?? null),
     [profile?.answers]
@@ -211,7 +386,7 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
   const collegeLabel =
     user.collegeName ??
     deriveCollegeFromDomain(user.collegeDomain ?? "");
-  const isSelf = viewer?.handle === user.handle;
+  const isSelf = viewer?.id === user.id;
 
   const runRelationshipAction = async (
     action: () => Promise<void>,
@@ -327,135 +502,225 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
     );
   };
 
-  return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 pb-16 pt-2">
-      <Card className="relative overflow-hidden">
-        <div className="absolute -right-16 -top-12 h-32 w-32 rounded-full bg-accent/20 blur-2xl" />
-        <div className="absolute -bottom-10 left-16 h-24 w-24 rounded-full bg-accent-2/20 blur-2xl" />
-        <div className="relative flex flex-wrap items-center gap-4">
-          <Avatar name={user.name} size={72} className="text-2xl" />
-          <div className="flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="font-display text-2xl font-semibold text-ink">
-                {user.name}
-              </p>
-              {collegeLabel && (
-                <span className="text-xs font-semibold text-muted">
-                  {collegeLabel}
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-muted">{user.handle}</p>
+  const renderHeader = () => (
+    <Card className="relative overflow-hidden">
+      <div className="absolute -right-16 -top-12 h-32 w-32 rounded-full bg-accent/20 blur-2xl" />
+      <div className="absolute -bottom-10 left-16 h-24 w-24 rounded-full bg-accent-2/20 blur-2xl" />
+      <div className="relative flex flex-wrap items-center gap-4">
+        <Avatar name={user.name} size={72} className="text-2xl" />
+        <div className="flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-display text-2xl font-semibold text-ink">
+              {user.name}
+            </p>
+            {collegeLabel && (
+              <span className="text-xs font-semibold text-muted">
+                {collegeLabel}
+              </span>
+            )}
           </div>
-          {!isSelf && (
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-              {relationship === "blocked" ? (
+          <p className="text-sm text-muted">{user.handle}</p>
+        </div>
+        {!isSelf && (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {relationship === "blocked" ? (
+              <Button
+                variant="outline"
+                requiresAuth={true}
+                onClick={handleUnblock}
+                disabled={isRelationshipLoading}
+              >
+                Unblock
+              </Button>
+            ) : relationship === "blocked_by" ? (
+              <Button variant="outline" requiresAuth={false} disabled={true}>
+                Blocked
+              </Button>
+            ) : relationship === "friends" ? (
+              <>
                 <Button
                   variant="outline"
                   requiresAuth={true}
-                  onClick={handleUnblock}
+                  onClick={handleRemoveFriend}
                   disabled={isRelationshipLoading}
                 >
-                  Unblock
+                  Remove friend
                 </Button>
-              ) : relationship === "blocked_by" ? (
+                <Button
+                  variant="outline"
+                  requiresAuth={true}
+                  onClick={handleBlock}
+                  disabled={isRelationshipLoading}
+                >
+                  Block
+                </Button>
+              </>
+            ) : relationship === "incoming" ? (
+              <>
+                <Button
+                  requiresAuth={true}
+                  onClick={handleAccept}
+                  disabled={isRelationshipLoading}
+                >
+                  Accept
+                </Button>
+                <Button
+                  variant="outline"
+                  requiresAuth={true}
+                  onClick={handleDecline}
+                  disabled={isRelationshipLoading}
+                >
+                  Decline
+                </Button>
+              </>
+            ) : relationship === "outgoing" ? (
+              <>
                 <Button variant="outline" requiresAuth={false} disabled={true}>
-                  Blocked
+                  Pending
                 </Button>
-              ) : relationship === "friends" ? (
-                <>
-                  <Button
-                    variant="outline"
-                    requiresAuth={true}
-                    onClick={handleRemoveFriend}
-                    disabled={isRelationshipLoading}
-                  >
-                    Remove friend
-                  </Button>
-                  <Button
-                    variant="outline"
-                    requiresAuth={true}
-                    onClick={handleBlock}
-                    disabled={isRelationshipLoading}
-                  >
-                    Block
-                  </Button>
-                </>
-              ) : relationship === "incoming" ? (
-                <>
-                  <Button
-                    requiresAuth={true}
-                    onClick={handleAccept}
-                    disabled={isRelationshipLoading}
-                  >
-                    Accept
-                  </Button>
-                  <Button
-                    variant="outline"
-                    requiresAuth={true}
-                    onClick={handleDecline}
-                    disabled={isRelationshipLoading}
-                  >
-                    Decline
-                  </Button>
-                </>
-              ) : relationship === "outgoing" ? (
-                <>
-                  <Button variant="outline" requiresAuth={false} disabled={true}>
-                    Pending
-                  </Button>
-                  <Button
-                    variant="outline"
-                    requiresAuth={true}
-                    onClick={handleDecline}
-                    disabled={isRelationshipLoading}
-                  >
-                    Cancel
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    requiresAuth={true}
-                    onClick={handleConnect}
-                    disabled={isRelationshipLoading}
-                  >
-                    Connect
-                  </Button>
-                  <Button
-                    variant="outline"
-                    requiresAuth={true}
-                    onClick={handleBlock}
-                    disabled={isRelationshipLoading}
-                  >
-                    Block
-                  </Button>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-        {relationshipError && (
-          <p className="mt-3 text-xs font-semibold text-accent">
-            {relationshipError}
-          </p>
+                <Button
+                  variant="outline"
+                  requiresAuth={true}
+                  onClick={handleDecline}
+                  disabled={isRelationshipLoading}
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  requiresAuth={true}
+                  onClick={handleConnect}
+                  disabled={isRelationshipLoading}
+                >
+                  Connect
+                </Button>
+                <Button
+                  variant="outline"
+                  requiresAuth={true}
+                  onClick={handleBlock}
+                  disabled={isRelationshipLoading}
+                >
+                  Block
+                </Button>
+              </>
+            )}
+          </div>
         )}
-      </Card>
+      </div>
+      {relationshipError && (
+        <p className="mt-3 text-xs font-semibold text-accent">
+          {relationshipError}
+        </p>
+      )}
+    </Card>
+  );
 
-      <div className="grid gap-5 md:grid-cols-3">
-        <ProfileQuestionCard
-          title="If you guaranteed success, what career would you chose?"
-          answer={answers?.career}
-        />
-        <ProfileQuestionCard
-          title="Whenever I'm ____, my ____ stop and ____."
-          answer={madlibAnswer}
-        />
-        <ProfileQuestionCard
-          title="What's your favorite memory?"
-          answer={answers?.memory}
-        />
+  const renderBlock = (blockId: string) => {
+    switch (blockId) {
+      case "profile-header":
+        return renderHeader();
+      case "question-career":
+        return (
+          <ProfileQuestionCard
+            title="If you guaranteed success, what career would you chose?"
+            answer={answers?.career}
+          />
+        );
+      case "question-madlib":
+        return (
+          <ProfileQuestionCard
+            title="Whenever I'm ____, my ____ stop and ____."
+            answer={madlibAnswer}
+          />
+        );
+      case "question-memory":
+        return (
+          <ProfileQuestionCard
+            title="What's your favorite memory?"
+            answer={answers?.memory}
+          />
+        );
+      case "currently":
+        return <ProfileCurrentlyCard />;
+      case "crew":
+        return <ProfileCrewCard />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 pb-16 pt-2">
+      <div
+        ref={containerRef}
+        className="relative pointer-events-none"
+        style={{ height: canvasHeight }}
+      >
+        {BLOCK_TEMPLATES.map((block) => {
+          const pos = positions[block.id] ?? { x: 0, y: 0 };
+          const width = getBlockWidth(block);
+          const height = blockHeights[block.id] ?? "auto";
+          const style = {
+            left: pos.x * gridStep,
+            top: pos.y * gridStep,
+            width,
+            height,
+          } as const;
+
+          return (
+            <div
+              key={block.id}
+              className="absolute pointer-events-auto"
+              style={style}
+            >
+              <BlockSizer
+                blockId={block.id}
+                onResize={(nextHeight) =>
+                  setBlockHeights((prev) => ({
+                    ...prev,
+                    [block.id]: nextHeight,
+                  }))
+                }
+              >
+                {renderBlock(block.id)}
+              </BlockSizer>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
+};
+
+const BlockSizer = ({
+  blockId,
+  onResize,
+  children,
+}: {
+  blockId: string;
+  onResize: (height: number) => void;
+  children: ReactNode;
+}) => {
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!ref.current) {
+      return;
+    }
+
+    const element = ref.current;
+    const update = () => {
+      const rect = element.getBoundingClientRect();
+      onResize(rect.height);
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [blockId, onResize]);
+
+  return <div ref={ref}>{children}</div>;
 };
