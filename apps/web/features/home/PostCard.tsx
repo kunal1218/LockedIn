@@ -7,13 +7,6 @@ import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
 import { formatRelativeTime } from "@/lib/time";
 
-const typeLabels: Record<FeedPost["type"], string> = {
-  text: "Update",
-  poll: "Poll",
-  prompt: "Prompt",
-  update: "Project drop",
-};
-
 type PostCardProps = {
   post: FeedPost;
   isOwnPost?: boolean;
@@ -21,7 +14,6 @@ type PostCardProps = {
   onEdit?: (post: FeedPost) => void;
   onDelete?: (post: FeedPost) => void;
   onLike?: (post: FeedPost) => void;
-  onComment?: (post: FeedPost) => void;
   isLiking?: boolean;
 };
 
@@ -32,7 +24,6 @@ export const PostCard = ({
   onEdit,
   onDelete,
   onLike,
-  onComment,
   isLiking,
 }: PostCardProps) => {
   const isClickable = Boolean(onOpen);
@@ -72,6 +63,19 @@ export const PostCard = ({
       tabIndex={isClickable ? 0 : undefined}
     >
       <div className="flex items-center gap-3">
+        <button
+          type="button"
+          className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+            post.likedByUser
+              ? "border-accent/40 bg-accent/15 text-accent"
+              : "border-card-border/70 bg-white/80 text-ink/80 hover:border-accent/40 hover:text-ink"
+          }`}
+          onClick={handleActionClick(onLike)}
+          disabled={!onLike || isLiking}
+          aria-pressed={post.likedByUser}
+        >
+          Like {likeCount}
+        </button>
         <Avatar name={post.author.name} />
         <div>
           <p className="text-sm font-semibold text-ink">{post.author.name}</p>
@@ -98,38 +102,18 @@ export const PostCard = ({
               Delete
             </button>
           )}
-          <Tag tone="sun">{typeLabels[post.type]}</Tag>
         </div>
       </div>
       <p className="text-base text-ink">{post.content}</p>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-            post.likedByUser
-              ? "border-accent/40 bg-accent/15 text-accent"
-              : "border-card-border/70 bg-white/80 text-ink/80 hover:border-accent/40 hover:text-ink"
-          }`}
-          onClick={handleActionClick(onLike)}
-          disabled={!onLike || isLiking}
-          aria-pressed={post.likedByUser}
-        >
-          Like {likeCount}
-        </button>
-        <button
-          type="button"
-          className="rounded-full border border-card-border/70 bg-white/80 px-3 py-1 text-xs font-semibold text-ink/80 transition hover:border-accent/40 hover:text-ink"
-          onClick={handleActionClick(onComment)}
-          disabled={!onComment}
-        >
-          Comment
-        </button>
-        {post.tags?.map((tag) => (
-          <Tag key={tag} tone="default">
-            {tag}
-          </Tag>
-        ))}
-      </div>
+      {post.tags && post.tags.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {post.tags.map((tag) => (
+            <Tag key={tag} tone="default">
+              {tag}
+            </Tag>
+          ))}
+        </div>
+      )}
     </Card>
   );
 };

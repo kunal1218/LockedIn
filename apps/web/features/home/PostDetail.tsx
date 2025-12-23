@@ -216,7 +216,7 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
     setComposerOpen(true);
   };
 
-  const handleOpenComment = (_post?: FeedPost) => {
+  const handleOpenComment = () => {
     commentsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     if (typeof window !== "undefined") {
       window.setTimeout(() => {
@@ -235,13 +235,22 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
               Dive into the full conversation and leave your reply.
             </p>
           </div>
-          <Button
-            variant="outline"
-            requiresAuth={false}
-            onClick={() => router.push("/")}
-          >
-            Back to feed
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              requiresAuth={false}
+              onClick={handleOpenComment}
+              disabled={!post}
+            >
+              Add comment
+            </Button>
+            <Button
+              variant="outline"
+              requiresAuth={false}
+              onClick={() => router.push("/")}
+            >
+              Back to feed
+            </Button>
+          </div>
         </div>
 
         {error && (
@@ -262,7 +271,6 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
               onEdit={handleOpenEdit}
               onDelete={handleDeletePost}
               onLike={handleToggleLike}
-              onComment={handleOpenComment}
               isLiking={isLiking}
             />
           ) : (
@@ -272,7 +280,6 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
               onEdit={handleOpenEdit}
               onDelete={handleDeletePost}
               onLike={handleToggleLike}
-              onComment={handleOpenComment}
               isLiking={isLiking}
             />
           )

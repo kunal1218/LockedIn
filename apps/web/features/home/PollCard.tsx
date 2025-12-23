@@ -19,7 +19,6 @@ type PollCardProps = {
   onEdit?: (post: FeedPost) => void;
   onDelete?: (post: FeedPost) => void;
   onLike?: (post: FeedPost) => void;
-  onComment?: (post: FeedPost) => void;
   isLiking?: boolean;
 };
 
@@ -30,7 +29,6 @@ export const PollCard = ({
   onEdit,
   onDelete,
   onLike,
-  onComment,
   isLiking,
 }: PollCardProps) => {
   const maxVotes = getMaxVotes(post) || 1;
@@ -71,6 +69,19 @@ export const PollCard = ({
       tabIndex={isClickable ? 0 : undefined}
     >
       <div className="flex items-center gap-3">
+        <button
+          type="button"
+          className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+            post.likedByUser
+              ? "border-accent/40 bg-accent/15 text-accent"
+              : "border-card-border/70 bg-white/80 text-ink/80 hover:border-accent/40 hover:text-ink"
+          }`}
+          onClick={handleActionClick(onLike)}
+          disabled={!onLike || isLiking}
+          aria-pressed={post.likedByUser}
+        >
+          Like {likeCount}
+        </button>
         <Avatar name={post.author.name} />
         <div>
           <p className="text-sm font-semibold text-ink">{post.author.name}</p>
@@ -122,34 +133,15 @@ export const PollCard = ({
           ))}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-            post.likedByUser
-              ? "border-accent/40 bg-accent/15 text-accent"
-              : "border-card-border/70 bg-white/80 text-ink/80 hover:border-accent/40 hover:text-ink"
-          }`}
-          onClick={handleActionClick(onLike)}
-          disabled={!onLike || isLiking}
-          aria-pressed={post.likedByUser}
-        >
-          Like {likeCount}
-        </button>
-        <button
-          type="button"
-          className="rounded-full border border-card-border/70 bg-white/80 px-3 py-1 text-xs font-semibold text-ink/80 transition hover:border-accent/40 hover:text-ink"
-          onClick={handleActionClick(onComment)}
-          disabled={!onComment}
-        >
-          Comment
-        </button>
-        {post.tags?.map((tag) => (
-          <Tag key={tag} tone="default">
-            {tag}
-          </Tag>
-        ))}
-      </div>
+      {post.tags && post.tags.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {post.tags.map((tag) => (
+            <Tag key={tag} tone="default">
+              {tag}
+            </Tag>
+          ))}
+        </div>
+      )}
     </Card>
   );
 };
