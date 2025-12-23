@@ -299,18 +299,6 @@ const ProfileLayoutInner = () => {
 
   const handleMovementMode = useCallback((mode: MovementMode) => {
     setMovementMode(mode);
-    if (mode === "relative") {
-      setPositions((prev) => {
-        const next: Record<string, BlockPosition> = {};
-        Object.entries(prev).forEach(([key, value]) => {
-          next[key] = {
-            x: Math.round(value.x / GRID_SNAP) * GRID_SNAP,
-            y: Math.round(value.y / GRID_SNAP) * GRID_SNAP,
-          };
-        });
-        return next;
-      });
-    }
   }, []);
 
   const canvasHeight = useMemo(() => {
@@ -332,7 +320,27 @@ const ProfileLayoutInner = () => {
       return;
     }
 
-    const rect = getRect(id);
+    const currentPosition = positions[id] ?? { x: 0, y: 0 };
+    const snappedPosition =
+      movementMode === "relative"
+        ? {
+            x: Math.round(currentPosition.x / GRID_SNAP) * GRID_SNAP,
+            y: Math.round(currentPosition.y / GRID_SNAP) * GRID_SNAP,
+          }
+        : currentPosition;
+
+    if (
+      movementMode === "relative" &&
+      (snappedPosition.x !== currentPosition.x ||
+        snappedPosition.y !== currentPosition.y)
+    ) {
+      setPositions((prev) => ({
+        ...prev,
+        [id]: snappedPosition,
+      }));
+    }
+
+    const rect = getRect(id, snappedPosition);
     dragOffsetRef.current = {
       x: event.clientX - (containerRef.current.getBoundingClientRect().left + rect.x),
       y: event.clientY - (containerRef.current.getBoundingClientRect().top + rect.y),
@@ -378,21 +386,11 @@ const ProfileLayoutInner = () => {
         height,
       };
 
-      const hasCollision = blockTemplates.some((other) => {
-        if (other.id === draggingId) {
-          return false;
-        }
-        const otherRect = getRect(other.id, positions[other.id]);
-        return rectsOverlap(candidateRect, otherRect);
-      });
-
-      if (!hasCollision) {
-        setPositions((prev) => ({
-          ...prev,
-          [draggingId]: { x: nextX, y: nextY },
-        }));
-        setLayoutError(null);
-      }
+      setPositions((prev) => ({
+        ...prev,
+        [draggingId]: { x: nextX, y: nextY },
+      }));
+      setLayoutError(null);
     };
 
     const handleUp = () => {
