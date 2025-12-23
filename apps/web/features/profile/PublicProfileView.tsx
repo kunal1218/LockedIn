@@ -63,7 +63,9 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
   const [relationshipError, setRelationshipError] = useState<string | null>(null);
 
   const sanitizedHandle =
-    typeof handle === "string" ? handle.trim() : "";
+    typeof handle === "string"
+      ? handle.trim().replace(/^@/, "").trim()
+      : "";
 
   useEffect(() => {
     let isActive = true;

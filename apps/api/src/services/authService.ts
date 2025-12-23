@@ -37,6 +37,7 @@ export class AuthError extends Error {
 }
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
+let didBackfillHandles = false;
 
 export const ensureUsersTable = async () => {
   await db.query(`
@@ -62,6 +63,8 @@ export const ensureUsersTable = async () => {
     CREATE INDEX IF NOT EXISTS users_college_domain_idx
       ON users (college_domain);
   `);
+
+  await backfillInvalidHandles();
 };
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
@@ -124,6 +127,14 @@ const normalizeHandle = (handle: string) => {
   return `@${cleaned}`;
 };
 
+const isHandleAvailable = async (handle: string, userId: string) => {
+  const result = await db.query(
+    "SELECT 1 FROM users WHERE handle = $1 AND id <> $2",
+    [handle, userId]
+  );
+  return (result.rowCount ?? 0) === 0;
+};
+
 const mapUser = (
   row: Pick<
     UserRow,
@@ -160,6 +171,44 @@ const generateHandle = async (name: string) => {
   }
 
   return `${base}${randomUUID().slice(0, 6)}`;
+};
+
+const backfillInvalidHandles = async () => {
+  if (didBackfillHandles) {
+    return;
+  }
+
+  const result = await db.query(
+    `SELECT id, name, handle
+     FROM users
+     WHERE handle IS NULL
+        OR BTRIM(handle) = ''
+        OR handle !~ '^@[a-z0-9_]+$'`
+  );
+
+  for (const row of result.rows as Array<{
+    id: string;
+    name: string;
+    handle?: string | null;
+  }>) {
+    const normalized = normalizeHandle(row.handle ?? "");
+    let candidate = "";
+
+    if (normalized && (await isHandleAvailable(normalized, row.id))) {
+      candidate = normalized;
+    } else {
+      candidate = await generateHandle(row.name || "user");
+    }
+
+    if (candidate) {
+      await db.query("UPDATE users SET handle = $2 WHERE id = $1", [
+        row.id,
+        candidate,
+      ]);
+    }
+  }
+
+  didBackfillHandles = true;
 };
 
 const createSession = async (userId: string) => {

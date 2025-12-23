@@ -41,7 +41,10 @@ export const PostCard = ({
     post.author.collegeName ??
     deriveCollegeFromDomain(post.author.collegeDomain ?? "") ??
     fallbackCollege;
-  const profileSlug = post.author.handle.replace(/^@/, "");
+  const profileSlug =
+    typeof post.author.handle === "string"
+      ? post.author.handle.replace(/^@/, "").trim()
+      : "";
 
   const handleCardClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
@@ -83,7 +86,7 @@ export const PostCard = ({
     if (!profileSlug) {
       return;
     }
-    router.push(`/profile/${profileSlug}`);
+    router.push(`/profile/${encodeURIComponent(profileSlug)}`);
   };
 
   return (

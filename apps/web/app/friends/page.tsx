@@ -152,7 +152,7 @@ export default function FriendsPage() {
               <div className="space-y-4">
                 {summary.friends.map((friend) => {
                   const collegeLabel = getCollegeLabel(friend);
-                  const slug = friend.handle.replace(/^@/, "");
+                  const slug = friend.handle.replace(/^@/, "").trim();
                   return (
                     <div
                       key={friend.id}
@@ -168,9 +168,21 @@ export default function FriendsPage() {
                         </p>
                       </div>
                       <div className="ml-auto flex flex-wrap items-center gap-2">
-                        <Link href={`/profile/${slug}`} className={ctaClasses}>
-                          View profile
-                        </Link>
+                        {slug ? (
+                          <Link
+                            href={`/profile/${encodeURIComponent(slug)}`}
+                            className={ctaClasses}
+                          >
+                            View profile
+                          </Link>
+                        ) : (
+                          <span
+                            className={`${ctaClasses} cursor-not-allowed opacity-60`}
+                            aria-disabled={true}
+                          >
+                            Profile unavailable
+                          </span>
+                        )}
                         <button
                           type="button"
                           className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
