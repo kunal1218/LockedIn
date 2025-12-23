@@ -15,6 +15,8 @@ type FeedPostRow = {
   author_id: string;
   author_name: string;
   author_handle: string;
+  author_college_name?: string | null;
+  author_college_domain?: string | null;
   type: FeedPostType;
   content: string;
   created_at: string | Date;
@@ -150,6 +152,8 @@ const mapPost = (
     id: row.author_id,
     name: row.author_name,
     handle: row.author_handle,
+    collegeName: row.author_college_name ?? undefined,
+    collegeDomain: row.author_college_domain ?? undefined,
   },
   type: row.type,
   content: row.content,
@@ -237,6 +241,8 @@ export const fetchFeed = async (params: {
             posts.like_count,
             users.name AS author_name,
             users.handle AS author_handle,
+            users.college_name AS author_college_name,
+            users.college_domain AS author_college_domain,
             (likes.user_id IS NOT NULL) AS liked_by_user
      FROM feed_posts posts
      JOIN users ON users.id = posts.author_id
@@ -269,6 +275,8 @@ export const fetchPostById = async (
             posts.like_count,
             users.name AS author_name,
             users.handle AS author_handle,
+            users.college_name AS author_college_name,
+            users.college_domain AS author_college_domain,
             (likes.user_id IS NOT NULL) AS liked_by_user
      FROM feed_posts posts
      JOIN users ON users.id = posts.author_id

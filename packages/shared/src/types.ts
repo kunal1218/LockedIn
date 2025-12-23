@@ -3,6 +3,8 @@ export type User = {
   name: string;
   handle: string;
   avatarUrl?: string;
+  collegeName?: string;
+  collegeDomain?: string;
   campus?: string;
   year?: string;
   vibes?: string[];

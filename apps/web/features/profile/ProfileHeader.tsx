@@ -34,6 +34,7 @@ export const ProfileHeader = ({
   const { user } = useAuth();
   const displayName = user?.name ?? profile.name;
   const displayHandle = user?.handle ?? profile.handle;
+  const displayCollege = user?.collegeName ?? null;
 
   return (
     <Card className="relative overflow-hidden">
@@ -43,9 +44,16 @@ export const ProfileHeader = ({
         <div className="flex items-center gap-4">
           <Avatar name={displayName} size={72} className="text-2xl" />
           <div>
-            <p className="font-display text-2xl font-semibold text-ink">
-              {displayName}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-display text-2xl font-semibold text-ink">
+                {displayName}
+              </p>
+              {displayCollege && (
+                <Tag tone="mint" className="px-2 py-0 text-[10px]">
+                  {displayCollege}
+                </Tag>
+              )}
+            </div>
             <p className="text-sm text-muted">{displayHandle}</p>
             <p className="mt-2 text-sm text-ink/80">{profile.bio}</p>
             <div className="mt-3 flex flex-wrap gap-2">

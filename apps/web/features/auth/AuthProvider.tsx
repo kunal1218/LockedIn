@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { apiPost } from "@/lib/api";
+import { apiGet, apiPost } from "@/lib/api";
 
 export type AuthUser = {
   id: string;
@@ -88,6 +88,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     setAuth(readStoredAuth());
   }, []);
+
+  useEffect(() => {
+    if (!auth?.token || !auth.user) {
+      return;
+    }
+
+    if (
+      auth.user.collegeName !== undefined ||
+      auth.user.collegeDomain !== undefined
+    ) {
+      return;
+    }
+
+    let isActive = true;
+
+    apiGet<{ user: AuthUser }>("/auth/me", auth.token)
+      .then((payload) => {
+        if (!isActive) {
+          return;
+        }
+        updateAuth({ user: payload.user, token: auth.token });
+      })
+      .catch(() => {
+        // Ignore sync failures; existing auth still works.
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [auth, updateAuth]);
 
   const updateAuth = useCallback((payload: AuthPayload | null) => {
     setAuth(payload);

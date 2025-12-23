@@ -28,6 +28,7 @@ export const PostCard = ({
 }: PostCardProps) => {
   const isClickable = Boolean(onOpen);
   const likeCount = post.likeCount ?? 0;
+  const collegeName = post.author.collegeName;
 
   const handleCardClick = () => {
     onOpen?.(post);
@@ -65,7 +66,14 @@ export const PostCard = ({
       <div className="flex items-center gap-3">
         <Avatar name={post.author.name} />
         <div>
-          <p className="text-sm font-semibold text-ink">{post.author.name}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold text-ink">{post.author.name}</p>
+            {collegeName && (
+              <Tag tone="mint" className="px-2 py-0 text-[10px]">
+                {collegeName}
+              </Tag>
+            )}
+          </div>
           <p className="text-xs text-muted">
             {post.author.handle} · {formatRelativeTime(post.createdAt)}
           </p>
