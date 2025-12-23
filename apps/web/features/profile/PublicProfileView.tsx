@@ -62,7 +62,8 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
   const [isRelationshipLoading, setRelationshipLoading] = useState(false);
   const [relationshipError, setRelationshipError] = useState<string | null>(null);
 
-  const sanitizedHandle = handle.trim();
+  const sanitizedHandle =
+    typeof handle === "string" ? handle.trim() : "";
 
   useEffect(() => {
     let isActive = true;
