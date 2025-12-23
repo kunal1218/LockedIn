@@ -1,23 +1,26 @@
 "use client";
 
+import type { MouseEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth";
+import { Avatar } from "@/components/Avatar";
 import { Button } from "./Button";
 
 const navItems = [
   { href: "/", label: "Home" },
-  { href: "/profile", label: "Profile" },
+  { href: "/friends", label: "Friends" },
   { href: "/map", label: "Map" },
   { href: "/requests", label: "Requests" },
 ];
 
 export const SiteHeader = () => {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const profileName = user?.name ?? "Profile";
 
   const handleNavClick =
-    (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
+    (href: string) => (event: MouseEvent<HTMLAnchorElement>) => {
       event.preventDefault();
       router.push(href);
       if (typeof window !== "undefined") {
@@ -59,6 +62,14 @@ export const SiteHeader = () => {
               Join today
             </Button>
           )}
+          <Link
+            href="/profile"
+            onClick={handleNavClick("/profile")}
+            aria-label="Profile"
+            className="rounded-full border border-card-border/70 bg-white/80 p-1 shadow-sm transition hover:-translate-y-0.5 hover:border-accent/50"
+          >
+            <Avatar name={profileName} size={32} />
+          </Link>
         </div>
       </div>
     </header>
