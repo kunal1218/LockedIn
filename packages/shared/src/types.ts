@@ -34,6 +34,8 @@ export type FeedComment = {
   author: User;
   content: string;
   createdAt: string;
+  likeCount: number;
+  likedByUser?: boolean;
 };
 
 export type DailyChallenge = {

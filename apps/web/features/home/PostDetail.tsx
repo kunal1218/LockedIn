@@ -46,6 +46,9 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(
     null
   );
+  const [pendingCommentLikes, setPendingCommentLikes] = useState<Set<string>>(
+    new Set()
+  );
   const commentsRef = useRef<HTMLDivElement | null>(null);
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -96,6 +99,7 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
       setEditingBody("");
       setEditCommentError(null);
       setDeletingCommentId(null);
+      setPendingCommentLikes(new Set());
 
       if (!resolvedPostId) {
         setError("This post link is missing an ID.");
@@ -257,7 +261,7 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
         { content: trimmed },
         token
       );
-      setComments((prev) => [...prev, response.comment]);
+      setComments((prev) => [response.comment, ...prev]);
       setCommentBody("");
     } catch (submitError) {
       setCommentError(
@@ -353,6 +357,50 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
       );
     } finally {
       setDeletingCommentId(null);
+    }
+  };
+
+  const handleToggleCommentLike = async (comment: FeedComment) => {
+    if (!token) {
+      openAuthModal();
+      return;
+    }
+
+    if (pendingCommentLikes.has(comment.id)) {
+      return;
+    }
+
+    setPendingCommentLikes((prev) => new Set(prev).add(comment.id));
+
+    try {
+      const response = await apiPost<{ likeCount: number; liked: boolean }>(
+        `/feed/comments/${comment.id}/like`,
+        {},
+        token
+      );
+      setComments((prev) =>
+        prev.map((item) =>
+          item.id === comment.id
+            ? {
+                ...item,
+                likeCount: response.likeCount,
+                likedByUser: response.liked,
+              }
+            : item
+        )
+      );
+    } catch (likeError) {
+      setError(
+        likeError instanceof Error
+          ? likeError.message
+          : "Unable to update comment like."
+      );
+    } finally {
+      setPendingCommentLikes((prev) => {
+        const next = new Set(prev);
+        next.delete(comment.id);
+        return next;
+      });
     }
   };
 
@@ -478,6 +526,8 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
                     const isOwnComment = user?.id === comment.author.id;
                     const isEditing = editingCommentId === comment.id;
                     const isDeleting = deletingCommentId === comment.id;
+                    const likeCount = comment.likeCount ?? 0;
+                    const isLiked = Boolean(comment.likedByUser);
 
                     return (
                       <div key={comment.id} className="flex items-start gap-3">
@@ -490,46 +540,57 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
                               </span>
                               <span>{formatRelativeTime(comment.createdAt)}</span>
                             </div>
-                            {isOwnComment && !isEditing && (
-                              <div
-                                className="relative ml-auto"
-                                data-comment-menu={comment.id}
-                              >
-                                <button
-                                  type="button"
-                                  className="rounded-full border border-card-border/70 px-2 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
-                                  onClick={() =>
-                                    handleToggleCommentMenu(comment.id)
-                                  }
-                                  aria-label="Comment actions"
+                            <div className="ml-auto flex items-center gap-2">
+                              {(likeCount > 0 || isLiked) && (
+                                <span
+                                  className={`text-[11px] font-semibold ${
+                                    isLiked ? "text-accent" : "text-muted"
+                                  }`}
                                 >
-                                  ...
-                                </button>
-                                {openCommentMenuId === comment.id && (
-                                  <div className="absolute right-0 top-full z-10 mt-2 w-32 overflow-hidden rounded-2xl border border-card-border/70 bg-white/95 py-1 text-xs font-semibold text-ink/80 shadow-[0_16px_32px_rgba(27,26,23,0.14)]">
-                                    <button
-                                      type="button"
-                                      className="w-full px-3 py-2 text-left transition hover:bg-card-border/40 hover:text-ink"
-                                      onClick={() =>
-                                        handleStartEditComment(comment)
-                                      }
-                                    >
-                                      Edit
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="w-full px-3 py-2 text-left text-ink/70 transition hover:bg-card-border/40 hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
-                                      onClick={() =>
-                                        handleDeleteComment(comment)
-                                      }
-                                      disabled={isDeleting}
-                                    >
-                                      Delete
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                                  ♥ {likeCount}
+                                </span>
+                              )}
+                              {isOwnComment && !isEditing && (
+                                <div
+                                  className="relative"
+                                  data-comment-menu={comment.id}
+                                >
+                                  <button
+                                    type="button"
+                                    className="rounded-full border border-card-border/70 px-2 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
+                                    onClick={() =>
+                                      handleToggleCommentMenu(comment.id)
+                                    }
+                                    aria-label="Comment actions"
+                                  >
+                                    ...
+                                  </button>
+                                  {openCommentMenuId === comment.id && (
+                                    <div className="absolute right-0 top-full z-10 mt-2 w-32 overflow-hidden rounded-2xl border border-card-border/70 bg-white/95 py-1 text-xs font-semibold text-ink/80 shadow-[0_16px_32px_rgba(27,26,23,0.14)]">
+                                      <button
+                                        type="button"
+                                        className="w-full px-3 py-2 text-left transition hover:bg-card-border/40 hover:text-ink"
+                                        onClick={() =>
+                                          handleStartEditComment(comment)
+                                        }
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="w-full px-3 py-2 text-left text-ink/70 transition hover:bg-card-border/40 hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
+                                        onClick={() =>
+                                          handleDeleteComment(comment)
+                                        }
+                                        disabled={isDeleting}
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                           {isEditing ? (
                             <div className="space-y-2">
@@ -566,7 +627,11 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
                               </div>
                             </div>
                           ) : (
-                            <p className="text-sm text-ink/90">
+                            <p
+                              className="text-sm text-ink/90"
+                              onDoubleClick={() => handleToggleCommentLike(comment)}
+                              title="Double-click to like"
+                            >
                               {comment.content}
                             </p>
                           )}

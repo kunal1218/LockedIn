@@ -7,6 +7,7 @@ import {
   getComments,
   getFeed,
   getPost,
+  likeFeedComment,
   likeFeedPost,
   updateFeedComment,
   updateFeedPost,
@@ -21,6 +22,7 @@ router.get("/:postId/comments", getComments);
 router.post("/:postId/comments", createComment);
 router.patch("/comments/:commentId", updateFeedComment);
 router.delete("/comments/:commentId", deleteFeedComment);
+router.post("/comments/:commentId/like", likeFeedComment);
 router.post("/:postId/like", likeFeedPost);
 
 router.get("/:postId", getPost);

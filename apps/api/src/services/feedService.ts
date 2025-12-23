@@ -39,6 +39,8 @@ type CommentRow = {
   author_handle: string;
   content: string;
   created_at: string | Date;
+  like_count?: number | string | null;
+  liked_by_user?: boolean | null;
 };
 
 export class FeedError extends Error {
@@ -91,6 +93,15 @@ const ensureFeedTables = async () => {
       author_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       content text NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS feed_comment_likes (
+      comment_id uuid NOT NULL REFERENCES feed_comments(id) ON DELETE CASCADE,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (comment_id, user_id)
     );
   `);
 
@@ -159,6 +170,8 @@ const mapComment = (row: CommentRow): FeedComment => ({
   },
   content: row.content,
   createdAt: toIsoString(row.created_at),
+  likeCount: Number(row.like_count ?? 0),
+  likedByUser: Boolean(row.liked_by_user),
 });
 
 const fetchPollOptionsForPosts = async (postIds: string[]) => {
@@ -440,7 +453,92 @@ export const toggleLike = async (params: {
   };
 };
 
-export const fetchComments = async (postId: string): Promise<FeedComment[]> => {
+export const toggleCommentLike = async (params: {
+  userId: string;
+  commentId: string;
+}): Promise<{ likeCount: number; liked: boolean }> => {
+  await ensureFeedTables();
+
+  const commentExists = await db.query(
+    "SELECT 1 FROM feed_comments WHERE id = $1",
+    [params.commentId]
+  );
+  if ((commentExists.rowCount ?? 0) === 0) {
+    throw new FeedError("Comment not found", 404);
+  }
+
+  const existing = await db.query(
+    "SELECT 1 FROM feed_comment_likes WHERE comment_id = $1 AND user_id = $2",
+    [params.commentId, params.userId]
+  );
+
+  if ((existing.rowCount ?? 0) > 0) {
+    await db.query(
+      "DELETE FROM feed_comment_likes WHERE comment_id = $1 AND user_id = $2",
+      [params.commentId, params.userId]
+    );
+    const countResult = await db.query(
+      "SELECT COUNT(*) FROM feed_comment_likes WHERE comment_id = $1",
+      [params.commentId]
+    );
+    return {
+      likeCount: Number(countResult.rows[0]?.count ?? 0),
+      liked: false,
+    };
+  }
+
+  await db.query(
+    "INSERT INTO feed_comment_likes (comment_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    [params.commentId, params.userId]
+  );
+  const countResult = await db.query(
+    "SELECT COUNT(*) FROM feed_comment_likes WHERE comment_id = $1",
+    [params.commentId]
+  );
+  return {
+    likeCount: Number(countResult.rows[0]?.count ?? 0),
+    liked: true,
+  };
+};
+
+const fetchCommentById = async (
+  commentId: string,
+  viewerId?: string | null
+): Promise<FeedComment | null> => {
+  const result = await db.query(
+    `SELECT comments.id,
+            comments.post_id,
+            comments.author_id,
+            comments.content,
+            comments.created_at,
+            users.name AS author_name,
+            users.handle AS author_handle,
+            COALESCE(like_counts.count, 0) AS like_count,
+            (user_likes.user_id IS NOT NULL) AS liked_by_user
+     FROM feed_comments comments
+     JOIN users ON users.id = comments.author_id
+     LEFT JOIN (
+       SELECT comment_id, COUNT(*)::int AS count
+       FROM feed_comment_likes
+       GROUP BY comment_id
+     ) like_counts ON like_counts.comment_id = comments.id
+     LEFT JOIN feed_comment_likes user_likes
+       ON user_likes.comment_id = comments.id AND user_likes.user_id = $2
+     WHERE comments.id = $1`,
+    [commentId, viewerId ?? null]
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    return null;
+  }
+
+  return mapComment(result.rows[0] as CommentRow);
+};
+
+export const fetchComments = async (
+  postId: string,
+  viewerId?: string | null
+): Promise<FeedComment[]> => {
   await ensureFeedTables();
 
   const result = await db.query(
@@ -450,12 +548,21 @@ export const fetchComments = async (postId: string): Promise<FeedComment[]> => {
             comments.content,
             comments.created_at,
             users.name AS author_name,
-            users.handle AS author_handle
+            users.handle AS author_handle,
+            COALESCE(like_counts.count, 0) AS like_count,
+            (user_likes.user_id IS NOT NULL) AS liked_by_user
      FROM feed_comments comments
      JOIN users ON users.id = comments.author_id
+     LEFT JOIN (
+       SELECT comment_id, COUNT(*)::int AS count
+       FROM feed_comment_likes
+       GROUP BY comment_id
+     ) like_counts ON like_counts.comment_id = comments.id
+     LEFT JOIN feed_comment_likes user_likes
+       ON user_likes.comment_id = comments.id AND user_likes.user_id = $2
      WHERE comments.post_id = $1
-     ORDER BY comments.created_at ASC`,
-    [postId]
+     ORDER BY comments.created_at DESC`,
+    [postId, viewerId ?? null]
   );
 
   return (result.rows as CommentRow[]).map(mapComment);
@@ -482,25 +589,12 @@ export const addComment = async (params: {
     [commentId, params.postId, params.userId, params.content]
   );
 
-  const result = await db.query(
-    `SELECT comments.id,
-            comments.post_id,
-            comments.author_id,
-            comments.content,
-            comments.created_at,
-            users.name AS author_name,
-            users.handle AS author_handle
-     FROM feed_comments comments
-     JOIN users ON users.id = comments.author_id
-     WHERE comments.id = $1`,
-    [commentId]
-  );
-
-  if ((result.rowCount ?? 0) === 0) {
+  const comment = await fetchCommentById(commentId, params.userId);
+  if (!comment) {
     throw new FeedError("Unable to save comment", 500);
   }
 
-  return mapComment(result.rows[0] as CommentRow);
+  return comment;
 };
 
 export const updateComment = async (params: {
@@ -529,25 +623,12 @@ export const updateComment = async (params: {
     [params.commentId, params.content]
   );
 
-  const result = await db.query(
-    `SELECT comments.id,
-            comments.post_id,
-            comments.author_id,
-            comments.content,
-            comments.created_at,
-            users.name AS author_name,
-            users.handle AS author_handle
-     FROM feed_comments comments
-     JOIN users ON users.id = comments.author_id
-     WHERE comments.id = $1`,
-    [params.commentId]
-  );
-
-  if ((result.rowCount ?? 0) === 0) {
+  const comment = await fetchCommentById(params.commentId, params.userId);
+  if (!comment) {
     throw new FeedError("Unable to update comment", 500);
   }
 
-  return mapComment(result.rows[0] as CommentRow);
+  return comment;
 };
 
 export const deleteComment = async (params: {

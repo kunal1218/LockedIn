@@ -9,6 +9,7 @@ import {
   fetchFeed,
   fetchPostById,
   FeedError,
+  toggleCommentLike,
   toggleLike,
   updatePost,
   updateComment,
@@ -261,10 +262,22 @@ export const likeFeedPost = async (req: Request, res: Response) => {
   }
 };
 
+export const likeFeedComment = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const commentId = requireCommentId(req.params?.commentId);
+    const result = await toggleCommentLike({ userId: user.id, commentId });
+    res.json(result);
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
 export const getComments = async (req: Request, res: Response) => {
   try {
+    const viewer = await getOptionalUser(req);
     const postId = requirePostId(req.params?.postId);
-    const comments = await fetchComments(postId);
+    const comments = await fetchComments(postId, viewer?.id ?? null);
     res.json({ comments });
   } catch (error) {
     handleError(res, error);
