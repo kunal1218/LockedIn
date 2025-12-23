@@ -2,6 +2,7 @@
 
 import type { KeyboardEvent, MouseEvent } from "react";
 import type { FeedPost } from "@lockedin/shared";
+import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
@@ -31,10 +32,12 @@ export const PollCard = ({
   onLike,
   isLiking,
 }: PollCardProps) => {
+  const router = useRouter();
   const maxVotes = getMaxVotes(post) || 1;
   const isClickable = Boolean(onOpen);
   const likeCount = post.likeCount ?? 0;
   const collegeName = post.author.collegeName;
+  const profileSlug = post.author.handle.replace(/^@/, "");
 
   const handleCardClick = () => {
     onOpen?.(post);
@@ -57,6 +60,14 @@ export const PollCard = ({
       action?.(post);
     };
 
+  const handleProfileClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (!profileSlug) {
+      return;
+    }
+    router.push(`/profile/${profileSlug}`);
+  };
+
   return (
     <Card
       className={`space-y-4 ${
@@ -70,7 +81,14 @@ export const PollCard = ({
       tabIndex={isClickable ? 0 : undefined}
     >
       <div className="flex items-center gap-3">
-        <Avatar name={post.author.name} />
+        <button
+          type="button"
+          onClick={handleProfileClick}
+          className="rounded-full"
+          aria-label={`View ${post.author.handle} profile`}
+        >
+          <Avatar name={post.author.name} />
+        </button>
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-semibold text-ink">{post.author.name}</p>
