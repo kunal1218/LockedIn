@@ -222,11 +222,18 @@ export const Feed = () => {
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+          <Tag
+            tone="default"
+            className="h-7 px-3 py-0 text-[10px] uppercase tracking-[0.16em] text-muted"
+          >
             Filter
-          </span>
+          </Tag>
           {filterTags.map((tag) => (
-            <Tag key={tag} tone={tag === "All" ? "accent" : "default"}>
+            <Tag
+              key={tag}
+              tone={tag === "All" ? "accent" : "default"}
+              className="h-7 px-3 py-0"
+            >
               {tag}
             </Tag>
           ))}
@@ -237,7 +244,7 @@ export const Feed = () => {
               <button
                 key={option.id}
                 type="button"
-                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                className={`h-7 rounded-full px-3 text-xs font-semibold transition ${
                   sort === option.id
                     ? "bg-accent text-white shadow-[0_12px_24px_rgba(255,134,88,0.25)]"
                     : "text-ink/80 hover:bg-card-border/40"
@@ -252,7 +259,7 @@ export const Feed = () => {
             type="button"
             onClick={openCreateComposer}
             aria-label="Create post"
-            className="inline-flex items-center rounded-full border border-card-border/70 bg-white/80 px-3 py-1 text-xs font-semibold text-ink/80 transition hover:border-accent/50 hover:bg-accent/15 hover:text-accent"
+            className="inline-flex h-7 items-center justify-center rounded-full border border-card-border/70 bg-white/80 px-3 text-base font-semibold leading-none text-ink/80 transition hover:border-accent/50 hover:bg-accent/15 hover:text-accent"
           >
             +
           </button>
