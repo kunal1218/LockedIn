@@ -502,3 +502,75 @@ export const addComment = async (params: {
 
   return mapComment(result.rows[0] as CommentRow);
 };
+
+export const updateComment = async (params: {
+  userId: string;
+  commentId: string;
+  content: string;
+}): Promise<FeedComment> => {
+  await ensureFeedTables();
+
+  const current = await db.query(
+    "SELECT author_id FROM feed_comments WHERE id = $1",
+    [params.commentId]
+  );
+
+  if ((current.rowCount ?? 0) === 0) {
+    throw new FeedError("Comment not found", 404);
+  }
+
+  const { author_id: authorId } = current.rows[0] as { author_id: string };
+  if (authorId !== params.userId) {
+    throw new FeedError("You can only edit your own comments", 403);
+  }
+
+  await db.query(
+    "UPDATE feed_comments SET content = $2 WHERE id = $1",
+    [params.commentId, params.content]
+  );
+
+  const result = await db.query(
+    `SELECT comments.id,
+            comments.post_id,
+            comments.author_id,
+            comments.content,
+            comments.created_at,
+            users.name AS author_name,
+            users.handle AS author_handle
+     FROM feed_comments comments
+     JOIN users ON users.id = comments.author_id
+     WHERE comments.id = $1`,
+    [params.commentId]
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new FeedError("Unable to update comment", 500);
+  }
+
+  return mapComment(result.rows[0] as CommentRow);
+};
+
+export const deleteComment = async (params: {
+  userId: string;
+  commentId: string;
+}): Promise<void> => {
+  await ensureFeedTables();
+
+  const current = await db.query(
+    "SELECT author_id FROM feed_comments WHERE id = $1",
+    [params.commentId]
+  );
+
+  if ((current.rowCount ?? 0) === 0) {
+    throw new FeedError("Comment not found", 404);
+  }
+
+  const { author_id: authorId } = current.rows[0] as { author_id: string };
+  if (authorId !== params.userId) {
+    throw new FeedError("You can only delete your own comments", 403);
+  }
+
+  await db.query("DELETE FROM feed_comments WHERE id = $1", [
+    params.commentId,
+  ]);
+};

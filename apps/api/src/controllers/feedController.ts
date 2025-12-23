@@ -4,12 +4,14 @@ import {
   addComment,
   createPost,
   deletePost,
+  deleteComment,
   fetchComments,
   fetchFeed,
   fetchPostById,
   FeedError,
   toggleLike,
   updatePost,
+  updateComment,
 } from "../services/feedService";
 
 const allowedTypes = ["text", "poll", "prompt", "update"] as const;
@@ -119,6 +121,17 @@ const requirePostId = (value: unknown) => {
   return postId;
 };
 
+const requireCommentId = (value: unknown) => {
+  const commentId = asString(value).trim();
+  if (!commentId) {
+    throw new FeedError("Comment ID is required", 400);
+  }
+  if (!isUuid(commentId)) {
+    throw new FeedError("Invalid comment ID", 400);
+  }
+  return commentId;
+};
+
 const parsePostPayload = (body: Request["body"]) => {
   const type = parsePostType(body?.type);
   const content = asString(body?.content).trim();
@@ -153,6 +166,14 @@ const parseUpdatePayload = (body: Request["body"]) => {
     : undefined;
 
   return { content, tags, pollOptions };
+};
+
+const parseCommentPayload = (body: Request["body"]) => {
+  const content = asString(body?.content).trim();
+  if (!content) {
+    throw new FeedError("Comment content is required", 400);
+  }
+  return { content };
 };
 
 const handleError = (res: Response, error: unknown) => {
@@ -254,11 +275,7 @@ export const createComment = async (req: Request, res: Response) => {
   try {
     const user = await requireUser(req);
     const postId = requirePostId(req.params?.postId);
-
-    const content = asString(req.body?.content).trim();
-    if (!content) {
-      throw new FeedError("Comment cannot be empty", 400);
-    }
+    const { content } = parseCommentPayload(req.body);
 
     const comment = await addComment({
       userId: user.id,
@@ -267,6 +284,36 @@ export const createComment = async (req: Request, res: Response) => {
     });
 
     res.status(201).json({ comment });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const updateFeedComment = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const commentId = requireCommentId(req.params?.commentId);
+    const { content } = parseCommentPayload(req.body);
+
+    const comment = await updateComment({
+      userId: user.id,
+      commentId,
+      content,
+    });
+
+    res.json({ comment });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const deleteFeedComment = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const commentId = requireCommentId(req.params?.commentId);
+
+    await deleteComment({ userId: user.id, commentId });
+    res.status(204).send();
   } catch (error) {
     handleError(res, error);
   }

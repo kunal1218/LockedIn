@@ -36,6 +36,16 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
+  const [openCommentMenuId, setOpenCommentMenuId] = useState<string | null>(
+    null
+  );
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingBody, setEditingBody] = useState("");
+  const [editCommentError, setEditCommentError] = useState<string | null>(null);
+  const [isUpdatingComment, setIsUpdatingComment] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(
+    null
+  );
   const commentsRef = useRef<HTMLDivElement | null>(null);
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -52,6 +62,28 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
     "";
 
   useEffect(() => {
+    if (!openCommentMenuId) {
+      return;
+    }
+
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) {
+        return;
+      }
+
+      if (target.closest(`[data-comment-menu="${openCommentMenuId}"]`)) {
+        return;
+      }
+
+      setOpenCommentMenuId(null);
+    };
+
+    window.addEventListener("click", handleClick);
+    return () => window.removeEventListener("click", handleClick);
+  }, [openCommentMenuId]);
+
+  useEffect(() => {
     let isActive = true;
 
     const loadPost = async () => {
@@ -59,6 +91,11 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
       setError(null);
       setPost(null);
       setComments([]);
+      setOpenCommentMenuId(null);
+      setEditingCommentId(null);
+      setEditingBody("");
+      setEditCommentError(null);
+      setDeletingCommentId(null);
 
       if (!resolvedPostId) {
         setError("This post link is missing an ID.");
@@ -233,6 +270,92 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
     }
   };
 
+  const handleToggleCommentMenu = (commentId: string) => {
+    setOpenCommentMenuId((prev) => (prev === commentId ? null : commentId));
+  };
+
+  const handleStartEditComment = (comment: FeedComment) => {
+    setEditingCommentId(comment.id);
+    setEditingBody(comment.content);
+    setEditCommentError(null);
+    setOpenCommentMenuId(null);
+  };
+
+  const handleCancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditingBody("");
+    setEditCommentError(null);
+  };
+
+  const handleSaveEditComment = async (comment: FeedComment) => {
+    if (!token) {
+      openAuthModal();
+      return;
+    }
+
+    const trimmed = editingBody.trim();
+    if (!trimmed) {
+      setEditCommentError("Comment cannot be empty.");
+      return;
+    }
+
+    if (isUpdatingComment) {
+      return;
+    }
+
+    setIsUpdatingComment(true);
+    setEditCommentError(null);
+
+    try {
+      const response = await apiPatch<{ comment: FeedComment }>(
+        `/feed/comments/${comment.id}`,
+        { content: trimmed },
+        token
+      );
+      setComments((prev) =>
+        prev.map((item) => (item.id === comment.id ? response.comment : item))
+      );
+      setEditingCommentId(null);
+      setEditingBody("");
+    } catch (updateError) {
+      setEditCommentError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Unable to update comment."
+      );
+    } finally {
+      setIsUpdatingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (comment: FeedComment) => {
+    if (!token) {
+      openAuthModal();
+      return;
+    }
+
+    const confirmed = window.confirm("Delete this comment? This can't be undone.");
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingCommentId(comment.id);
+    setOpenCommentMenuId(null);
+
+    try {
+      await apiDelete(`/feed/comments/${comment.id}`, token);
+      setComments((prev) => prev.filter((item) => item.id !== comment.id));
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Unable to delete comment."
+      );
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
+
   const isOwnPost = Boolean(post && user?.id === post.author.id);
   const handleOpenEdit = (_post?: FeedPost) => {
     setComposerOpen(true);
@@ -351,20 +474,106 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
                     No comments yet. Start the conversation.
                   </p>
                 ) : (
-                  comments.map((comment) => (
-                    <div key={comment.id} className="flex items-start gap-3">
-                      <Avatar name={comment.author.name} size={32} />
-                      <div>
-                        <div className="flex items-center gap-2 text-xs text-muted">
-                          <span className="font-semibold text-ink">
-                            {comment.author.handle}
-                          </span>
-                          <span>{formatRelativeTime(comment.createdAt)}</span>
+                  comments.map((comment) => {
+                    const isOwnComment = user?.id === comment.author.id;
+                    const isEditing = editingCommentId === comment.id;
+                    const isDeleting = deletingCommentId === comment.id;
+
+                    return (
+                      <div key={comment.id} className="flex items-start gap-3">
+                        <Avatar name={comment.author.name} size={32} />
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div className="flex items-start gap-2">
+                            <div className="flex items-center gap-2 text-xs text-muted">
+                              <span className="font-semibold text-ink">
+                                {comment.author.handle}
+                              </span>
+                              <span>{formatRelativeTime(comment.createdAt)}</span>
+                            </div>
+                            {isOwnComment && !isEditing && (
+                              <div
+                                className="relative ml-auto"
+                                data-comment-menu={comment.id}
+                              >
+                                <button
+                                  type="button"
+                                  className="rounded-full border border-card-border/70 px-2 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
+                                  onClick={() =>
+                                    handleToggleCommentMenu(comment.id)
+                                  }
+                                  aria-label="Comment actions"
+                                >
+                                  ...
+                                </button>
+                                {openCommentMenuId === comment.id && (
+                                  <div className="absolute right-0 top-full z-10 mt-2 w-32 overflow-hidden rounded-2xl border border-card-border/70 bg-white/95 py-1 text-xs font-semibold text-ink/80 shadow-[0_16px_32px_rgba(27,26,23,0.14)]">
+                                    <button
+                                      type="button"
+                                      className="w-full px-3 py-2 text-left transition hover:bg-card-border/40 hover:text-ink"
+                                      onClick={() =>
+                                        handleStartEditComment(comment)
+                                      }
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="w-full px-3 py-2 text-left text-ink/70 transition hover:bg-card-border/40 hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
+                                      onClick={() =>
+                                        handleDeleteComment(comment)
+                                      }
+                                      disabled={isDeleting}
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          {isEditing ? (
+                            <div className="space-y-2">
+                              <textarea
+                                className={`${inputClasses} min-h-[96px]`}
+                                value={editingBody}
+                                onChange={(event) =>
+                                  setEditingBody(event.target.value)
+                                }
+                              />
+                              {editCommentError && (
+                                <p className="rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent">
+                                  {editCommentError}
+                                </p>
+                              )}
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
+                                  onClick={handleCancelEditComment}
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rounded-full bg-accent px-3 py-1 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-70"
+                                  onClick={() =>
+                                    handleSaveEditComment(comment)
+                                  }
+                                  disabled={isUpdatingComment}
+                                >
+                                  {isUpdatingComment ? "Saving..." : "Save"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-ink/90">
+                              {comment.content}
+                            </p>
+                          )}
                         </div>
-                        <p className="text-sm text-ink/90">{comment.content}</p>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </Card>

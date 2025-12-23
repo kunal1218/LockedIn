@@ -7,14 +7,14 @@ import { chatMessages } from "./mock";
 export const UniChat = () => {
   return (
     <Card className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <Tag tone="mint">Uni Chat</Tag>
           <p className="mt-2 text-sm text-muted">
             Global chat. Keep it light, invite people in.
           </p>
         </div>
-        <span className="rounded-full bg-accent-2/20 px-3 py-1 text-xs font-semibold text-accent-2">
+        <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-accent-2/20 px-3 py-1 text-xs font-semibold leading-none text-accent-2">
           {chatMessages.length} online
         </span>
       </div>
