@@ -557,13 +557,13 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
                                 >
                                   <button
                                     type="button"
-                                    className="rounded-full border border-card-border/70 px-2 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
+                                    className="inline-flex h-6 w-6 items-center justify-center text-sm font-semibold text-muted transition hover:text-ink"
                                     onClick={() =>
                                       handleToggleCommentMenu(comment.id)
                                     }
                                     aria-label="Comment actions"
                                   >
-                                    ...
+                                    ⋮
                                   </button>
                                   {openCommentMenuId === comment.id && (
                                     <div className="absolute right-0 top-full z-10 mt-2 w-32 overflow-hidden rounded-2xl border border-card-border/70 bg-white/95 py-1 text-xs font-semibold text-ink/80 shadow-[0_16px_32px_rgba(27,26,23,0.14)]">
