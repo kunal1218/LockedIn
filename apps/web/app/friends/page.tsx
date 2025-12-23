@@ -1,7 +1,9 @@
 "use client";
 
+import type { MouseEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
@@ -45,6 +47,7 @@ const getCollegeLabel = (user: FriendUser) => {
 };
 
 export default function FriendsPage() {
+  const router = useRouter();
   const { token, isAuthenticated, openAuthModal } = useAuth();
   const [summary, setSummary] = useState<FriendSummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -122,6 +125,17 @@ export default function FriendsPage() {
     refreshSummary();
   };
 
+  const handleRowNavigation = (slug: string) => {
+    if (!slug) {
+      return;
+    }
+    router.push(`/messages/${encodeURIComponent(slug)}`);
+  };
+
+  const stopRowClick = (event: MouseEvent) => {
+    event.stopPropagation();
+  };
+
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-2">
       <div className="space-y-8">
@@ -155,20 +169,24 @@ export default function FriendsPage() {
                 {summary.friends.map((friend) => {
                   const collegeLabel = getCollegeLabel(friend);
                   const slug = friend.handle.replace(/^@/, "").trim();
-                  const profileIdentifier = slug || friend.id;
                   const messageSlug =
                     slug || friend.handle.replace(/^@/, "").trim();
                   return (
                     <div
                       key={friend.id}
-                      className="flex flex-wrap items-center gap-3 rounded-2xl border border-card-border/70 bg-white/70 px-4 py-3"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Open chat with ${friend.handle}`}
+                      className="flex flex-wrap items-center gap-3 rounded-2xl border border-card-border/70 bg-white/70 px-4 py-3 transition hover:border-accent/40 hover:bg-white/90"
+                      onClick={() => handleRowNavigation(messageSlug)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          handleRowNavigation(messageSlug);
+                        }
+                      }}
                     >
-                      <Link
-                        href={`/profile/${encodeURIComponent(profileIdentifier)}`}
-                        className="rounded-full transition hover:-translate-y-0.5 hover:shadow-sm"
-                      >
-                        <Avatar name={friend.name} size={36} />
-                      </Link>
+                      <Avatar name={friend.name} size={36} />
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-ink">
                           {friend.handle}
@@ -178,23 +196,23 @@ export default function FriendsPage() {
                         </p>
                       </div>
                       <div className="ml-auto flex flex-wrap items-center gap-2">
-                        <Link
-                          href={`/messages/${encodeURIComponent(messageSlug)}`}
-                          className={actionClasses}
-                        >
-                          Send message
-                        </Link>
                         <button
                           type="button"
                           className={actionClasses}
-                          onClick={() => handleRemove(friend.handle)}
+                          onClick={(event) => {
+                            stopRowClick(event);
+                            handleRemove(friend.handle);
+                          }}
                         >
                           Remove
                         </button>
                         <button
                           type="button"
                           className={actionClasses}
-                          onClick={() => handleBlock(friend.handle)}
+                          onClick={(event) => {
+                            stopRowClick(event);
+                            handleBlock(friend.handle);
+                          }}
                         >
                           Block
                         </button>
