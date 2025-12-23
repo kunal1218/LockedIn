@@ -2,7 +2,7 @@
 
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
@@ -31,8 +31,8 @@ type ThreadResponse = {
 };
 
 type MessagePageProps = {
-  params: {
-    handle: string;
+  params?: {
+    handle?: string;
   };
 };
 
@@ -41,6 +41,7 @@ const inputClasses =
 
 export default function MessagePage({ params }: MessagePageProps) {
   const router = useRouter();
+  const routeParams = useParams();
   const { token, user, isAuthenticated, openAuthModal } = useAuth();
   const [threadUser, setThreadUser] = useState<MessageUser | null>(null);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
@@ -51,9 +52,17 @@ export default function MessagePage({ params }: MessagePageProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
 
   const handleSlug = useMemo(() => {
-    const raw = decodeURIComponent(params.handle ?? "");
-    return raw.replace(/^@/, "").trim();
-  }, [params.handle]);
+    const paramValue =
+      (routeParams as { handle?: string | string[] } | null)?.handle ??
+      params?.handle ??
+      "";
+    const raw = Array.isArray(paramValue) ? paramValue[0] ?? "" : paramValue;
+    if (!raw) {
+      return "";
+    }
+    const decoded = decodeURIComponent(raw);
+    return decoded.replace(/^@/, "").trim();
+  }, [params?.handle, routeParams]);
 
   useEffect(() => {
     if (!token) {
