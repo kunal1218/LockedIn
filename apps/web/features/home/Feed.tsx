@@ -219,44 +219,44 @@ export const Feed = () => {
           <h2 className="font-display text-2xl font-semibold">Global Feed</h2>
           <p className="text-sm text-muted">What your campus is up to right now.</p>
         </div>
-        <div className="flex flex-col gap-3 sm:items-end">
-          <Card className="hidden items-center gap-3 px-4 py-2 sm:flex">
-            <span className="text-xs font-semibold text-muted">Sort</span>
-            <div className="flex gap-2">
-              {sortOptions.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                    sort === option.id
-                      ? "bg-accent text-white"
-                      : "border border-card-border/70 bg-white/80 text-ink hover:border-accent/50"
-                  }`}
-                  onClick={() => setSort(option.id)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </Card>
-        </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+            Filter
+          </span>
           {filterTags.map((tag) => (
             <Tag key={tag} tone={tag === "All" ? "accent" : "default"}>
               {tag}
             </Tag>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={openCreateComposer}
-          aria-label="Create post"
-          className="ml-auto inline-flex items-center rounded-full bg-card-border/40 px-3 py-1 text-xs font-semibold text-ink/80 transition hover:bg-accent/15 hover:text-accent"
-        >
-          +
-        </button>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 rounded-full border border-card-border/70 bg-white/80 p-1">
+            {sortOptions.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                  sort === option.id
+                    ? "bg-accent text-white shadow-[0_12px_24px_rgba(255,134,88,0.25)]"
+                    : "text-ink/80 hover:bg-card-border/40"
+                }`}
+                onClick={() => setSort(option.id)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={openCreateComposer}
+            aria-label="Create post"
+            className="inline-flex items-center rounded-full border border-card-border/70 bg-white/80 px-3 py-1 text-xs font-semibold text-ink/80 transition hover:border-accent/50 hover:bg-accent/15 hover:text-accent"
+          >
+            +
+          </button>
+        </div>
       </div>
       {error && (
         <Card className="border border-accent/30 bg-accent/10 py-4">
