@@ -62,10 +62,35 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
   const [isRelationshipLoading, setRelationshipLoading] = useState(false);
   const [relationshipError, setRelationshipError] = useState<string | null>(null);
 
-  const sanitizedHandle =
-    typeof handle === "string"
-      ? handle.trim().replace(/^@/, "").trim()
-      : "";
+  const fallbackHandle = useMemo(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+
+    const marker = "/profile/";
+    const path = window.location.pathname;
+    const index = path.indexOf(marker);
+    if (index === -1) {
+      return "";
+    }
+
+    const segment = path.slice(index + marker.length).split("/")[0] ?? "";
+    if (!segment) {
+      return "";
+    }
+
+    try {
+      return decodeURIComponent(segment);
+    } catch {
+      return segment;
+    }
+  }, []);
+
+  const rawHandle = typeof handle === "string" ? handle : "";
+  const sanitizedHandle = (rawHandle || fallbackHandle)
+    .trim()
+    .replace(/^@/, "")
+    .trim();
 
   useEffect(() => {
     let isActive = true;
