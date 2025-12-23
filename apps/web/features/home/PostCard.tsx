@@ -21,6 +21,7 @@ type PostCardProps = {
   onEdit?: (post: FeedPost) => void;
   onDelete?: (post: FeedPost) => void;
   onLike?: (post: FeedPost) => void;
+  onComment?: (post: FeedPost) => void;
   isLiking?: boolean;
 };
 
@@ -31,6 +32,7 @@ export const PostCard = ({
   onEdit,
   onDelete,
   onLike,
+  onComment,
   isLiking,
 }: PostCardProps) => {
   const isClickable = Boolean(onOpen);
@@ -113,6 +115,14 @@ export const PostCard = ({
           aria-pressed={post.likedByUser}
         >
           Like {likeCount}
+        </button>
+        <button
+          type="button"
+          className="rounded-full border border-card-border/70 bg-white/80 px-3 py-1 text-xs font-semibold text-ink/80 transition hover:border-accent/40 hover:text-ink"
+          onClick={handleActionClick(onComment)}
+          disabled={!onComment}
+        >
+          Comment
         </button>
         {post.tags?.map((tag) => (
           <Tag key={tag} tone="default">

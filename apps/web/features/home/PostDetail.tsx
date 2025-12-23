@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { FeedComment, FeedPost } from "@lockedin/shared";
 import { useRouter } from "next/navigation";
@@ -34,6 +34,8 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
+  const commentsRef = useRef<HTMLDivElement | null>(null);
+  const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     let isActive = true;
@@ -214,6 +216,15 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
     setComposerOpen(true);
   };
 
+  const handleOpenComment = (_post?: FeedPost) => {
+    commentsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (typeof window !== "undefined") {
+      window.setTimeout(() => {
+        commentInputRef.current?.focus();
+      }, 150);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-4xl px-4 pb-16 pt-2">
       <div className="space-y-8">
@@ -251,6 +262,7 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
               onEdit={handleOpenEdit}
               onDelete={handleDeletePost}
               onLike={handleToggleLike}
+              onComment={handleOpenComment}
               isLiking={isLiking}
             />
           ) : (
@@ -260,6 +272,7 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
               onEdit={handleOpenEdit}
               onDelete={handleDeletePost}
               onLike={handleToggleLike}
+              onComment={handleOpenComment}
               isLiking={isLiking}
             />
           )
@@ -270,60 +283,63 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
         )}
 
         {post && (
-          <Card className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-                  Comments
-                </p>
-                <h2 className="mt-2 font-display text-xl font-semibold">
-                  {comments.length} replies
-                </h2>
+          <div ref={commentsRef}>
+            <Card className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                    Comments
+                  </p>
+                  <h2 className="mt-2 font-display text-xl font-semibold">
+                    {comments.length} replies
+                  </h2>
+                </div>
               </div>
-            </div>
 
-            <form className="space-y-3" onSubmit={handleSubmitComment}>
-              <textarea
-                className={`${inputClasses} min-h-[120px]`}
-                value={commentBody}
-                onChange={(event) => setCommentBody(event.target.value)}
-                placeholder="Add your take, share a tip, or respond with a plan."
-              />
-              {commentError && (
-                <p className="rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent">
-                  {commentError}
-                </p>
-              )}
-              <div className="flex justify-end">
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Posting..." : "Post comment"}
-                </Button>
-              </div>
-            </form>
+              <form className="space-y-3" onSubmit={handleSubmitComment}>
+                <textarea
+                  ref={commentInputRef}
+                  className={`${inputClasses} min-h-[120px]`}
+                  value={commentBody}
+                  onChange={(event) => setCommentBody(event.target.value)}
+                  placeholder="Add your take, share a tip, or respond with a plan."
+                />
+                {commentError && (
+                  <p className="rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent">
+                    {commentError}
+                  </p>
+                )}
+                <div className="flex justify-end">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Posting..." : "Post comment"}
+                  </Button>
+                </div>
+              </form>
 
-            <div className="space-y-4">
-              {comments.length === 0 ? (
-                <p className="text-sm text-muted">
-                  No comments yet. Start the conversation.
-                </p>
-              ) : (
-                comments.map((comment) => (
-                  <div key={comment.id} className="flex items-start gap-3">
-                    <Avatar name={comment.author.name} size={32} />
-                    <div>
-                      <div className="flex items-center gap-2 text-xs text-muted">
-                        <span className="font-semibold text-ink">
-                          {comment.author.handle}
-                        </span>
-                        <span>{formatRelativeTime(comment.createdAt)}</span>
+              <div className="space-y-4">
+                {comments.length === 0 ? (
+                  <p className="text-sm text-muted">
+                    No comments yet. Start the conversation.
+                  </p>
+                ) : (
+                  comments.map((comment) => (
+                    <div key={comment.id} className="flex items-start gap-3">
+                      <Avatar name={comment.author.name} size={32} />
+                      <div>
+                        <div className="flex items-center gap-2 text-xs text-muted">
+                          <span className="font-semibold text-ink">
+                            {comment.author.handle}
+                          </span>
+                          <span>{formatRelativeTime(comment.createdAt)}</span>
+                        </div>
+                        <p className="text-sm text-ink/90">{comment.content}</p>
                       </div>
-                      <p className="text-sm text-ink/90">{comment.content}</p>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </Card>
+                  ))
+                )}
+              </div>
+            </Card>
+          </div>
         )}
       </div>
 

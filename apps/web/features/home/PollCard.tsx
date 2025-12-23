@@ -19,6 +19,7 @@ type PollCardProps = {
   onEdit?: (post: FeedPost) => void;
   onDelete?: (post: FeedPost) => void;
   onLike?: (post: FeedPost) => void;
+  onComment?: (post: FeedPost) => void;
   isLiking?: boolean;
 };
 
@@ -29,6 +30,7 @@ export const PollCard = ({
   onEdit,
   onDelete,
   onLike,
+  onComment,
   isLiking,
 }: PollCardProps) => {
   const maxVotes = getMaxVotes(post) || 1;
@@ -133,6 +135,14 @@ export const PollCard = ({
           aria-pressed={post.likedByUser}
         >
           Like {likeCount}
+        </button>
+        <button
+          type="button"
+          className="rounded-full border border-card-border/70 bg-white/80 px-3 py-1 text-xs font-semibold text-ink/80 transition hover:border-accent/40 hover:text-ink"
+          onClick={handleActionClick(onComment)}
+          disabled={!onComment}
+        >
+          Comment
         </button>
         {post.tags?.map((tag) => (
           <Tag key={tag} tone="default">
