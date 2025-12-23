@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Card } from "@/components/Card";
-import { Tag } from "@/components/Tag";
 import { apiGet } from "@/lib/api";
 import { deriveCollegeFromDomain } from "@/lib/college";
 import { ProfileQuestionCard } from "./ProfileQuestionCard";
@@ -140,9 +139,9 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
                 {user.name}
               </p>
               {collegeLabel && (
-                <Tag tone="mint" className="px-2 py-0 text-[10px]">
+                <span className="text-xs font-semibold text-muted">
                   {collegeLabel}
-                </Tag>
+                </span>
               )}
             </div>
             <p className="text-sm text-muted">{user.handle}</p>

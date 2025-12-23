@@ -113,9 +113,9 @@ export const PollCard = ({
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-semibold text-ink">{post.author.name}</p>
             {collegeLabel && (
-              <Tag tone="mint" className="px-2 py-0 text-[10px]">
+              <span className="text-xs font-semibold text-muted">
                 {collegeLabel}
-              </Tag>
+              </span>
             )}
           </div>
           <p className="text-xs text-muted">
