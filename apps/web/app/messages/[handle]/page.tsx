@@ -194,7 +194,7 @@ export default function MessagePage({ params }: MessagePageProps) {
             Loading messages...
           </Card>
         ) : (
-          <Card className="space-y-6">
+          <Card className="flex h-[60vh] min-h-[420px] flex-col gap-6 md:h-[65vh]">
             {threadUser ? (
               <div className="flex items-center gap-3">
                 <Link
@@ -216,43 +216,48 @@ export default function MessagePage({ params }: MessagePageProps) {
               <p className="text-sm text-muted">No chat selected.</p>
             )}
 
-            <div className="space-y-3">
-              {messages.length === 0 ? (
-                <p className="text-sm text-muted">
-                  No messages yet. Start the conversation.
-                </p>
-              ) : (
-                messages.map((message) => {
-                  const isMine = message.sender.id === user?.id;
-                  return (
-                    <div
-                      key={message.id}
-                      className={`flex ${isMine ? "justify-end" : "justify-start"}`}
-                    >
+            <div className="flex-1 overflow-y-auto pr-1">
+              <div className="space-y-3">
+                {messages.length === 0 ? (
+                  <p className="text-sm text-muted">
+                    No messages yet. Start the conversation.
+                  </p>
+                ) : (
+                  messages.map((message) => {
+                    const isMine = message.sender.id === user?.id;
+                    return (
                       <div
-                        className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                          isMine
-                            ? "bg-accent text-white"
-                            : "border border-card-border/70 bg-white/90 text-ink"
-                        }`}
+                        key={message.id}
+                        className={`flex ${isMine ? "justify-end" : "justify-start"}`}
                       >
-                        <p className="whitespace-pre-wrap">{message.body}</p>
-                        <span
-                          className={`mt-2 block text-xs ${
-                            isMine ? "text-white/70" : "text-muted"
+                        <div
+                          className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                            isMine
+                              ? "bg-accent text-white"
+                              : "border border-card-border/70 bg-white/90 text-ink"
                           }`}
                         >
-                          {formatRelativeTime(message.createdAt)}
-                        </span>
+                          <p className="whitespace-pre-wrap">{message.body}</p>
+                          <span
+                            className={`mt-2 block text-xs ${
+                              isMine ? "text-white/70" : "text-muted"
+                            }`}
+                          >
+                            {formatRelativeTime(message.createdAt)}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })
-              )}
-              <div ref={endRef} />
+                    );
+                  })
+                )}
+                <div ref={endRef} />
+              </div>
             </div>
 
-            <form className="space-y-3" onSubmit={handleSubmit}>
+            <form
+              className="mt-auto space-y-3 border-t border-card-border/60 pt-4"
+              onSubmit={handleSubmit}
+            >
               <textarea
                 className={`${inputClasses} min-h-[120px]`}
                 value={draft}
