@@ -16,6 +16,8 @@ export type AuthUser = {
   name: string;
   handle: string;
   email: string;
+  collegeName?: string | null;
+  collegeDomain?: string | null;
 };
 
 type AuthPayload = {

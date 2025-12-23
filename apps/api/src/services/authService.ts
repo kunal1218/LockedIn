@@ -9,6 +9,8 @@ type UserRow = {
   handle: string;
   email: string;
   password_hash: string;
+  college_name?: string | null;
+  college_domain?: string | null;
 };
 
 export type AuthUser = {
@@ -16,6 +18,8 @@ export type AuthUser = {
   name: string;
   handle: string;
   email: string;
+  collegeName?: string | null;
+  collegeDomain?: string | null;
 };
 
 export type AuthPayload = {
@@ -42,12 +46,79 @@ export const ensureUsersTable = async () => {
       handle text NOT NULL UNIQUE,
       email text NOT NULL UNIQUE,
       password_hash text NOT NULL,
+      college_name text,
+      college_domain text,
       created_at timestamptz NOT NULL DEFAULT now()
     );
+  `);
+
+  await db.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS college_name text,
+    ADD COLUMN IF NOT EXISTS college_domain text;
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS users_college_domain_idx
+      ON users (college_domain);
   `);
 };
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+const secondaryEducationTlds = new Set([
+  "ac.uk",
+  "edu.au",
+  "edu.in",
+  "edu.ca",
+]);
+
+const toCollegeName = (slug: string) => {
+  const cleaned = slug.replace(/[-_]+/g, " ").trim();
+  if (!cleaned) {
+    return "";
+  }
+
+  const compact = cleaned.replace(/\s+/g, "");
+  if (compact.length <= 4) {
+    return compact.toUpperCase();
+  }
+
+  return cleaned
+    .split(" ")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+};
+
+const deriveCollegeFromEmail = (email: string) => {
+  const domain = email.split("@")[1]?.toLowerCase() ?? "";
+  const parts = domain.split(".").filter(Boolean);
+  if (parts.length < 2) {
+    return null;
+  }
+
+  const tld = parts[parts.length - 1];
+  const lastTwo = parts.slice(-2).join(".");
+  let collegeDomain = "";
+  let slug = "";
+
+  if (tld === "edu" && parts.length >= 2) {
+    slug = parts[parts.length - 2];
+    collegeDomain = parts.slice(-2).join(".");
+  } else if (secondaryEducationTlds.has(lastTwo) && parts.length >= 3) {
+    slug = parts[parts.length - 3];
+    collegeDomain = parts.slice(-3).join(".");
+  } else {
+    return null;
+  }
+
+  const name = toCollegeName(slug);
+  if (!name || !collegeDomain) {
+    return null;
+  }
+
+  return { name, domain: collegeDomain };
+};
 
 const normalizeHandle = (handle: string) => {
   const cleaned = handle.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
@@ -57,11 +128,18 @@ const normalizeHandle = (handle: string) => {
   return `@${cleaned}`;
 };
 
-const mapUser = (row: Pick<UserRow, "id" | "name" | "handle" | "email">) => ({
+const mapUser = (
+  row: Pick<
+    UserRow,
+    "id" | "name" | "handle" | "email" | "college_name" | "college_domain"
+  >
+) => ({
   id: row.id,
   name: row.name,
   handle: row.handle,
   email: row.email,
+  collegeName: row.college_name ?? null,
+  collegeDomain: row.college_domain ?? null,
 });
 
 const handleExists = async (handle: string) => {
@@ -140,12 +218,21 @@ export const signUpUser = async (params: {
 
   const passwordHash = await bcrypt.hash(params.password, 10);
   const userId = randomUUID();
+  const college = deriveCollegeFromEmail(email);
 
   const result = await db.query(
-    `INSERT INTO users (id, name, handle, email, password_hash)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, name, handle, email`,
-    [userId, name, handle, email, passwordHash]
+    `INSERT INTO users (id, name, handle, email, password_hash, college_name, college_domain)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, name, handle, email, college_name, college_domain`,
+    [
+      userId,
+      name,
+      handle,
+      email,
+      passwordHash,
+      college?.name ?? null,
+      college?.domain ?? null,
+    ]
   );
 
   const user = mapUser(result.rows[0]);
@@ -167,7 +254,7 @@ export const signInUser = async (params: {
   }
 
   const result = await db.query(
-    "SELECT id, name, handle, email, password_hash FROM users WHERE email = $1",
+    "SELECT id, name, handle, email, password_hash, college_name, college_domain FROM users WHERE email = $1",
     [email]
   );
   const row = result.rows[0] as UserRow | undefined;
@@ -179,6 +266,24 @@ export const signInUser = async (params: {
   const matches = await bcrypt.compare(params.password, row.password_hash);
   if (!matches) {
     throw new AuthError("Invalid email or password", 401);
+  }
+
+  if (!row.college_domain) {
+    const college = deriveCollegeFromEmail(row.email);
+    if (college) {
+      const refreshed = await db.query(
+        `UPDATE users
+         SET college_name = $2, college_domain = $3
+         WHERE id = $1
+         RETURNING id, name, handle, email, college_name, college_domain`,
+        [row.id, college.name, college.domain]
+      );
+      const updated = refreshed.rows[0] as UserRow | undefined;
+      if (updated) {
+        row.college_name = updated.college_name ?? null;
+        row.college_domain = updated.college_domain ?? null;
+      }
+    }
   }
 
   const user = mapUser(row);
@@ -203,10 +308,31 @@ export const getUserFromToken = async (
 
   const { userId } = JSON.parse(session) as { userId: string };
   const result = await db.query(
-    "SELECT id, name, handle, email FROM users WHERE id = $1",
+    "SELECT id, name, handle, email, college_name, college_domain FROM users WHERE id = $1",
     [userId]
   );
-  const row = result.rows[0] as AuthUser | undefined;
+  const row = result.rows[0] as UserRow | undefined;
+  if (!row) {
+    return null;
+  }
 
-  return row ? mapUser(row) : null;
+  if (!row.college_domain) {
+    const college = deriveCollegeFromEmail(row.email);
+    if (college) {
+      const refreshed = await db.query(
+        `UPDATE users
+         SET college_name = $2, college_domain = $3
+         WHERE id = $1
+         RETURNING id, name, handle, email, college_name, college_domain`,
+        [row.id, college.name, college.domain]
+      );
+      const updated = refreshed.rows[0] as UserRow | undefined;
+      if (updated) {
+        row.college_name = updated.college_name ?? null;
+        row.college_domain = updated.college_domain ?? null;
+      }
+    }
+  }
+
+  return mapUser(row);
 };
