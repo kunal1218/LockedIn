@@ -26,9 +26,15 @@ const formatNumber = (value: number) => value.toString().padStart(2, "0");
 
 export const DailyChallenge = () => {
   const endsAt = dailyChallenge.endsAt;
-  const [timeLeft, setTimeLeft] = useState(() => getTimeLeft(endsAt));
+  const [timeLeft, setTimeLeft] = useState(() => ({
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+    expired: false,
+  }));
 
   useEffect(() => {
+    setTimeLeft(getTimeLeft(endsAt));
     const interval = setInterval(() => {
       setTimeLeft(getTimeLeft(endsAt));
     }, 1000);
