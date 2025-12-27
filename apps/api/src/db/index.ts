@@ -19,7 +19,7 @@ export const getPool = () => {
 export const db = {
   query: async (
     text: string,
-    params?: Array<string | number | string[] | number[] | null>
+    params?: Array<string | number | boolean | string[] | number[] | boolean[] | null>
   ) => {
     const activePool = getPool();
     if (!activePool) {
