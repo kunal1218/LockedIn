@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google";
 import { BackgroundDecor } from "@/components/BackgroundDecor";
 import { SiteHeader } from "@/components/SiteHeader";
 import { AuthModal, AuthProvider } from "@/features/auth";
+import "mapbox-gl/dist/mapbox-gl.css";
 import "./globals.css";
 
 const display = Space_Grotesk({
