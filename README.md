@@ -33,6 +33,7 @@ REDIS_URL=redis://localhost:6379
 ## Deployment
 Frontend (Vercel)
 - Set `NEXT_PUBLIC_API_BASE_URL` to your Railway API URL
+- Set `NEXT_PUBLIC_MAPBOX_TOKEN` for Mapbox-powered maps
 - Build command: `npm run build -w apps/web`
 - Output: default Next.js
 
