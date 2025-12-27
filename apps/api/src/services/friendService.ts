@@ -103,7 +103,7 @@ const mapRequest = (row: FriendRequestRow): FriendRequest => ({
   }),
 });
 
-const ensureFriendTables = async () => {
+export const ensureFriendTables = async () => {
   await ensureUsersTable();
 
   await db.query(`
