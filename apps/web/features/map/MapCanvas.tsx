@@ -222,9 +222,14 @@ export const MapCanvas = () => {
             if (error) {
               return;
             }
+            if (zoom == null) {
+              return;
+            }
+            if (cluster.geometry.type !== "Point") {
+              return;
+            }
             map.easeTo({
-              center: (cluster.geometry as { coordinates: [number, number] })
-                .coordinates,
+              center: cluster.geometry.coordinates as [number, number],
               zoom,
             });
           }
