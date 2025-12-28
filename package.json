@@ -11,7 +11,10 @@
     "dev:api": "npm run dev -w apps/api",
     "build:web": "npm run build -w apps/web",
     "build:api": "npm run build -w apps/api",
-    "lint:web": "npm run lint -w apps/web",
-    "postinstall": "node scripts/ensure-lightningcss.cjs"
+    "lint:web": "npm run lint -w apps/web"
+  },
+  "optionalDependencies": {
+    "@tailwindcss/oxide-linux-x64-gnu": "4.1.18",
+    "lightningcss-linux-x64-gnu": "1.30.2"
   }
 }
