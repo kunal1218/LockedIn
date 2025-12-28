@@ -1,4 +1,9 @@
 const { execSync } = require("node:child_process");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const DEFAULT_VERSION = "1.30.2";
+const repoRoot = path.resolve(__dirname, "..");
 
 function getLightningCssPackage() {
   const parts = [process.platform, process.arch];
@@ -21,7 +26,43 @@ function getLightningCssPackage() {
   return `lightningcss-${parts.join("-")}`;
 }
 
-function ensureLightningCssBinary() {
+function findLightningCssPackageJson() {
+  const candidates = [
+    path.join(process.cwd(), "node_modules", "lightningcss", "package.json"),
+    path.join(repoRoot, "node_modules", "lightningcss", "package.json"),
+    path.join(process.cwd(), "..", "node_modules", "lightningcss", "package.json"),
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function ensureLightningCssInstalled(version) {
+  try {
+    require.resolve("lightningcss");
+    return;
+  } catch (error) {
+    if (error && error.code !== "MODULE_NOT_FOUND") {
+      throw error;
+    }
+  }
+
+  console.log(`[ensure-lightningcss] Installing lightningcss@${version}.`);
+  execSync(
+    `npm install --no-save --ignore-scripts lightningcss@${version}`,
+    {
+      stdio: "inherit",
+      cwd: repoRoot,
+    }
+  );
+}
+
+function ensureLightningCssBinary(version) {
   const pkgName = getLightningCssPackage();
 
   try {
@@ -33,22 +74,33 @@ function ensureLightningCssBinary() {
     }
   }
 
-  let version;
-  try {
-    version = require("lightningcss/package.json").version;
-  } catch (error) {
-    console.warn(
-      "[ensure-lightningcss] lightningcss is not installed; skipping binary check."
-    );
-    return;
-  }
-
   console.log(
-    `[ensure-lightningcss] Installing ${pkgName}@${version} to satisfy optional native bindings.`
+    `[ensure-lightningcss] Installing ${pkgName}@${version} to satisfy native bindings.`
   );
-  execSync(`npm install --no-save --ignore-scripts ${pkgName}@${version}`, {
-    stdio: "inherit",
-  });
+  execSync(
+    `npm install --no-save --ignore-scripts ${pkgName}@${version}`,
+    {
+      stdio: "inherit",
+      cwd: repoRoot,
+    }
+  );
 }
 
-ensureLightningCssBinary();
+function run() {
+  let version = DEFAULT_VERSION;
+  const pkgJsonPath = findLightningCssPackageJson();
+
+  if (pkgJsonPath) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"));
+      version = parsed.version || version;
+    } catch {
+      // keep default version
+    }
+  }
+
+  ensureLightningCssInstalled(version);
+  ensureLightningCssBinary(version);
+}
+
+run();
