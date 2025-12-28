@@ -73,6 +73,11 @@ function ensurePackageInstalled(pkg, version) {
 }
 
 function ensureNativeBinary(pkgName, version) {
+  const pkgJsonPath = path.join(repoRoot, "node_modules", ...pkgName.split("/"), "package.json");
+  if (fs.existsSync(pkgJsonPath)) {
+    return;
+  }
+
   try {
     require.resolve(pkgName);
     return;
@@ -85,10 +90,17 @@ function ensureNativeBinary(pkgName, version) {
   console.log(
     `[ensure-lightningcss] Installing ${pkgName}@${version} to satisfy native bindings.`
   );
-  execSync(`npm install --no-save --ignore-scripts ${pkgName}@${version}`, {
-    stdio: "inherit",
-    cwd: repoRoot,
-  });
+  try {
+    execSync(`npm install --no-save --ignore-scripts ${pkgName}@${version}`, {
+      stdio: "inherit",
+      cwd: repoRoot,
+    });
+  } catch (error) {
+    // Ignore npm rename collisions that happen when the dir already exists.
+    if (!String(error.message || "").includes("ENOTEMPTY")) {
+      throw error;
+    }
+  }
 }
 
 function loadVersion(pkg, fallback) {
