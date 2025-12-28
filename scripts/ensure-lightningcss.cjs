@@ -73,8 +73,13 @@ function ensurePackageInstalled(pkg, version) {
 }
 
 function ensureNativeBinary(pkgName, version) {
-  const pkgJsonPath = path.join(repoRoot, "node_modules", ...pkgName.split("/"), "package.json");
-  if (fs.existsSync(pkgJsonPath)) {
+  const pkgPathParts = pkgName.split("/");
+  const pkgDir = path.join(repoRoot, "node_modules", ...pkgPathParts);
+  const pkgJsonPath = path.join(pkgDir, "package.json");
+
+  // If the directory already exists (even without package.json), assume the native
+  // binary is present to avoid npm rename collisions in Vercel's cache.
+  if (fs.existsSync(pkgDir)) {
     return;
   }
 
@@ -96,8 +101,9 @@ function ensureNativeBinary(pkgName, version) {
       cwd: repoRoot,
     });
   } catch (error) {
-    // Ignore npm rename collisions that happen when the dir already exists.
-    if (!String(error.message || "").includes("ENOTEMPTY")) {
+    // If the install failed but the directory now exists, treat it as installed;
+    // otherwise rethrow to surface genuine failures.
+    if (!fs.existsSync(pkgDir)) {
       throw error;
     }
   }
