@@ -1,9 +1,8 @@
 "use client";
 
-import type { MouseEvent } from "react";
-import { useCallback, useEffect, useState } from "react";
+import type { FormEvent, MouseEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
@@ -11,9 +10,6 @@ import { useAuth } from "@/features/auth";
 import { apiDelete, apiGet, apiPost } from "@/lib/api";
 import { deriveCollegeFromDomain } from "@/lib/college";
 import { formatRelativeTime } from "@/lib/time";
-
-const ctaClasses =
-  "inline-flex items-center justify-center rounded-full border border-card-border bg-white/80 px-4 py-2 text-sm font-semibold text-ink transition hover:border-accent/60";
 const actionClasses =
   "rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink";
 
@@ -39,6 +35,25 @@ type FriendSummary = {
   blocked: FriendUser[];
 };
 
+type MessageUser = {
+  id: string;
+  name: string;
+  handle: string;
+};
+
+type DirectMessage = {
+  id: string;
+  body: string;
+  createdAt: string;
+  sender: MessageUser;
+  recipient: MessageUser;
+};
+
+type ThreadResponse = {
+  user: MessageUser;
+  messages: DirectMessage[];
+};
+
 const getCollegeLabel = (user: FriendUser) => {
   return (
     user.collegeName ??
@@ -46,12 +61,24 @@ const getCollegeLabel = (user: FriendUser) => {
   );
 };
 
+const inputClasses =
+  "w-full rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-ink outline-none transition focus:border-accent/60 focus:bg-white";
+
+const normalizeHandle = (handle: string) => handle.replace(/^@/, "").trim();
+
 export default function FriendsPage() {
-  const router = useRouter();
-  const { token, isAuthenticated, openAuthModal } = useAuth();
+  const { token, user, isAuthenticated, openAuthModal } = useAuth();
   const [summary, setSummary] = useState<FriendSummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedHandle, setSelectedHandle] = useState<string | null>(null);
+  const [threadUser, setThreadUser] = useState<MessageUser | null>(null);
+  const [messages, setMessages] = useState<DirectMessage[]>([]);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const endRef = useRef<HTMLDivElement | null>(null);
 
   const refreshSummary = useCallback(async () => {
     if (!token) {
@@ -79,6 +106,76 @@ export default function FriendsPage() {
     }
     refreshSummary();
   }, [refreshSummary, token]);
+
+  useEffect(() => {
+    if (!summary) {
+      return;
+    }
+    const hasFriends = summary.friends.length > 0;
+    const firstHandle = hasFriends
+      ? normalizeHandle(summary.friends[0].handle)
+      : null;
+    const containsSelected =
+      !!selectedHandle &&
+      summary.friends.some(
+        (friend) => normalizeHandle(friend.handle) === selectedHandle
+      );
+
+    if (!selectedHandle && firstHandle) {
+      setSelectedHandle(firstHandle);
+    } else if (selectedHandle && !containsSelected) {
+      setSelectedHandle(firstHandle ?? null);
+    }
+  }, [selectedHandle, summary]);
+
+  useEffect(() => {
+    if (!token || !selectedHandle) {
+      setThreadUser(null);
+      setMessages([]);
+      return;
+    }
+
+    let isActive = true;
+    setIsChatLoading(true);
+    setChatError(null);
+    setThreadUser(null);
+    setMessages([]);
+    setDraft("");
+
+    apiGet<ThreadResponse>(`/messages/with/${encodeURIComponent(selectedHandle)}`, token)
+      .then((payload) => {
+        if (!isActive) {
+          return;
+        }
+        setThreadUser(payload.user);
+        setMessages(payload.messages);
+      })
+      .catch((loadError) => {
+        if (!isActive) {
+          return;
+        }
+        setChatError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load this chat."
+        );
+        setThreadUser(null);
+        setMessages([]);
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsChatLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [selectedHandle, token]);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const handleCancelRequest = async (handle: string) => {
     if (!token) {
@@ -116,16 +213,59 @@ export default function FriendsPage() {
     refreshSummary();
   };
 
-  const handleRowNavigation = (slug: string) => {
-    if (!slug) {
+  const handleSelectFriend = (handle: string) => {
+    setSelectedHandle(normalizeHandle(handle));
+    setChatError(null);
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!token) {
+      openAuthModal("login");
       return;
     }
-    router.push(`/messages/${encodeURIComponent(slug)}`);
+    const slug = selectedHandle;
+    if (!slug) {
+      setChatError("Pick someone to chat with.");
+      return;
+    }
+
+    const trimmed = draft.trim();
+    if (!trimmed) {
+      setChatError("Write a message before sending.");
+      return;
+    }
+
+    setIsSending(true);
+    setChatError(null);
+
+    try {
+      const response = await apiPost<{ message: DirectMessage }>(
+        `/messages/with/${encodeURIComponent(slug)}`,
+        { body: trimmed },
+        token
+      );
+      setMessages((prev) => [...prev, response.message]);
+      setDraft("");
+    } catch (submitError) {
+      setChatError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Unable to send message."
+      );
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const stopRowClick = (event: MouseEvent) => {
     event.stopPropagation();
   };
+
+  const selectedFriend =
+    summary?.friends.find(
+      (friend) => normalizeHandle(friend.handle) === selectedHandle
+    ) ?? null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-2">
@@ -144,16 +284,18 @@ export default function FriendsPage() {
         </Link>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[320px,1fr]">
-        <Card className="flex h-[70vh] min-h-[520px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
+      <div className="grid gap-4 lg:grid-cols-[300px,1fr]">
+        <Card className="flex h-[78vh] min-h-[540px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-card-border/60 pb-3">
             <div>
-              <h2 className="font-display text-lg font-semibold">Your circle</h2>
-              <p className="text-xs text-muted">Choose a friend to jump into chat.</p>
+              <h2 className="font-display text-lg font-semibold">Direct messages</h2>
+              <p className="text-xs text-muted">
+                Tap a friend to swap the chat on the right.
+              </p>
             </div>
             {!isAuthenticated ? (
               <Button onClick={() => openAuthModal("signup")}>
-                Join to connect
+                Join
               </Button>
             ) : (
               <Link
@@ -167,31 +309,35 @@ export default function FriendsPage() {
 
           {!isAuthenticated ? (
             <p className="mt-4 text-sm text-muted">
-              Sign up to build your campus circle and see pending requests.
+              Sign up to see your friends and chats.
             </p>
           ) : isLoading ? (
             <p className="mt-4 text-sm text-muted">Loading friends...</p>
           ) : error ? (
             <p className="mt-4 text-sm font-semibold text-accent">{error}</p>
           ) : summary && summary.friends.length > 0 ? (
-            <div className="mt-3 flex-1 overflow-y-auto space-y-2 pr-1">
+            <div className="mt-3 flex-1 overflow-y-auto space-y-1 pr-1">
               {summary.friends.map((friend) => {
                 const collegeLabel = getCollegeLabel(friend);
-                const slug = friend.handle.replace(/^@/, "").trim();
-                const messageSlug =
-                  slug || friend.handle.replace(/^@/, "").trim();
+                const slug = normalizeHandle(friend.handle);
+                const isActive = slug === selectedHandle;
                 return (
                   <div
                     key={friend.id}
                     role="button"
                     tabIndex={0}
                     aria-label={`Open chat with ${friend.handle}`}
-                    className="group flex items-center gap-3 rounded-xl border border-card-border/60 bg-white px-3 py-2 transition hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
-                    onClick={() => handleRowNavigation(messageSlug)}
+                    aria-selected={isActive}
+                    className={`group flex items-center gap-3 rounded-xl border px-3 py-2 transition focus:outline-none focus:ring-2 focus:ring-accent/40 ${
+                      isActive
+                        ? "border-accent bg-accent/10"
+                        : "border-card-border/60 bg-white hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-sm"
+                    }`}
+                    onClick={() => handleSelectFriend(slug)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
-                        handleRowNavigation(messageSlug);
+                        handleSelectFriend(slug);
                       }
                     }}
                   >
@@ -251,121 +397,226 @@ export default function FriendsPage() {
           )}
         </Card>
 
-        <div className="space-y-4">
-          <Card className="h-[70vh] min-h-[520px] border border-card-border/70 bg-white/80 shadow-sm">
-            <div className="flex h-full flex-col justify-between">
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-accent">Direct messages</p>
-                <h2 className="font-display text-2xl font-semibold text-ink">
-                  Pick a friend to start chatting.
-                </h2>
-                <p className="text-sm text-muted">
-                  Your chat opens instantly when you tap someone on the left. It is the
-                  fastest way to keep the momentum going.
-                </p>
-              </div>
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  <Link href="/map" className={ctaClasses}>
-                    Explore map
-                  </Link>
-                  <Link href="/requests" className={ctaClasses}>
-                    View requests
-                  </Link>
-                  <Link href="/notifications" className={ctaClasses}>
-                    Notifications
-                  </Link>
-                </div>
-                <p className="text-xs text-muted">
-                  Pending invites have moved to notifications so they are easy to manage.
-                </p>
-              </div>
+        <Card className="flex h-[78vh] min-h-[540px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
+          {!isAuthenticated ? (
+            <div className="flex flex-1 flex-col items-center justify-center space-y-4 text-center">
+              <p className="text-base font-semibold text-ink">Sign in to keep chatting.</p>
+              <p className="text-sm text-muted">
+                Your messages stay put once you are in.
+              </p>
+              <Button requiresAuth={false} onClick={() => openAuthModal("login")}>
+                Log in
+              </Button>
             </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-3 border-b border-card-border/60 pb-3">
+                <div className="flex items-center gap-3">
+                  {threadUser || selectedFriend ? (
+                    <Avatar name={(threadUser ?? selectedFriend)?.name ?? ""} size={44} />
+                  ) : (
+                    <div className="h-11 w-11 rounded-full bg-card-border/60" />
+                  )}
+                  <div>
+                    <p className="text-sm font-semibold text-ink">
+                      {threadUser?.name ?? selectedFriend?.name ?? "Select a chat"}
+                    </p>
+                    <p className="text-xs text-muted">
+                      {threadUser?.handle ??
+                        selectedFriend?.handle ??
+                        "Choose someone from the left"}
+                    </p>
+                  </div>
+                </div>
+                {selectedFriend && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className={actionClasses}
+                      onClick={() => handleRemove(selectedFriend.handle)}
+                    >
+                      Remove
+                    </button>
+                    <button
+                      type="button"
+                      className={actionClasses}
+                      onClick={() => handleBlock(selectedFriend.handle)}
+                    >
+                      Block
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {chatError && (
+                <div className="mt-3 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-2 text-sm font-semibold text-accent">
+                  {chatError}
+                </div>
+              )}
+
+              <div className="flex-1 overflow-y-auto pr-1">
+                {isChatLoading ? (
+                  <p className="text-sm text-muted">Loading chat...</p>
+                ) : !selectedHandle ? (
+                  <p className="text-sm text-muted">
+                    Select a friend on the left to open your chat.
+                  </p>
+                ) : messages.length === 0 ? (
+                  <p className="text-sm text-muted">
+                    No messages yet. Drop the first line.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {messages.map((message) => {
+                      const isMine = message.sender.id === user?.id;
+                      return (
+                        <div
+                          key={message.id}
+                          className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+                        >
+                          <div
+                            className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                              isMine
+                                ? "bg-accent text-white"
+                                : "border border-card-border/70 bg-white/90 text-ink"
+                            }`}
+                          >
+                            <p className="whitespace-pre-wrap">{message.body}</p>
+                            <span
+                              className={`mt-2 block text-xs ${
+                                isMine ? "text-white/70" : "text-muted"
+                              }`}
+                            >
+                              {formatRelativeTime(message.createdAt)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={endRef} />
+                  </div>
+                )}
+              </div>
+
+              <form
+                className="mt-auto space-y-3 border-t border-card-border/60 pt-4"
+                onSubmit={handleSubmit}
+              >
+                <textarea
+                  className={`${inputClasses} min-h-[120px]`}
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  placeholder={
+                    selectedHandle
+                      ? "Drop a thought, a plan, or a hello."
+                      : "Pick a friend to start typing."
+                  }
+                  disabled={!selectedHandle || isChatLoading}
+                />
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted">
+                    Messages send as {user?.handle || "you"}.
+                  </p>
+                  <Button
+                    type="submit"
+                    disabled={!selectedHandle || isSending || isChatLoading}
+                  >
+                    {isSending
+                      ? "Sending..."
+                      : selectedHandle
+                        ? `Message @${selectedHandle}`
+                        : "Pick a friend"}
+                  </Button>
+                </div>
+              </form>
+            </>
+          )}
+        </Card>
+      </div>
+
+      <div className="mt-6 space-y-4">
+        {isAuthenticated && summary && summary.outgoing.length > 0 && (
+          <Card className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-lg font-semibold">Requests sent</h3>
+              <span className="text-xs text-muted">
+                {summary.outgoing.length} active
+              </span>
+            </div>
+            {summary.outgoing.map((request) => {
+              const recipient = request.recipient;
+              const collegeLabel = getCollegeLabel(recipient);
+              return (
+                <div
+                  key={request.id}
+                  className="flex flex-wrap items-center gap-3 rounded-2xl border border-card-border/70 bg-white/70 px-4 py-3"
+                >
+                  <Avatar name={recipient.name} size={32} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-ink">
+                      {recipient.handle}
+                    </p>
+                    <p className="text-xs text-muted">
+                      {collegeLabel ? `${collegeLabel}` : "Campus member"} ·{" "}
+                      {formatRelativeTime(request.createdAt)}
+                    </p>
+                  </div>
+                  <div className="ml-auto flex items-center gap-2">
+                    <span className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted">
+                      Pending
+                    </span>
+                    <button
+                      type="button"
+                      className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
+                      onClick={() => handleCancelRequest(recipient.handle)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </Card>
+        )}
 
-          {isAuthenticated && summary && summary.outgoing.length > 0 && (
-            <Card className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-display text-lg font-semibold">Requests sent</h3>
-                <span className="text-xs text-muted">
-                  {summary.outgoing.length} active
-                </span>
-              </div>
-              {summary.outgoing.map((request) => {
-                const recipient = request.recipient;
-                const collegeLabel = getCollegeLabel(recipient);
-                return (
-                  <div
-                    key={request.id}
-                    className="flex flex-wrap items-center gap-3 rounded-2xl border border-card-border/70 bg-white/70 px-4 py-3"
-                  >
-                    <Avatar name={recipient.name} size={32} />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-ink">
-                        {recipient.handle}
-                      </p>
-                      <p className="text-xs text-muted">
-                        {collegeLabel ? `${collegeLabel}` : "Campus member"} ·{" "}
-                        {formatRelativeTime(request.createdAt)}
-                      </p>
-                    </div>
-                    <div className="ml-auto flex items-center gap-2">
-                      <span className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted">
-                        Pending
-                      </span>
-                      <button
-                        type="button"
-                        className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
-                        onClick={() => handleCancelRequest(recipient.handle)}
-                      >
-                        Cancel
-                      </button>
-                    </div>
+        {isAuthenticated && summary && summary.blocked.length > 0 && (
+          <Card className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-lg font-semibold">Blocked</h3>
+              <span className="text-xs text-muted">
+                {summary.blocked.length} blocked
+              </span>
+            </div>
+            {summary.blocked.map((blocked) => {
+              const collegeLabel = getCollegeLabel(blocked);
+              return (
+                <div
+                  key={blocked.id}
+                  className="flex flex-wrap items-center gap-3 rounded-2xl border border-card-border/70 bg-white/70 px-4 py-3"
+                >
+                  <Avatar name={blocked.name} size={32} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-ink">
+                      {blocked.handle}
+                    </p>
+                    <p className="text-xs text-muted">
+                      {collegeLabel ? `${collegeLabel}` : "Campus member"}
+                    </p>
                   </div>
-                );
-              })}
-            </Card>
-          )}
-
-          {isAuthenticated && summary && summary.blocked.length > 0 && (
-            <Card className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-display text-lg font-semibold">Blocked</h3>
-                <span className="text-xs text-muted">
-                  {summary.blocked.length} blocked
-                </span>
-              </div>
-              {summary.blocked.map((blocked) => {
-                const collegeLabel = getCollegeLabel(blocked);
-                return (
-                  <div
-                    key={blocked.id}
-                    className="flex flex-wrap items-center gap-3 rounded-2xl border border-card-border/70 bg-white/70 px-4 py-3"
-                  >
-                    <Avatar name={blocked.name} size={32} />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-ink">
-                        {blocked.handle}
-                      </p>
-                      <p className="text-xs text-muted">
-                        {collegeLabel ? `${collegeLabel}` : "Campus member"}
-                      </p>
-                    </div>
-                    <div className="ml-auto flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
-                        onClick={() => handleUnblock(blocked.handle)}
-                      >
-                        Unblock
-                      </button>
-                    </div>
+                  <div className="ml-auto flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
+                      onClick={() => handleUnblock(blocked.handle)}
+                    >
+                      Unblock
+                    </button>
                   </div>
-                );
-              })}
-            </Card>
-          )}
-        </div>
+                </div>
+              );
+            })}
+          </Card>
+        )}
       </div>
     </div>
   );
