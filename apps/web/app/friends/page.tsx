@@ -264,9 +264,9 @@ export default function FriendsPage() {
     ) ?? null;
 
   return (
-    <div className="mx-auto h-screen max-w-6xl overflow-hidden px-4 pt-2">
-      <div className="grid h-full grid-cols-[200px_minmax(0,_1fr)] gap-4 lg:gap-6">
-        <Card className="flex h-full min-h-[560px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
+    <div className="mx-auto h-[calc(100vh-110px)] max-w-6xl overflow-hidden px-4 pb-4 pt-0">
+      <div className="grid h-full grid-cols-[200px_minmax(0,_1fr)] items-start gap-4 lg:gap-6">
+        <Card className="flex h-full min-h-[480px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-card-border/60 pb-3">
             <div>
               <h2 className="font-display text-lg font-semibold">Direct messages</h2>
@@ -346,7 +346,7 @@ export default function FriendsPage() {
           )}
         </Card>
 
-        <Card className="flex h-full min-h-[560px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
+        <Card className="flex h-full min-h-[480px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
           {!isAuthenticated ? (
             <div className="flex flex-1 flex-col items-center justify-center space-y-4 text-center">
               <p className="text-base font-semibold text-ink">Sign in to keep chatting.</p>
