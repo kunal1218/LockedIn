@@ -264,7 +264,7 @@ export default function FriendsPage() {
     ) ?? null;
 
   return (
-    <div className="mx-auto h-[calc(100vh-110px)] max-w-6xl overflow-hidden px-4 pb-4 pt-0">
+    <div className="mx-auto h-[calc(100vh-130px)] max-w-6xl overflow-hidden px-4 pb-4 pt-4">
       <div className="grid h-full grid-cols-[200px_minmax(0,_1fr)] items-start gap-4 lg:gap-6">
         <Card className="flex h-full min-h-[480px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-card-border/60 pb-3">
