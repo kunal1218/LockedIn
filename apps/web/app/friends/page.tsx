@@ -78,6 +78,12 @@ export default function FriendsPage() {
   const [isSending, setIsSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [confirmAction, setConfirmAction] = useState<{
+    type: "remove" | "block";
+    handle: string;
+    displayHandle: string;
+  } | null>(null);
+  const [isConfirmingAction, setIsConfirmingAction] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
 
   const refreshSummary = useCallback(async () => {
@@ -186,7 +192,7 @@ export default function FriendsPage() {
     refreshSummary();
   };
 
-  const handleRemove = async (handle: string) => {
+  const performRemove = async (handle: string) => {
     if (!token) {
       openAuthModal();
       return;
@@ -195,7 +201,7 @@ export default function FriendsPage() {
     refreshSummary();
   };
 
-  const handleBlock = async (handle: string) => {
+  const performBlock = async (handle: string) => {
     if (!token) {
       openAuthModal();
       return;
@@ -216,6 +222,45 @@ export default function FriendsPage() {
   const handleSelectFriend = (handle: string) => {
     setSelectedHandle(normalizeHandle(handle));
     setChatError(null);
+  };
+
+  const confirmRemove = (handle: string) => {
+    setConfirmAction({
+      type: "remove",
+      handle,
+      displayHandle: normalizeHandle(handle),
+    });
+  };
+
+  const confirmBlock = (handle: string) => {
+    setConfirmAction({
+      type: "block",
+      handle,
+      displayHandle: normalizeHandle(handle),
+    });
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction) {
+      return;
+    }
+    const targetHandle = confirmAction.handle;
+    setIsConfirmingAction(true);
+    try {
+      if (confirmAction.type === "remove") {
+        await performRemove(targetHandle);
+        if (confirmAction.displayHandle === selectedHandle) {
+          setSelectedHandle(null);
+          setThreadUser(null);
+          setMessages([]);
+        }
+      } else {
+        await performBlock(targetHandle);
+      }
+      setConfirmAction(null);
+    } finally {
+      setIsConfirmingAction(false);
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -382,14 +427,14 @@ export default function FriendsPage() {
                     <button
                       type="button"
                       className={actionClasses}
-                      onClick={() => handleRemove(selectedFriend.handle)}
+                      onClick={() => confirmRemove(selectedFriend.handle)}
                     >
                       Remove
                     </button>
                     <button
                       type="button"
                       className={actionClasses}
-                      onClick={() => handleBlock(selectedFriend.handle)}
+                      onClick={() => confirmBlock(selectedFriend.handle)}
                     >
                       Block
                     </button>
@@ -567,6 +612,43 @@ export default function FriendsPage() {
           </Card>
         )}
       </div>
+
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div className="w-full max-w-sm rounded-2xl border border-card-border/70 bg-white/90 p-5 shadow-lg">
+            <p className="text-base font-semibold text-ink">Are you sure?</p>
+            <p className="mt-2 text-sm text-muted">
+              {confirmAction.type === "remove"
+                ? `Remove @${confirmAction.displayHandle} from your friends list?`
+                : `Block @${confirmAction.displayHandle}? You will not receive messages from them.`}
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-full border border-card-border/70 px-4 py-2 text-xs font-semibold text-muted transition hover:border-accent/50 hover:text-ink"
+                onClick={() => {
+                  if (isConfirmingAction) return;
+                  setConfirmAction(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)] transition hover:translate-y-[-1px]"
+                onClick={handleConfirmAction}
+                disabled={isConfirmingAction}
+              >
+                {isConfirmingAction
+                  ? "Working..."
+                  : confirmAction.type === "remove"
+                    ? "Yes, remove"
+                    : "Yes, block"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
