@@ -284,7 +284,7 @@ export default function FriendsPage() {
         </Link>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[300px,1fr]">
+      <div className="grid grid-cols-[280px,minmax(0,1fr)] gap-4 lg:gap-6">
         <Card className="flex h-[78vh] min-h-[540px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-card-border/60 pb-3">
             <div>
