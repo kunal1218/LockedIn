@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormEvent, MouseEvent } from "react";
+import type { FormEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
@@ -258,38 +258,24 @@ export default function FriendsPage() {
     }
   };
 
-  const stopRowClick = (event: MouseEvent) => {
-    event.stopPropagation();
-  };
-
   const selectedFriend =
     summary?.friends.find(
       (friend) => normalizeHandle(friend.handle) === selectedHandle
     ) ?? null;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-16 pt-2">
-      <div className="grid grid-cols-[200px_minmax(0,_1fr)] gap-4 lg:gap-6">
-        <Card className="flex h-[82vh] min-h-[560px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
+    <div className="mx-auto h-screen max-w-6xl overflow-hidden px-4 pt-2">
+      <div className="grid h-full grid-cols-[200px_minmax(0,_1fr)] gap-4 lg:gap-6">
+        <Card className="flex h-full min-h-[560px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-card-border/60 pb-3">
             <div>
               <h2 className="font-display text-lg font-semibold">Direct messages</h2>
-              <p className="text-xs text-muted">
-                Tap a friend to swap the chat on the right.
-              </p>
             </div>
             {!isAuthenticated ? (
               <Button onClick={() => openAuthModal("signup")}>
                 Join
               </Button>
-            ) : (
-              <Link
-                href="/notifications"
-                className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/50 hover:text-ink"
-              >
-                Requests
-              </Link>
-            )}
+            ) : null}
           </div>
 
           {!isAuthenticated ? (
@@ -326,7 +312,7 @@ export default function FriendsPage() {
                       }
                     }}
                   >
-                    <Avatar name={friend.name} size={36} />
+                    <Avatar name={friend.name} size={42} className="shrink-0" />
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-ink">
                         {friend.handle}
@@ -334,28 +320,6 @@ export default function FriendsPage() {
                       <p className="text-xs text-muted">
                         {collegeLabel ? `${collegeLabel}` : "Campus member"}
                       </p>
-                    </div>
-                    <div className="ml-auto flex items-center gap-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
-                      <button
-                        type="button"
-                        className={actionClasses}
-                        onClick={(event) => {
-                          stopRowClick(event);
-                          handleRemove(friend.handle);
-                        }}
-                      >
-                        Remove
-                      </button>
-                      <button
-                        type="button"
-                        className={actionClasses}
-                        onClick={(event) => {
-                          stopRowClick(event);
-                          handleBlock(friend.handle);
-                        }}
-                      >
-                        Block
-                      </button>
                     </div>
                   </div>
                 );
@@ -382,7 +346,7 @@ export default function FriendsPage() {
           )}
         </Card>
 
-        <Card className="flex h-[82vh] min-h-[560px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
+        <Card className="flex h-full min-h-[560px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
           {!isAuthenticated ? (
             <div className="flex flex-1 flex-col items-center justify-center space-y-4 text-center">
               <p className="text-base font-semibold text-ink">Sign in to keep chatting.</p>
