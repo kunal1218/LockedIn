@@ -264,7 +264,7 @@ export default function FriendsPage() {
     ) ?? null;
 
   return (
-    <div className="mx-auto h-[calc(100vh-130px)] max-w-6xl overflow-hidden px-4 pb-4 pt-4">
+    <div className="mx-auto h-[calc(100vh-150px)] max-w-6xl overflow-hidden px-4 pb-4 pt-6">
       <div className="grid h-full grid-cols-[200px_minmax(0,_1fr)] items-start gap-4 lg:gap-6">
         <Card className="flex h-full min-h-[480px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-card-border/60 pb-3">
@@ -287,7 +287,7 @@ export default function FriendsPage() {
           ) : error ? (
             <p className="mt-4 text-sm font-semibold text-accent">{error}</p>
           ) : summary && summary.friends.length > 0 ? (
-            <div className="mt-3 flex-1 overflow-y-auto space-y-1 pr-1">
+            <div className="mt-3 flex-1 overflow-y-auto overflow-x-hidden space-y-1 pr-1">
               {summary.friends.map((friend) => {
                 const collegeLabel = getCollegeLabel(friend);
                 const slug = normalizeHandle(friend.handle);
@@ -314,7 +314,7 @@ export default function FriendsPage() {
                   >
                     <Avatar name={friend.name} size={42} className="shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-ink">
+                      <p className="text-sm font-semibold text-ink break-words">
                         {friend.handle}
                       </p>
                       <p className="text-xs text-muted">
