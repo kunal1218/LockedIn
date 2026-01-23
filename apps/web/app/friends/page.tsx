@@ -269,21 +269,6 @@ export default function FriendsPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-3 pb-16 pt-2 sm:px-4">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-3xl font-semibold">Friends</h1>
-          <p className="text-sm text-muted">
-            Keep tabs on the people you want to build with.
-          </p>
-        </div>
-        <Link
-          href="/notifications"
-          className="inline-flex items-center justify-center rounded-full border border-card-border bg-white/80 px-4 py-2 text-xs font-semibold text-ink transition hover:border-accent/50 hover:text-ink"
-        >
-          Notifications
-        </Link>
-      </div>
-
       <div className="grid grid-cols-[220px_minmax(0,_1fr)] gap-3 lg:gap-6">
         <Card className="flex h-[78vh] min-h-[540px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-card-border/60 pb-3">
