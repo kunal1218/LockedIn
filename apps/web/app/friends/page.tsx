@@ -439,7 +439,7 @@ export default function FriendsPage() {
                 </div>
               )}
 
-              <div className="flex-1 overflow-y-auto pr-1">
+              <div className="flex-1 overflow-y-auto pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {isChatLoading ? (
                   <p className="text-sm text-muted">Loading chat...</p>
                 ) : !selectedHandle ? (
