@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { useAuth } from "@/features/auth";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiDelete, apiGet, apiPost } from "@/lib/api";
+import { deriveCollegeFromDomain } from "@/lib/college";
 import { formatRelativeTime } from "@/lib/time";
 
 type NotificationActor = {
@@ -28,11 +30,86 @@ type NotificationsResponse = {
   notifications: NotificationItem[];
 };
 
+type FriendUser = {
+  id: string;
+  name: string;
+  handle: string;
+  collegeName?: string | null;
+  collegeDomain?: string | null;
+};
+
+type FriendRequest = {
+  id: string;
+  createdAt: string;
+  requester: FriendUser;
+  recipient: FriendUser;
+};
+
+type FriendSummary = {
+  incoming: FriendRequest[];
+};
+
+const getCollegeLabel = (user: FriendUser) => {
+  return (
+    user.collegeName ??
+    deriveCollegeFromDomain(user.collegeDomain ?? "")
+  );
+};
+
+const acceptClasses =
+  "rounded-full bg-accent px-3 py-1 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)] transition hover:translate-y-[-1px]";
+const declineClasses =
+  "rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink";
+
 export default function NotificationsPage() {
   const { token, isAuthenticated, openAuthModal } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const [requestsError, setRequestsError] = useState<string | null>(null);
+
+  const refreshFriendRequests = useCallback(async () => {
+    if (!token) {
+      setFriendRequests([]);
+      setIsLoadingRequests(false);
+      setRequestsError(null);
+      return;
+    }
+    setIsLoadingRequests(true);
+    setRequestsError(null);
+    try {
+      const payload = await apiGet<FriendSummary>("/friends/summary", token);
+      setFriendRequests(payload.incoming ?? []);
+    } catch (loadError) {
+      setRequestsError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load friend requests."
+      );
+    } finally {
+      setIsLoadingRequests(false);
+    }
+  }, [token]);
+
+  const handleAcceptRequest = async (handle: string) => {
+    if (!token) {
+      openAuthModal();
+      return;
+    }
+    await apiPost(`/friends/requests/accept/${encodeURIComponent(handle)}`, {}, token);
+    await refreshFriendRequests();
+  };
+
+  const handleDeclineRequest = async (handle: string) => {
+    if (!token) {
+      openAuthModal();
+      return;
+    }
+    await apiDelete(`/friends/requests/with/${encodeURIComponent(handle)}`, token);
+    await refreshFriendRequests();
+  };
 
   useEffect(() => {
     if (!token) {
@@ -74,6 +151,10 @@ export default function NotificationsPage() {
     };
   }, [token]);
 
+  useEffect(() => {
+    refreshFriendRequests();
+  }, [refreshFriendRequests]);
+
   if (!isAuthenticated) {
     return (
       <div className="mx-auto max-w-4xl px-4 pb-16 pt-2">
@@ -93,13 +174,75 @@ export default function NotificationsPage() {
         <div>
           <h1 className="font-display text-3xl font-semibold">Notifications</h1>
           <p className="text-sm text-muted">
-            Stay on top of new messages and pings.
+            Stay on top of new messages and friend requests.
           </p>
         </div>
 
         {error && (
           <Card className="border border-accent/30 bg-accent/10 py-4">
             <p className="text-sm font-semibold text-accent">{error}</p>
+          </Card>
+        )}
+
+        {requestsError && (
+          <Card className="border border-accent/30 bg-accent/10 py-4">
+            <p className="text-sm font-semibold text-accent">{requestsError}</p>
+          </Card>
+        )}
+
+        {isLoadingRequests ? (
+          <Card className="py-6 text-center text-sm text-muted">
+            Loading friend requests...
+          </Card>
+        ) : (
+          <Card className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-xl font-semibold">Friend requests</h2>
+              <span className="text-xs text-muted">
+                {friendRequests.length} pending
+              </span>
+            </div>
+            {friendRequests.length === 0 ? (
+              <p className="text-sm text-muted">No pending requests right now.</p>
+            ) : (
+              friendRequests.map((request) => {
+                const requester = request.requester;
+                const collegeLabel = getCollegeLabel(requester);
+                return (
+                  <div
+                    key={request.id}
+                    className="flex flex-wrap items-center gap-3 rounded-2xl border border-card-border/70 bg-white/70 px-4 py-3"
+                  >
+                    <Avatar name={requester.name} size={32} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-ink">
+                        {requester.handle}
+                      </p>
+                      <p className="text-xs text-muted">
+                        {collegeLabel ? `${collegeLabel}` : "Campus member"} ·{" "}
+                        {formatRelativeTime(request.createdAt)}
+                      </p>
+                    </div>
+                    <div className="ml-auto flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        className={acceptClasses}
+                        onClick={() => handleAcceptRequest(requester.handle)}
+                      >
+                        Accept
+                      </button>
+                      <button
+                        type="button"
+                        className={declineClasses}
+                        onClick={() => handleDeclineRequest(requester.handle)}
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </Card>
         )}
 
