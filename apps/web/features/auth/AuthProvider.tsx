@@ -20,6 +20,7 @@ export type AuthUser = {
   collegeName?: string | null;
   collegeDomain?: string | null;
   isAdmin?: boolean;
+  coins?: number;
 };
 
 type AuthPayload = {
@@ -88,10 +89,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [authModalMode, setAuthModalMode] = useState<AuthModalMode>("signup");
   const collegeSyncTokenRef = useRef<string | null>(null);
 
+  const normalizeAuthPayload = useCallback(
+    (payload: AuthPayload | null): AuthPayload | null => {
+      if (!payload) {
+        return null;
+      }
+      return {
+        ...payload,
+        user: {
+          ...payload.user,
+          coins: payload.user.coins ?? 0,
+        },
+      };
+    },
+    []
+  );
+
   const updateAuth = useCallback((payload: AuthPayload | null) => {
-    setAuth(payload);
-    persistAuth(payload);
-  }, []);
+    const normalized = normalizeAuthPayload(payload);
+    setAuth(normalized);
+    persistAuth(normalized);
+  }, [normalizeAuthPayload]);
 
   useEffect(() => {
     setAuth(readStoredAuth());

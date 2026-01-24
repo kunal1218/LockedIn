@@ -73,6 +73,7 @@ export const SiteHeader = () => {
   }, [pathname, token]);
 
   const badgeCount = unreadCount > 99 ? "99+" : `${unreadCount}`;
+  const coinCount = user?.coins ?? 0;
 
   return (
     <header className="relative z-[70] pointer-events-auto">
@@ -105,6 +106,12 @@ export const SiteHeader = () => {
             </Button>
           ) : (
             <>
+              <div className="flex items-center gap-1 rounded-full border border-card-border/70 bg-white/80 px-3 py-1 text-xs font-semibold text-ink shadow-sm">
+                <span role="img" aria-label="coins">
+                  🪙
+                </span>
+                <span>{coinCount}</span>
+              </div>
               <Link
                 href="/notifications"
                 onClick={handleNavClick("/notifications")}

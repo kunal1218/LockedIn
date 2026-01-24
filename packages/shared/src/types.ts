@@ -8,6 +8,7 @@ export type User = {
   campus?: string;
   year?: string;
   vibes?: string[];
+  coins?: number;
 };
 
 export type FeedPostType = "text" | "poll" | "prompt" | "update";
