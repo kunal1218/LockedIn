@@ -161,6 +161,14 @@ const assertParticipant = async (matchId: string, userId: string) => {
 export const enqueueAndMatch = async (userId: string): Promise<RankedStatus> => {
   await ensureRankedTables();
 
+  // End any prior active match so a fresh session is created every time.
+  await db.query(
+    `UPDATE ranked_matches
+     SET timed_out = true
+     WHERE timed_out = false AND (user_a_id = $1 OR user_b_id = $1)`,
+    [userId]
+  );
+
   // Remove stale queue entry for the same user to avoid duplicates.
   await removeFromQueue(userId);
 
@@ -189,11 +197,11 @@ export const getRankedStatusForUser = async (userId: string): Promise<RankedStat
   const matchResult = await db.query(
     `SELECT id, user_a_id, user_b_id, started_at
      FROM ranked_matches
-     WHERE user_a_id = $1 OR user_b_id = $1
+     WHERE (user_a_id = $1 OR user_b_id = $1) AND timed_out = false
      ORDER BY started_at DESC
      LIMIT 1`,
-    [userId]
-  );
+   [userId]
+ );
 
   if ((matchResult.rowCount ?? 0) > 0) {
     const row = matchResult.rows[0] as {

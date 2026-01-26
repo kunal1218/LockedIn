@@ -49,6 +49,7 @@ export default function RankedPlayPage() {
   const endRef = useRef<HTMLDivElement | null>(null);
   const lastMessageCountRef = useRef<number>(0);
   const timeoutReportedRef = useRef<boolean>(false);
+  const progress = Math.max(0, Math.min(1, timeLeft / TURN_SECONDS));
 
   const loadStatus = useCallback(async () => {
     if (!token) {
@@ -381,18 +382,32 @@ export default function RankedPlayPage() {
                 </div>
               </div>
               {rankedStatus.status === "matched" && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      isTimeout
-                        ? "bg-red-100 text-red-700"
-                        : timeLeft <= 5
-                          ? "bg-amber-100 text-amber-700"
-                          : "bg-emerald-100 text-emerald-700"
-                    }`}
-                  >
-                    {isTimeout ? "Timer out · both lose" : `Timer: ${timeLeft}s`}
-                  </span>
+                <div className="flex w-full flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        isTimeout
+                          ? "bg-red-100 text-red-700"
+                          : timeLeft <= 5
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-emerald-100 text-emerald-700"
+                      }`}
+                    >
+                      {isTimeout ? "Timer out · both lose" : `Timer: ${timeLeft}s`}
+                    </span>
+                    <div className="relative h-2 w-28 overflow-hidden rounded-full bg-card-border/60">
+                      <div
+                        className={`h-full ${
+                          isTimeout
+                            ? "bg-red-500"
+                            : timeLeft <= 5
+                              ? "bg-amber-500"
+                              : "bg-accent"
+                        } transition-[width] duration-300`}
+                        style={{ width: `${progress * 100}%` }}
+                      />
+                    </div>
+                  </div>
                   <Button
                     variant="outline"
                     onClick={handleSave}
