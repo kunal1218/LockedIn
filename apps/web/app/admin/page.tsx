@@ -32,6 +32,7 @@ export default function AdminPage() {
   const [submissions, setSubmissions] = useState<AdminSubmission[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [zoomSrc, setZoomSrc] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token || !user?.isAdmin) {
@@ -149,18 +150,47 @@ export default function AdminPage() {
                     Challenge ID: {submission.challengeId}
                   </p>
                 </div>
-                <div className="overflow-hidden rounded-2xl border border-card-border/70 bg-white">
+                <button
+                  type="button"
+                  className="group block overflow-hidden rounded-2xl border border-card-border/70 bg-white transition hover:-translate-y-0.5 hover:shadow-md"
+                  onClick={() => setZoomSrc(submission.imageData)}
+                >
                   <img
                     src={submission.imageData}
                     alt="Challenge attempt"
-                    className="h-auto w-full object-cover"
+                    className="max-h-64 w-full object-contain transition duration-200 group-hover:scale-[1.01]"
                   />
-                </div>
+                  <p className="px-4 py-2 text-center text-xs text-muted">
+                    Tap to zoom
+                  </p>
+                </button>
               </Card>
             ))}
           </div>
         )}
       </div>
+
+      {zoomSrc && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setZoomSrc(null)}
+        >
+          <div className="relative max-h-[90vh] max-w-5xl overflow-hidden rounded-2xl bg-white p-4 shadow-2xl">
+            <button
+              type="button"
+              className="absolute right-3 top-3 rounded-full border border-card-border/70 bg-white px-3 py-1 text-xs font-semibold text-muted shadow-sm transition hover:border-accent/50 hover:text-ink"
+              onClick={() => setZoomSrc(null)}
+            >
+              Close
+            </button>
+            <img
+              src={zoomSrc}
+              alt="Challenge attempt large view"
+              className="max-h-[80vh] w-full object-contain"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
