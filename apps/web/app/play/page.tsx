@@ -49,6 +49,8 @@ export default function RankedPlayPage() {
   const endRef = useRef<HTMLDivElement | null>(null);
   const lastMessageCountRef = useRef<number>(0);
   const timeoutReportedRef = useRef<boolean>(false);
+  const timerInitializedRef = useRef<boolean>(false);
+  const hasLoadedMessagesRef = useRef<boolean>(false);
   const progress = Math.max(0, Math.min(1, timeLeft / TURN_SECONDS));
   const sessionStartRef = useRef<number>(0);
 
@@ -71,7 +73,9 @@ export default function RankedPlayPage() {
     if (!token || rankedStatus.status !== "matched") {
       return;
     }
-    setIsChatLoading(true);
+    if (!hasLoadedMessagesRef.current) {
+      setIsChatLoading(true);
+    }
     setChatError(null);
     try {
       const payload = await apiGet<{ messages: RankedMessage[]; timedOut: boolean }>(
@@ -90,6 +94,7 @@ export default function RankedPlayPage() {
           : true;
       });
       setMessages(filtered);
+      hasLoadedMessagesRef.current = true;
     } catch (error) {
       setChatError(
         error instanceof Error ? error.message : "Unable to load matched chat."
@@ -129,6 +134,8 @@ export default function RankedPlayPage() {
       setTimeLeft(TURN_SECONDS);
       lastMessageCountRef.current = 0;
       timeoutReportedRef.current = false;
+      timerInitializedRef.current = false;
+      hasLoadedMessagesRef.current = false;
       setChatError(null);
       loadMessages();
     } else {
@@ -139,6 +146,8 @@ export default function RankedPlayPage() {
       setTimeLeft(TURN_SECONDS);
       lastMessageCountRef.current = 0;
       timeoutReportedRef.current = false;
+      timerInitializedRef.current = false;
+      hasLoadedMessagesRef.current = false;
       setChatError(null);
     }
   }, [loadMessages, rankedStatus.status]);
@@ -272,17 +281,20 @@ export default function RankedPlayPage() {
     if (rankedStatus.status !== "matched") {
       return;
     }
-    if (messages.length === 0 && lastMessageCountRef.current === 0) {
+    if (!timerInitializedRef.current) {
+      timerInitializedRef.current = true;
+      lastMessageCountRef.current = messages.length;
       setTimeLeft(TURN_SECONDS);
       setIsTimeout(false);
       return;
     }
+
     if (messages.length > lastMessageCountRef.current) {
       lastMessageCountRef.current = messages.length;
       setTimeLeft(TURN_SECONDS);
       setIsTimeout(false);
     }
-  }, [messages, rankedStatus.status, isTimeout]);
+  }, [messages, rankedStatus.status]);
 
   useEffect(() => {
     if (rankedStatus.status !== "matched" || isTimeout) {
