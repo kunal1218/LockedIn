@@ -50,6 +50,7 @@ export default function RankedPlayPage() {
   const lastMessageCountRef = useRef<number>(0);
   const timeoutReportedRef = useRef<boolean>(false);
   const progress = Math.max(0, Math.min(1, timeLeft / TURN_SECONDS));
+  const sessionStartRef = useRef<number>(0);
 
   const loadStatus = useCallback(async () => {
     if (!token) {
@@ -70,7 +71,6 @@ export default function RankedPlayPage() {
     if (!token || rankedStatus.status !== "matched") {
       return;
     }
-    const matchStartMs = new Date(rankedStatus.startedAt).getTime();
     setIsChatLoading(true);
     setChatError(null);
     try {
@@ -85,7 +85,9 @@ export default function RankedPlayPage() {
       }
       const filtered = payload.messages.filter((message) => {
         const createdMs = new Date(message.createdAt).getTime();
-        return Number.isFinite(createdMs) ? createdMs >= matchStartMs : true;
+        return Number.isFinite(createdMs)
+          ? createdMs >= (sessionStartRef.current || 0)
+          : true;
       });
       setMessages(filtered);
     } catch (error) {
@@ -118,6 +120,8 @@ export default function RankedPlayPage() {
 
   useEffect(() => {
     if (rankedStatus.status === "matched") {
+      // Each match session starts fresh; use a client-side epoch so we ignore any prior history.
+      sessionStartRef.current = Date.now();
       setMessages([]);
       setDraft("");
       setSavedAt(null);
@@ -128,6 +132,7 @@ export default function RankedPlayPage() {
       setChatError(null);
       loadMessages();
     } else {
+      sessionStartRef.current = 0;
       setMessages([]);
       setSavedAt(null);
       setIsTimeout(false);
