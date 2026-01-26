@@ -249,10 +249,12 @@ export default function RankedPlayPage() {
   };
 
   const handleEnterToSend = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const isComposing =
+      (event.nativeEvent as unknown as { isComposing?: boolean })?.isComposing ?? false;
     if (
       event.key === "Enter" &&
       !event.shiftKey &&
-      !event.isComposing &&
+      !isComposing &&
       rankedStatus.status === "matched" &&
       !isTimeout &&
       isMyTurn &&
