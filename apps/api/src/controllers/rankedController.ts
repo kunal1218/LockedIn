@@ -3,7 +3,11 @@ import { AuthError, getUserFromToken } from "../services/authService";
 import {
   cancelRankedQueue,
   enqueueAndMatch,
+  fetchRankedMessages,
   getRankedStatusForUser,
+  markRankedTimeout,
+  saveRankedTranscript,
+  sendRankedMessage,
 } from "../services/rankedService";
 
 const getToken = (req: Request) => {
@@ -44,6 +48,20 @@ const handleError = (res: Response, error: unknown) => {
   res.status(500).json({ error: "Unable to process ranked play" });
 };
 
+const parseMatchId = (value: unknown) => {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error("Match id is required");
+  }
+  return value.trim();
+};
+
+const parseMessageBody = (value: unknown) => {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error("Message body is required");
+  }
+  return value.trim();
+};
+
 export const postRankedPlay = async (req: Request, res: Response) => {
   try {
     const user = await requireUser(req);
@@ -69,6 +87,51 @@ export const postRankedCancel = async (req: Request, res: Response) => {
     const user = await requireUser(req);
     await cancelRankedQueue(user.id);
     res.status(204).end();
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const getRankedMessages = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const matchId = parseMatchId(req.params?.matchId);
+    const result = await fetchRankedMessages(matchId, user.id);
+    res.json(result);
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const postRankedMessage = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const matchId = parseMatchId(req.params?.matchId);
+    const body = parseMessageBody(req.body?.body);
+    const message = await sendRankedMessage({ matchId, senderId: user.id, body });
+    res.status(201).json({ message });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const postRankedSave = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const matchId = parseMatchId(req.params?.matchId);
+    const result = await saveRankedTranscript(matchId, user.id);
+    res.json({ savedAt: result.savedAt });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const postRankedTimeout = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const matchId = parseMatchId(req.params?.matchId);
+    await markRankedTimeout(matchId, user.id);
+    res.json({ timedOut: true });
   } catch (error) {
     handleError(res, error);
   }
