@@ -181,6 +181,13 @@ export default function FriendsPage() {
     };
   }, [selectedHandle, token]);
 
+  const isMyTurn = useMemo(() => {
+    if (!user?.id) return true;
+    const last = messages[messages.length - 1];
+    if (!last) return true;
+    return last.sender.id !== user.id;
+  }, [messages, user?.id]);
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
