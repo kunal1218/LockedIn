@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
@@ -53,6 +53,12 @@ export default function RankedPlayPage() {
   const hasLoadedMessagesRef = useRef<boolean>(false);
   const progress = Math.max(0, Math.min(1, timeLeft / TURN_SECONDS));
   const sessionStartRef = useRef<number>(0);
+  const isMyTurn = useMemo(() => {
+    if (!user?.id) return true;
+    const last = messages[messages.length - 1];
+    if (!last) return true;
+    return last.sender.id !== user.id;
+  }, [messages, user?.id]);
 
   const loadStatus = useCallback(async () => {
     if (!token) {
@@ -206,6 +212,10 @@ export default function RankedPlayPage() {
       openAuthModal("login");
       return;
     }
+    if (!isMyTurn) {
+      setChatError("Wait for your partner to reply before sending again.");
+      return;
+    }
     if (rankedStatus.status !== "matched") {
       setChatError("You need a match before chatting.");
       return;
@@ -231,6 +241,22 @@ export default function RankedPlayPage() {
       );
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleEnterToSend = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.isComposing &&
+      rankedStatus.status === "matched" &&
+      !isTimeout &&
+      isMyTurn &&
+      !isSending &&
+      !isChatLoading
+    ) {
+      event.preventDefault();
+      event.currentTarget.form?.requestSubmit();
     }
   };
 
@@ -513,6 +539,7 @@ export default function RankedPlayPage() {
                 className={`${inputClasses} min-h-[90px]`}
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={handleEnterToSend}
                 placeholder={
                   rankedStatus.status === "matched"
                     ? `Message ${rankedStatus.partner.handle}`
@@ -520,6 +547,7 @@ export default function RankedPlayPage() {
                 }
                 disabled={
                   rankedStatus.status !== "matched" || isChatLoading || isTimeout
+                  || !isMyTurn
                 }
               />
               {chatError && (
@@ -537,7 +565,8 @@ export default function RankedPlayPage() {
                     rankedStatus.status !== "matched" ||
                     isSending ||
                     isChatLoading ||
-                    isTimeout
+                    isTimeout ||
+                    !isMyTurn
                   }
                 >
                   {isSending

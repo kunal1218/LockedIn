@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
@@ -183,6 +183,22 @@ export default function FriendsPage() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const handleEnterToSend = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.isComposing &&
+      !isSending &&
+      !isChatLoading &&
+      selectedHandle &&
+      isMyTurn
+    ) {
+      event.preventDefault();
+      const form = event.currentTarget.form;
+      form?.requestSubmit();
+    }
+  };
+
   const handleCancelRequest = async (handle: string) => {
     if (!token) {
       openAuthModal();
@@ -269,6 +285,10 @@ export default function FriendsPage() {
       openAuthModal("login");
       return;
     }
+    if (!isMyTurn) {
+      setChatError("Wait for your friend to reply before sending another message.");
+      return;
+    }
     const slug = selectedHandle;
     if (!slug) {
       setChatError("Pick someone to chat with.");
@@ -292,6 +312,7 @@ export default function FriendsPage() {
       );
       setMessages((prev) => [...prev, response.message]);
       setDraft("");
+      setChatError(null);
     } catch (submitError) {
       setChatError(
         submitError instanceof Error
@@ -307,6 +328,13 @@ export default function FriendsPage() {
     summary?.friends.find(
       (friend) => normalizeHandle(friend.handle) === selectedHandle
     ) ?? null;
+
+  const isMyTurn = useMemo(() => {
+    if (!user?.id) return true;
+    const last = messages[messages.length - 1];
+    if (!last) return true;
+    return last.sender.id !== user.id;
+  }, [messages, user?.id]);
 
   return (
     <div className="mx-auto h-[calc(100vh-120px)] max-w-6xl overflow-hidden px-4 pb-6 pt-10">
@@ -500,24 +528,27 @@ export default function FriendsPage() {
                   className={`${inputClasses} min-h-[90px]`}
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
-                  placeholder={
-                    selectedHandle
-                      ? "Drop a thought, a plan, or a hello."
-                      : "Pick a friend to start typing."
+                  onKeyDown={handleEnterToSend}
+                placeholder={
+                  selectedHandle
+                    ? "Drop a thought, a plan, or a hello."
+                    : "Pick a friend to start typing."
+                }
+                disabled={!selectedHandle || isChatLoading || !isMyTurn}
+              />
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted">
+                  Messages send as {user?.handle || "you"}.
+                </p>
+                <Button
+                  type="submit"
+                  disabled={
+                    !selectedHandle || isSending || isChatLoading || !isMyTurn
                   }
-                  disabled={!selectedHandle || isChatLoading}
-                />
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted">
-                    Messages send as {user?.handle || "you"}.
-                  </p>
-                  <Button
-                    type="submit"
-                    disabled={!selectedHandle || isSending || isChatLoading}
-                  >
-                    {isSending
-                      ? "Sending..."
-                      : selectedHandle
+                >
+                  {isSending
+                    ? "Sending..."
+                    : selectedHandle
                         ? `Message @${selectedHandle}`
                         : "Pick a friend"}
                   </Button>
