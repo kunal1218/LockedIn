@@ -79,6 +79,7 @@ export default function FriendsPage() {
   const [chatError, setChatError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [justSent, setJustSent] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const [confirmAction, setConfirmAction] = useState<{
     type: "remove" | "block";
     handle: string;
@@ -183,6 +184,20 @@ export default function FriendsPage() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    const canFocus =
+      Boolean(selectedHandle) &&
+      !isChatLoading &&
+      isMyTurn &&
+      !justSent &&
+      !isSending;
+    if (canFocus) {
+      window.setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
+    }
+  }, [selectedHandle, isChatLoading, isMyTurn, justSent, isSending, draft]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -543,10 +558,11 @@ export default function FriendsPage() {
                 onSubmit={handleSubmit}
               >
                 <textarea
-                  className={`${inputClasses} min-h-[90px]`}
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={handleEnterToSend}
+                className={`${inputClasses} min-h-[90px]`}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={handleEnterToSend}
+                ref={inputRef}
                 placeholder={
                   selectedHandle
                     ? "Drop a thought, a plan, or a hello."

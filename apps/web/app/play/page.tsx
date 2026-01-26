@@ -52,6 +52,7 @@ export default function RankedPlayPage() {
   const timerInitializedRef = useRef<boolean>(false);
   const hasLoadedMessagesRef = useRef<boolean>(false);
   const justSentRef = useRef<boolean>(false);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const progress = Math.max(0, Math.min(1, timeLeft / TURN_SECONDS));
   const sessionStartRef = useRef<number>(0);
   const isMyTurn = useMemo(() => {
@@ -188,6 +189,20 @@ export default function RankedPlayPage() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    const canFocus =
+      rankedStatus.status === "matched" &&
+      !isTimeout &&
+      isMyTurn &&
+      !isSending &&
+      !isChatLoading;
+    if (canFocus) {
+      window.setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
+    }
+  }, [rankedStatus.status, isTimeout, isMyTurn, isSending, isChatLoading, draft, timeLeft]);
 
   const handlePlay = async () => {
     if (!token) {
@@ -568,6 +583,7 @@ export default function RankedPlayPage() {
                     ? `Message ${rankedStatus.partner.handle}`
                     : "Queue up to unlock chat."
                 }
+                ref={inputRef}
                 disabled={
                   rankedStatus.status !== "matched" || isChatLoading || isTimeout
                   || !isMyTurn
