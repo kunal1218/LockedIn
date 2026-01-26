@@ -61,6 +61,19 @@ export default function RankedPlayPage() {
     return last.sender.id !== user.id;
   }, [messages, user?.id]);
 
+  useEffect(() => {
+    if (!user?.id) {
+      justSentRef.current = false;
+      return;
+    }
+    const last = messages[messages.length - 1];
+    if (!last) {
+      justSentRef.current = false;
+      return;
+    }
+    justSentRef.current = last.sender.id === user.id;
+  }, [messages, user?.id]);
+
   const loadStatus = useCallback(async () => {
     if (!token) {
       setRankedStatus({ status: "idle" });
@@ -102,6 +115,9 @@ export default function RankedPlayPage() {
       });
       setMessages(filtered);
       hasLoadedMessagesRef.current = true;
+      if (filtered.length > 0) {
+        lastMessageCountRef.current = filtered.length;
+      }
     } catch (error) {
       setChatError(
         error instanceof Error ? error.message : "Unable to load matched chat."
