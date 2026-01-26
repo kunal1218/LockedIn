@@ -256,7 +256,9 @@ export const fetchRankedMessages = async (
             sender.handle AS sender_handle
      FROM ranked_messages m
      JOIN users sender ON sender.id = m.sender_id
+     JOIN ranked_matches rm ON rm.id = m.match_id
      WHERE m.match_id = $1
+       AND m.created_at >= rm.started_at
      ORDER BY m.created_at ASC`,
     [matchId]
   );
