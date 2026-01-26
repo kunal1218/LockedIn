@@ -51,6 +51,7 @@ export default function RankedPlayPage() {
   const timeoutReportedRef = useRef<boolean>(false);
   const timerInitializedRef = useRef<boolean>(false);
   const hasLoadedMessagesRef = useRef<boolean>(false);
+  const justSentRef = useRef<boolean>(false);
   const progress = Math.max(0, Math.min(1, timeLeft / TURN_SECONDS));
   const sessionStartRef = useRef<number>(0);
   const isMyTurn = useMemo(() => {
@@ -142,6 +143,7 @@ export default function RankedPlayPage() {
       timeoutReportedRef.current = false;
       timerInitializedRef.current = false;
       hasLoadedMessagesRef.current = false;
+      justSentRef.current = false;
       setChatError(null);
       loadMessages();
     } else {
@@ -154,6 +156,7 @@ export default function RankedPlayPage() {
       timeoutReportedRef.current = false;
       timerInitializedRef.current = false;
       hasLoadedMessagesRef.current = false;
+      justSentRef.current = false;
       setChatError(null);
     }
   }, [loadMessages, rankedStatus.status]);
@@ -212,7 +215,7 @@ export default function RankedPlayPage() {
       openAuthModal("login");
       return;
     }
-    if (!isMyTurn) {
+    if (!isMyTurn || justSentRef.current) {
       setChatError("Wait for your partner to reply before sending again.");
       return;
     }
@@ -235,6 +238,7 @@ export default function RankedPlayPage() {
       );
       setMessages((prev) => [...prev, response.message]);
       setDraft("");
+      justSentRef.current = true;
     } catch (error) {
       setChatError(
         error instanceof Error ? error.message : "Unable to send message."
@@ -252,6 +256,7 @@ export default function RankedPlayPage() {
       rankedStatus.status === "matched" &&
       !isTimeout &&
       isMyTurn &&
+      !justSentRef.current &&
       !isSending &&
       !isChatLoading
     ) {

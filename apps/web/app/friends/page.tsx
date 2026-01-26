@@ -78,6 +78,7 @@ export default function FriendsPage() {
   const [isSending, setIsSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [justSent, setJustSent] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{
     type: "remove" | "block";
     handle: string;
@@ -183,6 +184,19 @@ export default function FriendsPage() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    if (!user?.id) {
+      setJustSent(false);
+      return;
+    }
+    const last = messages[messages.length - 1];
+    if (!last) {
+      setJustSent(false);
+      return;
+    }
+    setJustSent(last.sender.id === user.id);
+  }, [messages, user?.id]);
+
   const handleEnterToSend = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (
       event.key === "Enter" &&
@@ -191,7 +205,8 @@ export default function FriendsPage() {
       !isSending &&
       !isChatLoading &&
       selectedHandle &&
-      isMyTurn
+      isMyTurn &&
+      !justSent
     ) {
       event.preventDefault();
       const form = event.currentTarget.form;
@@ -285,7 +300,7 @@ export default function FriendsPage() {
       openAuthModal("login");
       return;
     }
-    if (!isMyTurn) {
+    if (!isMyTurn || justSent) {
       setChatError("Wait for your friend to reply before sending another message.");
       return;
     }
@@ -313,6 +328,7 @@ export default function FriendsPage() {
       setMessages((prev) => [...prev, response.message]);
       setDraft("");
       setChatError(null);
+      setJustSent(true);
     } catch (submitError) {
       setChatError(
         submitError instanceof Error
@@ -534,7 +550,7 @@ export default function FriendsPage() {
                     ? "Drop a thought, a plan, or a hello."
                     : "Pick a friend to start typing."
                 }
-                disabled={!selectedHandle || isChatLoading || !isMyTurn}
+                disabled={!selectedHandle || isChatLoading || !isMyTurn || justSent}
               />
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted">
@@ -543,7 +559,11 @@ export default function FriendsPage() {
                 <Button
                   type="submit"
                   disabled={
-                    !selectedHandle || isSending || isChatLoading || !isMyTurn
+                    !selectedHandle ||
+                    isSending ||
+                    isChatLoading ||
+                    !isMyTurn ||
+                    justSent
                   }
                 >
                   {isSending
