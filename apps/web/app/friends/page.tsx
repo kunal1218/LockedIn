@@ -181,7 +181,7 @@ export default function FriendsPage() {
     };
   }, [selectedHandle, token]);
 
-  const isMyTurn = useMemo(() => {
+  const myTurn = useMemo(() => {
     if (!user?.id) return true;
     const last = messages[messages.length - 1];
     if (!last) return true;
@@ -196,7 +196,7 @@ export default function FriendsPage() {
     const canFocus =
       Boolean(selectedHandle) &&
       !isChatLoading &&
-      isMyTurn &&
+      myTurn &&
       !justSent &&
       !isSending;
     if (canFocus) {
@@ -204,7 +204,7 @@ export default function FriendsPage() {
         inputRef.current?.focus();
       }, 0);
     }
-  }, [selectedHandle, isChatLoading, isMyTurn, justSent, isSending, draft]);
+  }, [selectedHandle, isChatLoading, myTurn, justSent, isSending, draft]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -229,7 +229,7 @@ export default function FriendsPage() {
       !isSending &&
       !isChatLoading &&
       selectedHandle &&
-      isMyTurn &&
+      myTurn &&
       !justSent
     ) {
       event.preventDefault();
@@ -324,7 +324,7 @@ export default function FriendsPage() {
       openAuthModal("login");
       return;
     }
-    if (!isMyTurn || justSent) {
+    if (!myTurn || justSent) {
       setChatError("Wait for your friend to reply before sending another message.");
       return;
     }
@@ -368,13 +368,6 @@ export default function FriendsPage() {
     summary?.friends.find(
       (friend) => normalizeHandle(friend.handle) === selectedHandle
     ) ?? null;
-
-  const isMyTurn = useMemo(() => {
-    if (!user?.id) return true;
-    const last = messages[messages.length - 1];
-    if (!last) return true;
-    return last.sender.id !== user.id;
-  }, [messages, user?.id]);
 
   return (
     <div className="mx-auto h-[calc(100vh-120px)] max-w-6xl overflow-hidden px-4 pb-6 pt-10">
@@ -575,7 +568,7 @@ export default function FriendsPage() {
                     ? "Drop a thought, a plan, or a hello."
                     : "Pick a friend to start typing."
                 }
-                disabled={!selectedHandle || isChatLoading || !isMyTurn || justSent}
+                disabled={!selectedHandle || isChatLoading || !myTurn || justSent}
               />
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted">
@@ -587,7 +580,7 @@ export default function FriendsPage() {
                     !selectedHandle ||
                     isSending ||
                     isChatLoading ||
-                    !isMyTurn ||
+                    !myTurn ||
                     justSent
                   }
                 >
