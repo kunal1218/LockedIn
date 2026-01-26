@@ -342,6 +342,15 @@ export default function RankedPlayPage() {
             <Button variant="outline" onClick={handleCancel} disabled={isQueuing}>
               Cancel
             </Button>
+          ) : rankedStatus.status === "matched" && !isTimeout ? (
+            <Button
+              variant="outline"
+              disabled
+              requiresAuth={false}
+              className="pointer-events-none"
+            >
+              Timer: {timeLeft}s
+            </Button>
           ) : (
             <Button onClick={handlePlay} disabled={isQueuing}>
               {rankedStatus.status === "matched" ? "Play again" : "Play"}
