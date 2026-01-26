@@ -237,11 +237,7 @@ export default function RankedPlayPage() {
         {},
         token
       );
-      setSavedAt(
-        payload.savedAt instanceof Date
-          ? payload.savedAt.toISOString()
-          : String(payload.savedAt)
-      );
+      setSavedAt(String(payload.savedAt));
     } catch (error) {
       setChatError(error instanceof Error ? error.message : "Unable to save chat.");
     } finally {
