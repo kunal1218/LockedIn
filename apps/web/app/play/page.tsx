@@ -70,6 +70,7 @@ export default function RankedPlayPage() {
     if (!token || rankedStatus.status !== "matched") {
       return;
     }
+    const matchStartMs = new Date(rankedStatus.startedAt).getTime();
     setIsChatLoading(true);
     setChatError(null);
     try {
@@ -82,7 +83,11 @@ export default function RankedPlayPage() {
         setTimeLeft(0);
         setChatError("Match ended: timer expired for this round.");
       }
-      setMessages(payload.messages);
+      const filtered = payload.messages.filter((message) => {
+        const createdMs = new Date(message.createdAt).getTime();
+        return Number.isFinite(createdMs) ? createdMs >= matchStartMs : true;
+      });
+      setMessages(filtered);
     } catch (error) {
       setChatError(
         error instanceof Error ? error.message : "Unable to load matched chat."
