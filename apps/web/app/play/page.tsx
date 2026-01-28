@@ -559,15 +559,6 @@ export default function RankedPlayPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {statusBadge}
-            {rankedStatus.status === "matched" && (
-              <Button
-                variant="outline"
-                onClick={handleSave}
-                disabled={isSaving || messages.length === 0}
-              >
-                {savedAt ? "Saved" : isSaving ? "Saving..." : "Save chat"}
-              </Button>
-            )}
             {rankedStatus.status === "waiting" ? (
               <Button variant="outline" onClick={handleCancel} disabled={isQueuing}>
                 Cancel
