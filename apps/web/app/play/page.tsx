@@ -454,7 +454,7 @@ export default function RankedPlayPage() {
           </div>
         ) : (
           <>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-card-border/60 pb-3">
+            <div className="grid items-center gap-3 border-b border-card-border/60 pb-3 md:grid-cols-[1fr_auto]">
               <div className="flex items-center gap-3">
                 {rankedStatus.status === "matched" ? (
                   <Avatar name={rankedStatus.partner.name} size={44} />
@@ -475,7 +475,7 @@ export default function RankedPlayPage() {
                 </div>
               </div>
               {rankedStatus.status === "matched" && (
-                <div className="flex w-full flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center justify-end gap-3">
                   <div className="flex items-center gap-2">
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-semibold ${
