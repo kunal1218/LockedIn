@@ -6,7 +6,7 @@ import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { useAuth } from "@/features/auth";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/time";
 
 type MessageUser = {
@@ -20,6 +20,7 @@ type RankedMessage = {
   body: string;
   createdAt: string;
   sender: MessageUser;
+  edited?: boolean;
 };
 
 type RankedStatus =
@@ -47,6 +48,12 @@ export default function RankedPlayPage() {
   const [isTimeout, setIsTimeout] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number>(TURN_SECONDS);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const editInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingDraft, setEditingDraft] = useState("");
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const lastMessageCountRef = useRef<number>(0);
   const timeoutReportedRef = useRef<boolean>(false);
   const timerInitializedRef = useRef<boolean>(false);
@@ -74,6 +81,36 @@ export default function RankedPlayPage() {
     }
     justSentRef.current = last.sender.id === user.id;
   }, [messages, user?.id]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if ((event.key === "Delete" || event.key === "Backspace") && selectedMessageId) {
+        const message = messages.find((m) => m.id === selectedMessageId);
+        if (message && message.sender.id === user?.id) {
+          setMessageToDelete(selectedMessageId);
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [messages, selectedMessageId, user?.id]);
+
+  useEffect(() => {
+    if (editingMessageId) {
+      window.setTimeout(() => {
+        editInputRef.current?.focus();
+      }, 0);
+    }
+  }, [editingMessageId]);
 
   const loadStatus = useCallback(async () => {
     if (!token) {
@@ -187,9 +224,11 @@ export default function RankedPlayPage() {
   }, [isTimeout, loadMessages, rankedStatus.status]);
 
   useEffect(() => {
-    if (messages.length > 1) {
-      endRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length <= 1) {
+      listRef.current?.scrollTo({ top: 0 });
+      return;
     }
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   useEffect(() => {
@@ -317,6 +356,70 @@ export default function RankedPlayPage() {
       setChatError(error instanceof Error ? error.message : "Unable to save chat.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const beginEditMessage = (message: RankedMessage) => {
+    if (message.sender.id !== user?.id) return;
+    setEditingMessageId(message.id);
+    setEditingDraft(message.body);
+    setSelectedMessageId(message.id);
+  };
+
+  const cancelEditMessage = () => {
+    setEditingMessageId(null);
+    setEditingDraft("");
+  };
+
+  const saveEditedMessage = async () => {
+    if (!editingMessageId || !token || rankedStatus.status !== "matched") return;
+    const trimmed = editingDraft.trim();
+    if (!trimmed) {
+      setChatError("Write something to save.");
+      return;
+    }
+    const existing = messages.find((m) => m.id === editingMessageId);
+    if (existing && existing.body === trimmed) {
+      setEditingMessageId(null);
+      setEditingDraft("");
+      return;
+    }
+    try {
+      const response = await apiPatch<{ message: RankedMessage }>(
+        `/ranked/match/${encodeURIComponent(rankedStatus.matchId)}/messages/${encodeURIComponent(editingMessageId)}`,
+        { body: trimmed },
+        token
+      );
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === editingMessageId ? { ...response.message, edited: true } : msg
+        )
+      );
+      setEditingMessageId(null);
+      setEditingDraft("");
+      setChatError(null);
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : "Unable to update message.");
+    }
+  };
+
+  const handleDeleteMessage = async () => {
+    if (!messageToDelete || !token || rankedStatus.status !== "matched") return;
+    try {
+      await apiDelete(
+        `/ranked/match/${encodeURIComponent(rankedStatus.matchId)}/messages/${encodeURIComponent(messageToDelete)}`,
+        token
+      );
+      setMessages((prev) => prev.filter((msg) => msg.id !== messageToDelete));
+      if (editingMessageId === messageToDelete) {
+        setEditingMessageId(null);
+        setEditingDraft("");
+      }
+      setSelectedMessageId(null);
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : "Unable to delete message.");
+    } finally {
+      setMessageToDelete(null);
     }
   };
 
@@ -506,7 +609,10 @@ export default function RankedPlayPage() {
                   {queueError}
                 </div>
               )}
-              <div className="min-h-0 flex-1 overflow-y-auto pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div
+                ref={listRef}
+                className="min-h-0 flex-1 overflow-y-auto pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
               {rankedStatus.status !== "matched" ? (
                 <div className="flex h-full flex-col items-center justify-center space-y-3 text-center">
                   <p className="text-base font-semibold text-ink">Blank chat.</p>
@@ -531,26 +637,64 @@ export default function RankedPlayPage() {
                     <div className="space-y-3">
                       {messages.map((message) => {
                         const isMine = message.sender.id === user?.id;
+                        const isEditing = editingMessageId === message.id;
+                        const isSelected = selectedMessageId === message.id;
                         return (
                           <div
                             key={message.id}
                             className={`flex ${isMine ? "justify-end" : "justify-start"}`}
                           >
                             <div
-                              className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                              onClick={() => setSelectedMessageId(message.id)}
+                              onDoubleClick={() => beginEditMessage(message)}
+                              className={`max-w-[90%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
                                 isMine
                                   ? "bg-accent text-white"
                                   : "border border-card-border/70 bg-white/90 text-ink"
-                              }`}
+                              } ${isSelected ? "ring-2 ring-accent/40" : ""}`}
                             >
-                              <p className="whitespace-pre-wrap">{message.body}</p>
-                              <span
-                                className={`mt-2 block text-xs ${
-                                  isMine ? "text-white/70" : "text-muted"
-                                }`}
-                              >
-                                {formatRelativeTime(message.createdAt)}
-                              </span>
+                              {isEditing ? (
+                                <div className="flex flex-col gap-1">
+                                  <textarea
+                                    ref={editInputRef}
+                                    className={`w-full resize-none bg-transparent text-current outline-none ${
+                                      isMine ? "placeholder-white/80" : "placeholder-ink/50"
+                                    }`}
+                                    value={editingDraft}
+                                    onChange={(e) => setEditingDraft(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" && !e.shiftKey) {
+                                        e.preventDefault();
+                                        saveEditedMessage();
+                                      } else if (e.key === "Escape") {
+                                        e.preventDefault();
+                                        cancelEditMessage();
+                                      }
+                                    }}
+                                    rows={1}
+                                  />
+                                  <div
+                                    className={`flex items-center gap-2 text-xs ${
+                                      isMine ? "text-white/70" : "text-muted"
+                                    }`}
+                                  >
+                                    <span>{formatRelativeTime(message.createdAt)}</span>
+                                    {message.edited && <span>· edited</span>}
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <p className="whitespace-pre-wrap">{message.body}</p>
+                                  <div
+                                    className={`mt-2 flex items-center gap-2 text-xs ${
+                                      isMine ? "text-white/70" : "text-muted"
+                                    }`}
+                                  >
+                                    <span>{formatRelativeTime(message.createdAt)}</span>
+                                    {message.edited && <span>· edited</span>}
+                                  </div>
+                                </>
+                              )}
                             </div>
                           </div>
                         );
@@ -611,6 +755,32 @@ export default function RankedPlayPage() {
               </div>
             </form>
           </>
+        )}
+        {messageToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+            <div className="w-full max-w-sm rounded-2xl border border-card-border/70 bg-white/90 p-5 shadow-lg">
+              <p className="text-base font-semibold text-ink">Delete message?</p>
+              <p className="mt-2 text-sm text-muted">
+                This message will be removed for both players.
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-full border border-card-border/70 px-4 py-2 text-xs font-semibold text-muted transition hover:border-accent/50 hover:text-ink"
+                  onClick={() => setMessageToDelete(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)] transition hover:translate-y-[-1px]"
+                  onClick={handleDeleteMessage}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </Card>
     </div>

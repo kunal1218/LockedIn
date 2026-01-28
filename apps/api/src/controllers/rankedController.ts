@@ -8,6 +8,8 @@ import {
   markRankedTimeout,
   saveRankedTranscript,
   sendRankedMessage,
+  updateRankedMessage,
+  deleteRankedMessageById,
 } from "../services/rankedService";
 
 const getToken = (req: Request) => {
@@ -51,6 +53,13 @@ const handleError = (res: Response, error: unknown) => {
 const parseMatchId = (value: unknown) => {
   if (typeof value !== "string" || !value.trim()) {
     throw new Error("Match id is required");
+  }
+  return value.trim();
+};
+
+const parseMessageId = (value: unknown) => {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error("Message id is required");
   }
   return value.trim();
 };
@@ -110,6 +119,31 @@ export const postRankedMessage = async (req: Request, res: Response) => {
     const body = parseMessageBody(req.body?.body);
     const message = await sendRankedMessage({ matchId, senderId: user.id, body });
     res.status(201).json({ message });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const patchRankedMessage = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const matchId = parseMatchId(req.params?.matchId);
+    const messageId = parseMessageId(req.params?.messageId);
+    const body = parseMessageBody(req.body?.body);
+    const message = await updateRankedMessage({ matchId, messageId, userId: user.id, body });
+    res.json({ message });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const deleteRankedMessage = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const matchId = parseMatchId(req.params?.matchId);
+    const messageId = parseMessageId(req.params?.messageId);
+    await deleteRankedMessageById({ matchId, messageId, userId: user.id });
+    res.status(204).end();
   } catch (error) {
     handleError(res, error);
   }
