@@ -181,12 +181,23 @@ export default function FriendsPage() {
     };
   }, [selectedHandle, token]);
 
+  const firstTurnIsMine = useMemo(() => {
+    if (!user?.handle || !selectedHandle) {
+      return true;
+    }
+    const me = user.handle.replace(/^@/, "").toLowerCase();
+    const them = selectedHandle.toLowerCase();
+    return me <= them;
+  }, [selectedHandle, user?.handle]);
+
   const myTurn = useMemo(() => {
     if (!user?.id) return true;
     const last = messages[messages.length - 1];
-    if (!last) return true;
+    if (!last) {
+      return firstTurnIsMine;
+    }
     return last.sender.id !== user.id;
-  }, [messages, user?.id]);
+  }, [firstTurnIsMine, messages, user?.id]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -370,9 +381,9 @@ export default function FriendsPage() {
     ) ?? null;
 
   return (
-    <div className="mx-auto h-[calc(100vh-120px)] max-w-6xl overflow-hidden px-4 pb-6 pt-10">
-      <div className="grid h-full grid-cols-[200px_minmax(0,_1fr)] items-start gap-4 lg:gap-6">
-        <Card className="flex h-full min-h-[520px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
+    <div className="mx-auto h-[calc(100vh-64px)] max-w-6xl overflow-hidden px-4 pb-6 pt-10">
+      <div className="grid h-full min-h-0 grid-cols-[200px_minmax(0,_1fr)] items-start gap-4 lg:gap-6">
+        <Card className="flex h-full min-h-[520px] flex-col overflow-hidden border border-card-border/70 bg-white/80 shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-card-border/60 pb-3">
             <div>
               <h2 className="font-display text-lg font-semibold">Direct messages</h2>
@@ -452,7 +463,7 @@ export default function FriendsPage() {
           )}
         </Card>
 
-        <Card className="flex h-full min-h-[520px] flex-col border border-card-border/70 bg-white/80 shadow-sm">
+        <Card className="flex h-full min-h-[520px] flex-col overflow-hidden border border-card-border/70 bg-white/80 shadow-sm">
           {!isAuthenticated ? (
             <div className="flex flex-1 flex-col items-center justify-center space-y-4 text-center">
               <p className="text-base font-semibold text-ink">Sign in to keep chatting.</p>
@@ -509,7 +520,7 @@ export default function FriendsPage() {
                 </div>
               )}
 
-              <div className="flex-1 overflow-y-auto pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex-1 min-h-0 overflow-y-auto pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {isChatLoading ? (
                   <p className="text-sm text-muted">Loading chat...</p>
                 ) : !selectedHandle ? (
