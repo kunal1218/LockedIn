@@ -11,6 +11,7 @@ import {
   likeFeedPost,
   updateFeedComment,
   updateFeedPost,
+  votePoll,
 } from "../controllers/feedController";
 
 const router = Router();
@@ -24,6 +25,7 @@ router.patch("/comments/:commentId", updateFeedComment);
 router.delete("/comments/:commentId", deleteFeedComment);
 router.post("/comments/:commentId/like", likeFeedComment);
 router.post("/:postId/like", likeFeedPost);
+router.post("/:postId/poll/:optionId/vote", votePoll);
 
 router.get("/:postId", getPost);
 router.patch("/:postId", updateFeedPost);

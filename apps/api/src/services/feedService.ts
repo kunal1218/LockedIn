@@ -80,6 +80,16 @@ const ensureFeedTables = async () => {
   `);
 
   await db.query(`
+    CREATE TABLE IF NOT EXISTS feed_poll_votes (
+      post_id uuid NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
+      option_id uuid NOT NULL REFERENCES feed_poll_options(id) ON DELETE CASCADE,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (post_id, user_id)
+    );
+  `);
+
+  await db.query(`
     CREATE TABLE IF NOT EXISTS feed_post_likes (
       post_id uuid NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
       user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -294,6 +304,77 @@ export const fetchPostById = async (
   const pollOptionsByPostId = await fetchPollOptionsForPosts([postId]);
 
   return mapPost(row, pollOptionsByPostId);
+};
+
+export const voteOnPollOption = async (params: {
+  postId: string;
+  optionId: string;
+  userId: string;
+}): Promise<PollOption[]> => {
+  await ensureFeedTables();
+  const { postId, optionId, userId } = params;
+
+  const postResult = await db.query(
+    `SELECT id, type FROM feed_posts WHERE id = $1 LIMIT 1`,
+    [postId]
+  );
+  if ((postResult.rowCount ?? 0) === 0) {
+    throw new FeedError("Post not found", 404);
+  }
+  const post = postResult.rows[0] as { id: string; type: FeedPostType };
+  if (post.type !== "poll") {
+    throw new FeedError("Not a poll", 400);
+  }
+
+  const optionResult = await db.query(
+    `SELECT id FROM feed_poll_options WHERE id = $1 AND post_id = $2`,
+    [optionId, postId]
+  );
+  if ((optionResult.rowCount ?? 0) === 0) {
+    throw new FeedError("Poll option not found", 404);
+  }
+
+  await db.query("BEGIN");
+  try {
+    const existing = await db.query(
+      `SELECT option_id FROM feed_poll_votes WHERE post_id = $1 AND user_id = $2`,
+      [postId, userId]
+    );
+
+    if ((existing.rowCount ?? 0) > 0) {
+      const prevOption = (existing.rows[0] as { option_id: string }).option_id;
+      if (prevOption === optionId) {
+        const options = await fetchPollOptionsForPosts([postId]);
+        await db.query("COMMIT");
+        return options.get(postId) ?? [];
+      }
+      await db.query(
+        `UPDATE feed_poll_options SET votes = votes - 1 WHERE id = $1`,
+        [prevOption]
+      );
+      await db.query(
+        `DELETE FROM feed_poll_votes WHERE post_id = $1 AND user_id = $2`,
+        [postId, userId]
+      );
+    }
+
+    await db.query(
+      `INSERT INTO feed_poll_votes (post_id, option_id, user_id)
+       VALUES ($1, $2, $3)`,
+      [postId, optionId, userId]
+    );
+    await db.query(
+      `UPDATE feed_poll_options SET votes = votes + 1 WHERE id = $1`,
+      [optionId]
+    );
+
+    const options = await fetchPollOptionsForPosts([postId]);
+    await db.query("COMMIT");
+    return options.get(postId) ?? [];
+  } catch (error) {
+    await db.query("ROLLBACK");
+    throw error;
+  }
 };
 
 export const createPost = async (params: {

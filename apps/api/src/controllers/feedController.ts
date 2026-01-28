@@ -13,6 +13,7 @@ import {
   toggleLike,
   updatePost,
   updateComment,
+  voteOnPollOption,
 } from "../services/feedService";
 
 const allowedTypes = ["text", "poll", "prompt", "update"] as const;
@@ -209,6 +210,18 @@ export const getPost = async (req: Request, res: Response) => {
     }
 
     res.json({ post });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const votePoll = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const postId = requirePostId(req.params?.postId);
+    const optionId = requireCommentId(req.params?.optionId); // reuse validator for UUID
+    const options = await voteOnPollOption({ postId, optionId, userId: user.id });
+    res.json({ options });
   } catch (error) {
     handleError(res, error);
   }
