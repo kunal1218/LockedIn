@@ -437,7 +437,7 @@ export default function RankedPlayPage() {
         </div>
       )}
 
-      <Card className="mt-6 grid min-h-[520px] grid-rows-[auto_1fr_auto] border border-card-border/70 bg-white/85 shadow-sm">
+      <Card className="mt-6 grid h-[60vh] min-h-[520px] grid-rows-[auto_1fr_auto] overflow-hidden border border-card-border/70 bg-white/85 shadow-sm md:h-[65vh]">
         {!isAuthenticated ? (
           <div className="flex flex-1 flex-col items-center justify-center space-y-4 text-center">
             <p className="text-base font-semibold text-ink">
@@ -513,7 +513,7 @@ export default function RankedPlayPage() {
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="min-h-0 overflow-y-auto pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {rankedStatus.status !== "matched" ? (
                 <div className="flex h-full flex-col items-center justify-center space-y-3 text-center">
                   <p className="text-base font-semibold text-ink">Blank chat.</p>
