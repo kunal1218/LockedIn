@@ -403,11 +403,37 @@ export default function RankedPlayPage() {
     <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-6">
       <Card className="grid h-full min-h-[520px] grid-rows-[auto_auto_1fr_auto] gap-3 overflow-hidden border border-card-border/70 bg-white/85 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="font-display text-3xl font-semibold">Ranked conversation</h1>
-            <p className="text-sm text-muted">
-              Hit play to queue for a 1:1 chat. Each turn has 15s—if the timer hits zero, both players lose points.
-            </p>
+          <div className="flex flex-wrap items-center gap-3">
+            {rankedStatus.status === "matched" ? (
+              <Avatar name={rankedStatus.partner.name} size={44} />
+            ) : (
+              <div className="h-11 w-11 rounded-full bg-card-border/60" />
+            )}
+            <div>
+              <p className="text-sm font-semibold text-ink">
+                {rankedStatus.status === "matched"
+                  ? rankedStatus.partner.name
+                  : "Waiting for a match"}
+              </p>
+              <p className="text-xs text-muted">
+                {rankedStatus.status === "matched"
+                  ? rankedStatus.partner.handle
+                  : "Queue to get paired with someone new."}
+              </p>
+            </div>
+            {rankedStatus.status === "matched" && (
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  isTimeout
+                    ? "bg-red-100 text-red-700"
+                    : timeLeft <= 5
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-emerald-100 text-emerald-700"
+                }`}
+              >
+                {isTimeout ? "Timer out · both lose" : `Timer: ${timeLeft}s`}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {statusBadge}
@@ -422,7 +448,7 @@ export default function RankedPlayPage() {
                 requiresAuth={false}
                 className="pointer-events-none"
               >
-                Timer: {timeLeft}s
+                In match
               </Button>
             ) : (
               <Button onClick={handlePlay} disabled={isQueuing}>
@@ -454,41 +480,11 @@ export default function RankedPlayPage() {
           </div>
         ) : (
           <>
-            <div className="grid items-center gap-3 border-b border-card-border/60 pb-3 md:grid-cols-[1fr_auto]">
-              <div className="flex items-center gap-3">
-                {rankedStatus.status === "matched" ? (
-                  <Avatar name={rankedStatus.partner.name} size={44} />
-                ) : (
-                  <div className="h-11 w-11 rounded-full bg-card-border/60" />
-                )}
-                <div>
-                  <p className="text-sm font-semibold text-ink">
-                    {rankedStatus.status === "matched"
-                      ? rankedStatus.partner.name
-                      : "Waiting for a match"}
-                  </p>
-                  <p className="text-xs text-muted">
-                    {rankedStatus.status === "matched"
-                      ? rankedStatus.partner.handle
-                      : "Queue to get paired with someone new."}
-                  </p>
-                </div>
-              </div>
-              {rankedStatus.status === "matched" && (
-                <div className="flex flex-wrap items-center justify-end gap-3">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        isTimeout
-                          ? "bg-red-100 text-red-700"
-                          : timeLeft <= 5
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-emerald-100 text-emerald-700"
-                      }`}
-                    >
-                      {isTimeout ? "Timer out · both lose" : `Timer: ${timeLeft}s`}
-                    </span>
-                    <div className="relative h-2 w-28 overflow-hidden rounded-full bg-card-border/60">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-card-border/60 pb-3">
+              {rankedStatus.status === "matched" ? (
+                <>
+                  <div className="flex items-center gap-3">
+                    <div className="relative h-2 w-32 overflow-hidden rounded-full bg-card-border/60">
                       <div
                         className={`h-full ${
                           isTimeout
@@ -500,18 +496,24 @@ export default function RankedPlayPage() {
                         style={{ width: `${progress * 100}%` }}
                       />
                     </div>
+                    <p className="text-xs text-muted">
+                      Started {formatRelativeTime(rankedStatus.startedAt)}
+                    </p>
                   </div>
-                  <Button
-                    variant="outline"
-                    onClick={handleSave}
-                    disabled={isSaving || messages.length === 0}
-                  >
-                    {savedAt ? "Saved" : isSaving ? "Saving..." : "Save chat"}
-                  </Button>
-                  <p className="text-xs text-muted">
-                    Started {formatRelativeTime(rankedStatus.startedAt)}
-                  </p>
-                </div>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={handleSave}
+                      disabled={isSaving || messages.length === 0}
+                    >
+                      {savedAt ? "Saved" : isSaving ? "Saving..." : "Save chat"}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted">
+                  Queue to get paired with someone new.
+                </p>
               )}
             </div>
 
