@@ -187,7 +187,9 @@ export default function RankedPlayPage() {
   }, [isTimeout, loadMessages, rankedStatus.status]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length > 1) {
+      endRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
 
   useEffect(() => {
