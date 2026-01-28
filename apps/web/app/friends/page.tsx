@@ -378,6 +378,12 @@ export default function FriendsPage() {
       setChatError("Write something to save.");
       return;
     }
+    const current = messages.find((msg) => msg.id === editingMessageId);
+    if (current && current.body === trimmed) {
+      setEditingMessageId(null);
+      setEditingDraft("");
+      return;
+    }
     try {
       const response = await apiPatch<{ message: DirectMessage }>(
         `/messages/${encodeURIComponent(editingMessageId)}`,
@@ -637,10 +643,10 @@ export default function FriendsPage() {
                             } ${isSelected ? "ring-2 ring-accent/40" : ""}`}
                           >
                             {isEditing ? (
-                              <>
+                              <div className="flex flex-col gap-1">
                                 <textarea
                                   ref={editInputRef}
-                                  className="w-full resize-none rounded-xl border border-card-border/70 bg-white/90 px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
+                                  className={`w-full resize-none bg-transparent text-current outline-none ${isMine ? "placeholder-white/80" : "placeholder-ink/50"}`}
                                   value={editingDraft}
                                   onChange={(e) => setEditingDraft(e.target.value)}
                                   onKeyDown={(e) => {
@@ -652,27 +658,16 @@ export default function FriendsPage() {
                                       cancelEditMessage();
                                     }
                                   }}
-                                  rows={2}
+                                  rows={1}
                                 />
-                                <div className="mt-2 flex items-center justify-end gap-2">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="px-3 py-1 text-xs"
-                                    onClick={cancelEditMessage}
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    className="px-3 py-1 text-xs"
-                                    onClick={saveEditedMessage}
-                                    disabled={!editingDraft.trim()}
-                                  >
-                                    Save
-                                  </Button>
-                                </div>
-                              </>
+                                <span
+                                  className={`text-xs ${
+                                    isMine ? "text-white/70" : "text-muted"
+                                  }`}
+                                >
+                                  {formatRelativeTime(message.createdAt)}
+                                </span>
+                              </div>
                             ) : (
                               <>
                                 <p className="whitespace-pre-wrap">{message.body}</p>
