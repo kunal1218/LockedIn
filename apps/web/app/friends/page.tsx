@@ -636,7 +636,7 @@ export default function FriendsPage() {
                           <div
                             onClick={() => setSelectedMessageId(message.id)}
                             onDoubleClick={() => beginEditMessage(message)}
-                            className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
+                            className={`max-w-[90%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
                               isMine
                                 ? "bg-accent text-white"
                                 : "border border-card-border/70 bg-white/90 text-ink"
