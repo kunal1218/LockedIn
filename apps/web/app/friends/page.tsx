@@ -640,10 +640,19 @@ export default function FriendsPage() {
                               <>
                                 <textarea
                                   ref={editInputRef}
-                                  className="w-full rounded-xl border border-card-border/70 bg-white/90 px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
+                                  className="w-full resize-none rounded-xl border border-card-border/70 bg-white/90 px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
                                   value={editingDraft}
                                   onChange={(e) => setEditingDraft(e.target.value)}
-                                  rows={3}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && !e.shiftKey) {
+                                      e.preventDefault();
+                                      saveEditedMessage();
+                                    } else if (e.key === "Escape") {
+                                      e.preventDefault();
+                                      cancelEditMessage();
+                                    }
+                                  }}
+                                  rows={2}
                                 />
                                 <div className="mt-2 flex items-center justify-end gap-2">
                                   <Button
