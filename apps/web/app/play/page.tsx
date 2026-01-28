@@ -401,7 +401,7 @@ export default function RankedPlayPage() {
 
   return (
     <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-6">
-      <Card className="grid h-full min-h-[520px] grid-rows-[auto_auto_1fr_auto] gap-3 overflow-hidden border border-card-border/70 bg-white/85 shadow-sm">
+      <Card className="grid h-full min-h-[520px] grid-rows-[auto_1fr_auto] gap-3 overflow-hidden border border-card-border/70 bg-white/85 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
             {rankedStatus.status === "matched" ? (
@@ -422,21 +422,47 @@ export default function RankedPlayPage() {
               </p>
             </div>
             {rankedStatus.status === "matched" && (
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                  isTimeout
-                    ? "bg-red-100 text-red-700"
-                    : timeLeft <= 5
-                      ? "bg-amber-100 text-amber-700"
-                      : "bg-emerald-100 text-emerald-700"
-                }`}
-              >
-                {isTimeout ? "Timer out · both lose" : `Timer: ${timeLeft}s`}
-              </span>
+              <div className="flex items-center gap-3">
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    isTimeout
+                      ? "bg-red-100 text-red-700"
+                      : timeLeft <= 5
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-emerald-100 text-emerald-700"
+                  }`}
+                >
+                  {isTimeout ? "Timer out · both lose" : `Timer: ${timeLeft}s`}
+                </span>
+                <div className="flex items-center gap-2">
+                  <div className="relative h-2 w-32 overflow-hidden rounded-full bg-card-border/60">
+                    <div
+                      className={`h-full ${
+                        isTimeout
+                          ? "bg-red-500"
+                          : timeLeft <= 5
+                            ? "bg-amber-500"
+                            : "bg-accent"
+                      } transition-[width] duration-300`}
+                      style={{ width: `${progress * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted">Started {formatRelativeTime(rankedStatus.startedAt)}</p>
+                </div>
+              </div>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {statusBadge}
+            {rankedStatus.status === "matched" && (
+              <Button
+                variant="outline"
+                onClick={handleSave}
+                disabled={isSaving || messages.length === 0}
+              >
+                {savedAt ? "Saved" : isSaving ? "Saving..." : "Save chat"}
+              </Button>
+            )}
             {rankedStatus.status === "waiting" ? (
               <Button variant="outline" onClick={handleCancel} disabled={isQueuing}>
                 Cancel
@@ -467,7 +493,7 @@ export default function RankedPlayPage() {
         )}
 
         {!isAuthenticated ? (
-          <div className="row-span-2 flex flex-col items-center justify-center space-y-4 text-center">
+          <div className="flex flex-col items-center justify-center space-y-4 text-center">
             <p className="text-base font-semibold text-ink">
               Log in to play ranked conversation.
             </p>
@@ -480,43 +506,6 @@ export default function RankedPlayPage() {
           </div>
         ) : (
           <>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-card-border/60 pb-3">
-              {rankedStatus.status === "matched" ? (
-                <>
-                  <div className="flex items-center gap-3">
-                    <div className="relative h-2 w-32 overflow-hidden rounded-full bg-card-border/60">
-                      <div
-                        className={`h-full ${
-                          isTimeout
-                            ? "bg-red-500"
-                            : timeLeft <= 5
-                              ? "bg-amber-500"
-                              : "bg-accent"
-                        } transition-[width] duration-300`}
-                        style={{ width: `${progress * 100}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-muted">
-                      Started {formatRelativeTime(rankedStatus.startedAt)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      variant="outline"
-                      onClick={handleSave}
-                      disabled={isSaving || messages.length === 0}
-                    >
-                      {savedAt ? "Saved" : isSaving ? "Saving..." : "Save chat"}
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-muted">
-                  Queue to get paired with someone new.
-                </p>
-              )}
-            </div>
-
             <div className="min-h-0 overflow-y-auto pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {rankedStatus.status !== "matched" ? (
                 <div className="flex h-full flex-col items-center justify-center space-y-3 text-center">
