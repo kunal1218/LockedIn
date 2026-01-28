@@ -204,3 +204,84 @@ export const sendDirectMessage = async (params: {
 
   return message;
 };
+
+export const updateDirectMessage = async (params: {
+  messageId: string;
+  userId: string;
+  body: string;
+}): Promise<DirectMessage> => {
+  await ensureMessageTables();
+  const trimmed = params.body.trim();
+  if (!trimmed) {
+    throw new MessageError("Message body is required", 400);
+  }
+  if (trimmed.length > 2000) {
+    throw new MessageError("Message is too long", 400);
+  }
+
+  const existing = await db.query(
+    `SELECT m.id,
+            m.sender_id,
+            m.recipient_id,
+            m.created_at,
+            sender.id AS sender_id,
+            sender.name AS sender_name,
+            sender.handle AS sender_handle,
+            recipient.id AS recipient_id,
+            recipient.name AS recipient_name,
+            recipient.handle AS recipient_handle
+     FROM direct_messages m
+     JOIN users sender ON sender.id = m.sender_id
+     JOIN users recipient ON recipient.id = m.recipient_id
+     WHERE m.id = $1`,
+    [params.messageId]
+  );
+
+  if ((existing.rowCount ?? 0) === 0) {
+    throw new MessageError("Message not found", 404);
+  }
+
+  const row = existing.rows[0] as MessageRow;
+  if (row.sender_id !== params.userId) {
+    throw new MessageError("You can only edit your own messages", 403);
+  }
+
+  await db.query(
+    `UPDATE direct_messages SET body = $1 WHERE id = $2`,
+    [trimmed, params.messageId]
+  );
+
+  const updated = await db.query(
+    `SELECT m.id,
+            m.body,
+            m.created_at,
+            sender.id AS sender_id,
+            sender.name AS sender_name,
+            sender.handle AS sender_handle,
+            recipient.id AS recipient_id,
+            recipient.name AS recipient_name,
+            recipient.handle AS recipient_handle
+     FROM direct_messages m
+     JOIN users sender ON sender.id = m.sender_id
+     JOIN users recipient ON recipient.id = m.recipient_id
+     WHERE m.id = $1`,
+    [params.messageId]
+  );
+
+  return mapMessage(updated.rows[0] as MessageRow);
+};
+
+export const deleteDirectMessage = async (params: {
+  messageId: string;
+  userId: string;
+}): Promise<void> => {
+  await ensureMessageTables();
+  const result = await db.query(
+    `DELETE FROM direct_messages WHERE id = $1 AND sender_id = $2`,
+    [params.messageId, params.userId]
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new MessageError("Message not found or not yours", 404);
+  }
+};

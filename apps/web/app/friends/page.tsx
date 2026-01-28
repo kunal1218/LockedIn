@@ -1,13 +1,13 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { useAuth } from "@/features/auth";
-import { apiDelete, apiGet, apiPost } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { deriveCollegeFromDomain } from "@/lib/college";
 import { formatRelativeTime } from "@/lib/time";
 const actionClasses =
@@ -65,6 +65,7 @@ const inputClasses =
   "w-full rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-ink outline-none transition focus:border-accent/60 focus:bg-white";
 
 const normalizeHandle = (handle: string) => handle.replace(/^@/, "").trim();
+const LAST_HANDLE_KEY = "friends:lastHandle";
 
 export default function FriendsPage() {
   const { token, user, isAuthenticated, openAuthModal } = useAuth();
@@ -78,8 +79,13 @@ export default function FriendsPage() {
   const [isSending, setIsSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const [justSent, setJustSent] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingDraft, setEditingDraft] = useState("");
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const editInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
   const [confirmAction, setConfirmAction] = useState<{
     type: "remove" | "block";
     handle: string;
@@ -87,6 +93,7 @@ export default function FriendsPage() {
   } | null>(null);
   const [isConfirmingAction, setIsConfirmingAction] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const initializedSelectionRef = useRef(false);
 
   const refreshSummary = useCallback(async () => {
     if (!token) {
@@ -116,23 +123,35 @@ export default function FriendsPage() {
   }, [refreshSummary, token]);
 
   useEffect(() => {
-    if (!summary) {
+    if (!summary || initializedSelectionRef.current) {
       return;
     }
-    const hasFriends = summary.friends.length > 0;
-    const firstHandle = hasFriends
-      ? normalizeHandle(summary.friends[0].handle)
-      : null;
-    const containsSelected =
-      !!selectedHandle &&
-      summary.friends.some(
-        (friend) => normalizeHandle(friend.handle) === selectedHandle
-      );
-
-    if (!selectedHandle && firstHandle) {
+    initializedSelectionRef.current = true;
+    const handles = summary.friends.map((friend) => normalizeHandle(friend.handle));
+    const stored =
+      typeof window !== "undefined"
+        ? normalizeHandle(localStorage.getItem(LAST_HANDLE_KEY) ?? "")
+        : "";
+    const firstHandle = handles[0] ?? null;
+    if (stored && handles.includes(stored)) {
+      setSelectedHandle(stored);
+    } else if (firstHandle) {
       setSelectedHandle(firstHandle);
-    } else if (selectedHandle && !containsSelected) {
-      setSelectedHandle(firstHandle ?? null);
+    }
+  }, [summary]);
+
+  useEffect(() => {
+    if (!summary) return;
+    if (
+      selectedHandle &&
+      !summary.friends.some(
+        (friend) => normalizeHandle(friend.handle) === selectedHandle
+      )
+    ) {
+      const fallback = summary.friends[0]?.handle
+        ? normalizeHandle(summary.friends[0].handle)
+        : null;
+      setSelectedHandle(fallback ?? null);
     }
   }, [selectedHandle, summary]);
 
@@ -149,6 +168,9 @@ export default function FriendsPage() {
     setThreadUser(null);
     setMessages([]);
     setDraft("");
+    setEditingMessageId(null);
+    setEditingDraft("");
+    setSelectedMessageId(null);
 
     apiGet<ThreadResponse>(`/messages/with/${encodeURIComponent(selectedHandle)}`, token)
       .then((payload) => {
@@ -157,6 +179,9 @@ export default function FriendsPage() {
         }
         setThreadUser(payload.user);
         setMessages(payload.messages);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(LAST_HANDLE_KEY, selectedHandle);
+        }
       })
       .catch((loadError) => {
         if (!isActive) {
@@ -181,54 +206,51 @@ export default function FriendsPage() {
     };
   }, [selectedHandle, token]);
 
-  const firstTurnIsMine = useMemo(() => {
-    if (!user?.handle || !selectedHandle) {
-      return true;
-    }
-    const me = user.handle.replace(/^@/, "").toLowerCase();
-    const them = selectedHandle.toLowerCase();
-    return me <= them;
-  }, [selectedHandle, user?.handle]);
-
-  const myTurn = useMemo(() => {
-    if (!user?.id) return true;
-    const last = messages[messages.length - 1];
-    if (!last) {
-      return firstTurnIsMine;
-    }
-    return last.sender.id !== user.id;
-  }, [firstTurnIsMine, messages, user?.id]);
-
   useEffect(() => {
+    if (messages.length <= 1) {
+      listRef.current?.scrollTo({ top: 0 });
+      return;
+    }
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   useEffect(() => {
-    const canFocus =
-      Boolean(selectedHandle) &&
-      !isChatLoading &&
-      myTurn &&
-      !justSent &&
-      !isSending;
-    if (canFocus) {
+    if (selectedHandle) {
       window.setTimeout(() => {
         inputRef.current?.focus();
       }, 0);
     }
-  }, [selectedHandle, isChatLoading, myTurn, justSent, isSending, draft]);
+  }, [selectedHandle]);
 
   useEffect(() => {
-    if (!user?.id) {
-      setJustSent(false);
-      return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if ((event.key === "Delete" || event.key === "Backspace") && selectedMessageId) {
+        const target = messages.find((message) => message.id === selectedMessageId);
+        if (target && target.sender.id === user?.id) {
+          setMessageToDelete(selectedMessageId);
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [messages, selectedMessageId, user?.id]);
+
+  useEffect(() => {
+    if (editingMessageId) {
+      window.setTimeout(() => {
+        editInputRef.current?.focus();
+      }, 0);
     }
-    const last = messages[messages.length - 1];
-    if (!last) {
-      setJustSent(false);
-      return;
-    }
-    setJustSent(last.sender.id === user.id);
-  }, [messages, user?.id]);
+  }, [editingMessageId]);
 
   const handleEnterToSend = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const isComposing =
@@ -239,9 +261,7 @@ export default function FriendsPage() {
       !isComposing &&
       !isSending &&
       !isChatLoading &&
-      selectedHandle &&
-      myTurn &&
-      !justSent
+      selectedHandle
     ) {
       event.preventDefault();
       const form = event.currentTarget.form;
@@ -286,8 +306,18 @@ export default function FriendsPage() {
   };
 
   const handleSelectFriend = (handle: string) => {
-    setSelectedHandle(normalizeHandle(handle));
+    const normalized = normalizeHandle(handle);
+    setSelectedHandle(normalized);
     setChatError(null);
+    setEditingMessageId(null);
+    setEditingDraft("");
+    setSelectedMessageId(null);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(LAST_HANDLE_KEY, normalized);
+    }
+    window.setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
   };
 
   const confirmRemove = (handle: string) => {
@@ -329,14 +359,67 @@ export default function FriendsPage() {
     }
   };
 
+  const beginEditMessage = (message: DirectMessage) => {
+    if (message.sender.id !== user?.id) return;
+    setEditingMessageId(message.id);
+    setEditingDraft(message.body);
+    setSelectedMessageId(message.id);
+  };
+
+  const cancelEditMessage = () => {
+    setEditingMessageId(null);
+    setEditingDraft("");
+  };
+
+  const saveEditedMessage = async () => {
+    if (!editingMessageId || !token) return;
+    const trimmed = editingDraft.trim();
+    if (!trimmed) {
+      setChatError("Write something to save.");
+      return;
+    }
+    try {
+      const response = await apiPatch<{ message: DirectMessage }>(
+        `/messages/${encodeURIComponent(editingMessageId)}`,
+        { body: trimmed },
+        token
+      );
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === editingMessageId ? response.message : msg))
+      );
+      setEditingMessageId(null);
+      setEditingDraft("");
+      setChatError(null);
+    } catch (error) {
+      setChatError(
+        error instanceof Error ? error.message : "Unable to update message."
+      );
+    }
+  };
+
+  const handleDeleteMessage = async () => {
+    if (!messageToDelete || !token) return;
+    try {
+      await apiDelete(`/messages/${encodeURIComponent(messageToDelete)}`, token);
+      setMessages((prev) => prev.filter((msg) => msg.id !== messageToDelete));
+      setSelectedMessageId(null);
+      if (editingMessageId === messageToDelete) {
+        setEditingMessageId(null);
+        setEditingDraft("");
+      }
+    } catch (error) {
+      setChatError(
+        error instanceof Error ? error.message : "Unable to delete message."
+      );
+    } finally {
+      setMessageToDelete(null);
+    }
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!token) {
       openAuthModal("login");
-      return;
-    }
-    if (!myTurn || justSent) {
-      setChatError("Wait for your friend to reply before sending another message.");
       return;
     }
     const slug = selectedHandle;
@@ -363,7 +446,6 @@ export default function FriendsPage() {
       setMessages((prev) => [...prev, response.message]);
       setDraft("");
       setChatError(null);
-      setJustSent(true);
     } catch (submitError) {
       setChatError(
         submitError instanceof Error
@@ -416,7 +498,7 @@ export default function FriendsPage() {
                     tabIndex={0}
                     aria-label={`Open chat with ${friend.handle}`}
                     aria-selected={isActive}
-                    className={`group flex items-center gap-3 rounded-xl border px-3 py-2 transition focus:outline-none focus:ring-2 focus:ring-accent/40 ${
+                    className={`group flex min-h-[68px] items-center gap-3 rounded-xl border px-3 py-2.5 transition focus:outline-none focus:ring-2 focus:ring-accent/40 ${
                       isActive
                         ? "border-accent bg-accent/10"
                         : "border-card-border/60 bg-white hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-sm"
@@ -520,7 +602,10 @@ export default function FriendsPage() {
                 </div>
               )}
 
-              <div className="flex-1 min-h-0 overflow-y-auto pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div
+                ref={listRef}
+                className="flex-1 min-h-0 overflow-y-auto pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
                 {isChatLoading ? (
                   <p className="text-sm text-muted">Loading chat...</p>
                 ) : !selectedHandle ? (
@@ -535,26 +620,62 @@ export default function FriendsPage() {
                   <div className="space-y-3">
                     {messages.map((message) => {
                       const isMine = message.sender.id === user?.id;
+                      const isEditing = editingMessageId === message.id;
+                      const isSelected = selectedMessageId === message.id;
                       return (
                         <div
                           key={message.id}
                           className={`flex ${isMine ? "justify-end" : "justify-start"}`}
                         >
                           <div
-                            className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                            onClick={() => setSelectedMessageId(message.id)}
+                            onDoubleClick={() => beginEditMessage(message)}
+                            className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
                               isMine
                                 ? "bg-accent text-white"
                                 : "border border-card-border/70 bg-white/90 text-ink"
-                            }`}
+                            } ${isSelected ? "ring-2 ring-accent/40" : ""}`}
                           >
-                            <p className="whitespace-pre-wrap">{message.body}</p>
-                            <span
-                              className={`mt-2 block text-xs ${
-                                isMine ? "text-white/70" : "text-muted"
-                              }`}
-                            >
-                              {formatRelativeTime(message.createdAt)}
-                            </span>
+                            {isEditing ? (
+                              <>
+                                <textarea
+                                  ref={editInputRef}
+                                  className="w-full rounded-xl border border-card-border/70 bg-white/90 px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
+                                  value={editingDraft}
+                                  onChange={(e) => setEditingDraft(e.target.value)}
+                                  rows={3}
+                                />
+                                <div className="mt-2 flex items-center justify-end gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="px-3 py-1 text-xs"
+                                    onClick={cancelEditMessage}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    className="px-3 py-1 text-xs"
+                                    onClick={saveEditedMessage}
+                                    disabled={!editingDraft.trim()}
+                                  >
+                                    Save
+                                  </Button>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <p className="whitespace-pre-wrap">{message.body}</p>
+                                <span
+                                  className={`mt-2 block text-xs ${
+                                    isMine ? "text-white/70" : "text-muted"
+                                  }`}
+                                >
+                                  {formatRelativeTime(message.createdAt)}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       );
@@ -569,7 +690,7 @@ export default function FriendsPage() {
                 onSubmit={handleSubmit}
               >
                 <textarea
-                className={`${inputClasses} min-h-[90px]`}
+                className={`${inputClasses} min-h-[72px]`}
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={handleEnterToSend}
@@ -579,7 +700,7 @@ export default function FriendsPage() {
                     ? "Drop a thought, a plan, or a hello."
                     : "Pick a friend to start typing."
                 }
-                disabled={!selectedHandle || isChatLoading || !myTurn || justSent}
+                disabled={!selectedHandle || isSending}
               />
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted">
@@ -590,9 +711,7 @@ export default function FriendsPage() {
                   disabled={
                     !selectedHandle ||
                     isSending ||
-                    isChatLoading ||
-                    !myTurn ||
-                    justSent
+                    isChatLoading
                   }
                 >
                   {isSending
@@ -724,6 +843,32 @@ export default function FriendsPage() {
                   : confirmAction.type === "remove"
                     ? "Yes, remove"
                     : "Yes, block"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {messageToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div className="w-full max-w-sm rounded-2xl border border-card-border/70 bg-white/90 p-5 shadow-lg">
+            <p className="text-base font-semibold text-ink">Delete message?</p>
+            <p className="mt-2 text-sm text-muted">
+              This message will be removed for both participants.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-full border border-card-border/70 px-4 py-2 text-xs font-semibold text-muted transition hover:border-accent/50 hover:text-ink"
+                onClick={() => setMessageToDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)] transition hover:translate-y-[-1px]"
+                onClick={handleDeleteMessage}
+              >
+                Delete
               </button>
             </div>
           </div>

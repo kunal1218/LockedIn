@@ -5,6 +5,8 @@ import {
   fetchDirectMessages,
   getMessageUserByHandle,
   sendDirectMessage,
+  updateDirectMessage,
+  deleteDirectMessage,
 } from "../services/messageService";
 import { markMessageNotificationsRead } from "../services/notificationService";
 
@@ -89,6 +91,35 @@ export const postMessageToUser = async (req: Request, res: Response) => {
       body,
     });
     res.status(201).json({ message });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const updateMessage = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const messageId = asString(req.params?.messageId);
+    const body = parseMessageBody(req.body?.body);
+    if (!messageId) {
+      throw new MessageError("Message id is required", 400);
+    }
+    const message = await updateDirectMessage({ messageId, userId: user.id, body });
+    res.json({ message });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const deleteMessage = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const messageId = asString(req.params?.messageId);
+    if (!messageId) {
+      throw new MessageError("Message id is required", 400);
+    }
+    await deleteDirectMessage({ messageId, userId: user.id });
+    res.status(204).end();
   } catch (error) {
     handleError(res, error);
   }
