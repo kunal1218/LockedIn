@@ -486,16 +486,8 @@ export default function RankedPlayPage() {
           </div>
         </div>
 
-        {queueError ? (
-          <div className="rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm font-semibold text-accent">
-            {queueError}
-          </div>
-        ) : (
-          <div aria-hidden className="h-0" />
-        )}
-
         {!isAuthenticated ? (
-          <div className="flex flex-col items-center justify-center space-y-4 text-center">
+          <div className="row-span-2 flex flex-col items-center justify-center space-y-4 text-center">
             <p className="text-base font-semibold text-ink">
               Log in to play ranked conversation.
             </p>
@@ -508,7 +500,13 @@ export default function RankedPlayPage() {
           </div>
         ) : (
           <>
-            <div className="min-h-0 overflow-y-auto pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex min-h-0 flex-col">
+              {queueError && (
+                <div className="mb-3 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm font-semibold text-accent">
+                  {queueError}
+                </div>
+              )}
+              <div className="min-h-0 flex-1 overflow-y-auto pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {rankedStatus.status !== "matched" ? (
                 <div className="flex h-full flex-col items-center justify-center space-y-3 text-center">
                   <p className="text-base font-semibold text-ink">Blank chat.</p>
@@ -562,6 +560,7 @@ export default function RankedPlayPage() {
                   )}
                 </>
               )}
+            </div>
             </div>
 
             <form
