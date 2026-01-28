@@ -400,46 +400,48 @@ export default function RankedPlayPage() {
   }, [isTimeout, rankedStatus, token]);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-16 pt-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-3xl font-semibold">Ranked conversation</h1>
-          <p className="text-sm text-muted">
-            Hit play to queue for a 1:1 chat. Each turn has 15s—if the timer hits zero, both players lose points.
-          </p>
+    <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-6">
+      <Card className="grid h-full min-h-[520px] grid-rows-[auto_auto_1fr_auto] gap-3 overflow-hidden border border-card-border/70 bg-white/85 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="font-display text-3xl font-semibold">Ranked conversation</h1>
+            <p className="text-sm text-muted">
+              Hit play to queue for a 1:1 chat. Each turn has 15s—if the timer hits zero, both players lose points.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {statusBadge}
+            {rankedStatus.status === "waiting" ? (
+              <Button variant="outline" onClick={handleCancel} disabled={isQueuing}>
+                Cancel
+              </Button>
+            ) : rankedStatus.status === "matched" && !isTimeout ? (
+              <Button
+                variant="outline"
+                disabled
+                requiresAuth={false}
+                className="pointer-events-none"
+              >
+                Timer: {timeLeft}s
+              </Button>
+            ) : (
+              <Button onClick={handlePlay} disabled={isQueuing}>
+                {rankedStatus.status === "matched" ? "Play again" : "Play"}
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {statusBadge}
-          {rankedStatus.status === "waiting" ? (
-            <Button variant="outline" onClick={handleCancel} disabled={isQueuing}>
-              Cancel
-            </Button>
-          ) : rankedStatus.status === "matched" && !isTimeout ? (
-            <Button
-              variant="outline"
-              disabled
-              requiresAuth={false}
-              className="pointer-events-none"
-            >
-              Timer: {timeLeft}s
-            </Button>
-          ) : (
-            <Button onClick={handlePlay} disabled={isQueuing}>
-              {rankedStatus.status === "matched" ? "Play again" : "Play"}
-            </Button>
-          )}
-        </div>
-      </div>
 
-      {queueError && (
-        <div className="mt-3 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm font-semibold text-accent">
-          {queueError}
-        </div>
-      )}
+        {queueError ? (
+          <div className="rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm font-semibold text-accent">
+            {queueError}
+          </div>
+        ) : (
+          <div aria-hidden className="h-0" />
+        )}
 
-      <Card className="mt-6 grid h-[60vh] min-h-[520px] grid-rows-[auto_1fr_auto] overflow-hidden border border-card-border/70 bg-white/85 shadow-sm md:h-[65vh]">
         {!isAuthenticated ? (
-          <div className="flex flex-1 flex-col items-center justify-center space-y-4 text-center">
+          <div className="row-span-2 flex flex-col items-center justify-center space-y-4 text-center">
             <p className="text-base font-semibold text-ink">
               Log in to play ranked conversation.
             </p>
