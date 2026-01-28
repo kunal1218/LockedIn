@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import type { FeedComment, FeedPost } from "@lockedin/shared";
+import type { FeedComment, FeedPost, PollOption } from "@lockedin/shared";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
@@ -49,6 +49,8 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
   const [pendingCommentLikes, setPendingCommentLikes] = useState<Set<string>>(
     new Set()
   );
+  const [isVoting, setIsVoting] = useState(false);
+  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const commentsRef = useRef<HTMLDivElement | null>(null);
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -63,6 +65,10 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
     (Array.isArray(params?.postId) ? params.postId[0] : params?.postId) ??
     pathPostId ??
     "";
+
+  useEffect(() => {
+    setSelectedOptionId(null);
+  }, [resolvedPostId]);
 
   useEffect(() => {
     if (!openCommentMenuId) {
@@ -212,6 +218,42 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
       );
     } finally {
       setIsLiking(false);
+    }
+  };
+
+  const handleVote = async (optionId: string) => {
+    if (!post) {
+      return;
+    }
+
+    if (!token) {
+      openAuthModal();
+      return;
+    }
+
+    if (isVoting) {
+      return;
+    }
+
+    setIsVoting(true);
+    try {
+      const response = await apiPost<{ options: PollOption[] }>(
+        `/feed/${post.id}/poll/${optionId}/vote`,
+        {},
+        token
+      );
+      setPost((prev) =>
+        prev ? { ...prev, pollOptions: response.options } : prev
+      );
+      setSelectedOptionId(optionId);
+    } catch (voteError) {
+      setError(
+        voteError instanceof Error
+          ? voteError.message
+          : "Unable to submit your vote."
+      );
+    } finally {
+      setIsVoting(false);
     }
   };
 
@@ -465,6 +507,9 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
               onDelete={handleDeletePost}
               onLike={handleToggleLike}
               isLiking={isLiking}
+              onVote={(_post, optionId) => handleVote(optionId)}
+              isVoting={isVoting}
+              selectedOptionId={selectedOptionId}
             />
           ) : (
             <PostCard

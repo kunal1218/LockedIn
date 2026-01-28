@@ -23,6 +23,9 @@ type PollCardProps = {
   onDelete?: (post: FeedPost) => void;
   onLike?: (post: FeedPost) => void;
   isLiking?: boolean;
+  onVote?: (post: FeedPost, optionId: string) => void;
+  selectedOptionId?: string | null;
+  isVoting?: boolean;
 };
 
 export const PollCard = ({
@@ -33,6 +36,9 @@ export const PollCard = ({
   onDelete,
   onLike,
   isLiking,
+  onVote,
+  selectedOptionId,
+  isVoting,
 }: PollCardProps) => {
   const { user, isAuthenticated, openAuthModal } = useAuth();
   const router = useRouter();
@@ -94,6 +100,20 @@ export const PollCard = ({
       return;
     }
     router.push(`/profile/${encodeURIComponent(profileIdentifier)}`);
+  };
+
+  const handleVoteClick = (optionId: string) => (
+    event: MouseEvent<HTMLButtonElement>
+  ) => {
+    event.stopPropagation();
+    if (!onVote || isVoting) {
+      return;
+    }
+    if (!isAuthenticated) {
+      openAuthModal("signup");
+      return;
+    }
+    onVote(post, optionId);
   };
 
   return (
@@ -166,13 +186,21 @@ export const PollCard = ({
         <p className="text-base font-semibold text-ink">{post.content}</p>
         <div className="mt-4 space-y-3">
           {post.pollOptions?.map((option) => (
-            <div
+            <button
               key={option.id}
-              className="rounded-2xl border border-card-border/70 bg-white/60 px-4 py-3"
+              type="button"
+              className={`w-full rounded-2xl border border-card-border/70 bg-white/60 px-4 py-3 text-left transition ${
+                selectedOptionId === option.id
+                  ? "border-accent/60 ring-2 ring-accent/25"
+                  : "hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-sm"
+              } ${isVoting ? "cursor-wait opacity-80" : ""}`}
+              onClick={handleVoteClick(option.id)}
+              disabled={!onVote || isVoting}
+              aria-pressed={selectedOptionId === option.id}
             >
               <div className="flex items-center justify-between text-sm font-semibold">
                 <span>{option.label}</span>
-                <span className="text-muted">{option.votes}</span>
+                <span className="text-muted">{option.votes} vote{option.votes === 1 ? "" : "s"}</span>
               </div>
               <div className="mt-2 h-2 rounded-full bg-card-border/40">
                 <div
@@ -180,7 +208,7 @@ export const PollCard = ({
                   style={{ width: `${(option.votes / maxVotes) * 100}%` }}
                 />
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>

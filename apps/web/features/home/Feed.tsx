@@ -11,6 +11,7 @@ import { PollCard } from "./PollCard";
 import { PostCard } from "./PostCard";
 import { PostComposerModal } from "./PostComposerModal";
 import type { PostComposerPayload, PostComposerMode } from "./PostComposerModal";
+import type { PollOption } from "@lockedin/shared";
 
 const filterTags = ["All", "Build", "Help", "Chaos", "Cofounder"];
 const sortOptions = [
@@ -31,6 +32,8 @@ export const Feed = () => {
   const [composerPost, setComposerPost] = useState<FeedPost | null>(null);
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [pendingLikes, setPendingLikes] = useState<Set<string>>(new Set());
+  const [pendingVotes, setPendingVotes] = useState<Set<string>>(new Set());
+  const [pollSelections, setPollSelections] = useState<Record<string, string>>({});
 
   const orderPosts = (nextPosts: FeedPost[]) => {
     const sorted = [...nextPosts];
@@ -204,12 +207,67 @@ export const Feed = () => {
     }
   };
 
+  const handleVote = async (post: FeedPost, optionId: string) => {
+    if (!token) {
+      openAuthModal();
+      return;
+    }
+
+    if (pendingVotes.has(post.id)) {
+      return;
+    }
+
+    setPendingVotes((prev) => {
+      const next = new Set(prev);
+      next.add(post.id);
+      return next;
+    });
+
+    try {
+      const response = await apiPost<{ options: PollOption[] }>(
+        `/feed/${post.id}/poll/${optionId}/vote`,
+        {},
+        token
+      );
+
+      setPosts((prev) =>
+        orderPosts(
+          prev.map((item) =>
+            item.id === post.id
+              ? {
+                  ...item,
+                  pollOptions: response.options,
+                }
+              : item
+          )
+        )
+      );
+      setPollSelections((prev) => ({ ...prev, [post.id]: optionId }));
+    } catch (voteError) {
+      setError(
+        voteError instanceof Error
+          ? voteError.message
+          : "Unable to submit your vote."
+      );
+    } finally {
+      setPendingVotes((prev) => {
+        const next = new Set(prev);
+        next.delete(post.id);
+        return next;
+      });
+    }
+  };
+
   const handleOpenPost = (target: FeedPost) => {
     if (!target.id) {
       setError("This post link is missing an ID. Refresh and try again.");
       return;
     }
     router.push(`/posts/${target.id}`);
+  };
+
+  const resolveUserVote = (post: FeedPost): string | null => {
+    return pollSelections[post.id] ?? null;
   };
 
   return (
@@ -283,7 +341,8 @@ export const Feed = () => {
           {posts.map((post) => {
             const isOwnPost = user?.id === post.author.id;
             const isLiking = pendingLikes.has(post.id);
-
+            const isVoting = pendingVotes.has(post.id);
+            
             return post.type === "poll" ? (
               <PollCard
                 key={post.id}
@@ -294,6 +353,9 @@ export const Feed = () => {
                 onDelete={handleDeletePost}
                 onLike={handleToggleLike}
                 isLiking={isLiking}
+                onVote={handleVote}
+                isVoting={isVoting}
+                selectedOptionId={resolveUserVote(post)}
               />
             ) : (
               <PostCard
