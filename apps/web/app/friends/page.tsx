@@ -47,6 +47,7 @@ type DirectMessage = {
   createdAt: string;
   sender: MessageUser;
   recipient: MessageUser;
+  edited?: boolean;
 };
 
 type ThreadResponse = {
@@ -391,7 +392,9 @@ export default function FriendsPage() {
         token
       );
       setMessages((prev) =>
-        prev.map((msg) => (msg.id === editingMessageId ? response.message : msg))
+        prev.map((msg) =>
+          msg.id === editingMessageId ? { ...response.message, edited: true } : msg
+        )
       );
       setEditingMessageId(null);
       setEditingDraft("");
@@ -660,24 +663,26 @@ export default function FriendsPage() {
                                   }}
                                   rows={1}
                                 />
-                                <span
-                                  className={`text-xs ${
+                                <div
+                                  className={`flex items-center gap-2 text-xs ${
                                     isMine ? "text-white/70" : "text-muted"
                                   }`}
                                 >
-                                  {formatRelativeTime(message.createdAt)}
-                                </span>
+                                  <span>{formatRelativeTime(message.createdAt)}</span>
+                                  {message.edited && <span>· edited</span>}
+                                </div>
                               </div>
                             ) : (
                               <>
                                 <p className="whitespace-pre-wrap">{message.body}</p>
-                                <span
-                                  className={`mt-2 block text-xs ${
+                                <div
+                                  className={`mt-2 flex items-center gap-2 text-xs ${
                                     isMine ? "text-white/70" : "text-muted"
                                   }`}
                                 >
-                                  {formatRelativeTime(message.createdAt)}
-                                </span>
+                                  <span>{formatRelativeTime(message.createdAt)}</span>
+                                  {message.edited && <span>· edited</span>}
+                                </div>
                               </>
                             )}
                           </div>
