@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import { Suspense, useEffect, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
@@ -11,7 +11,7 @@ import { useAuth } from "@/features/auth";
 const inputClasses =
   "w-full rounded-2xl border border-card-border/80 bg-white/80 px-4 py-3 text-sm text-ink placeholder:text-muted/60 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20";
 
-export default function ResetPasswordPage() {
+const ResetPasswordInner = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { openAuthModal } = useAuth();
@@ -146,5 +146,29 @@ export default function ResetPasswordPage() {
         </div>
       </Card>
     </div>
+  );
+};
+
+const ResetPasswordShell = ({ children }: { children: ReactNode }) => (
+  <Suspense
+    fallback={
+      <div className="mx-auto max-w-lg px-4 pb-16 pt-10">
+        <Card className="space-y-3 border border-card-border/70 bg-white/90 p-6 shadow-sm">
+          <div className="h-6 w-40 rounded bg-card-border/70" />
+          <div className="h-4 w-64 rounded bg-card-border/70" />
+          <div className="h-24 w-full rounded-2xl bg-card-border/60" />
+        </Card>
+      </div>
+    }
+  >
+    {children}
+  </Suspense>
+);
+
+export default function ResetPasswordPage() {
+  return (
+    <ResetPasswordShell>
+      <ResetPasswordInner />
+    </ResetPasswordShell>
   );
 }
