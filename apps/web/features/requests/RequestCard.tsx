@@ -63,7 +63,7 @@ export const RequestCard = ({
             <button
               type="button"
               aria-label="Offer help"
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-card-border/70 text-muted transition hover:border-accent/40 hover:text-accent"
+              className="inline-flex items-center justify-center rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-accent"
               onClick={(e) => {
                 e.stopPropagation();
                 onHelp?.(request);
