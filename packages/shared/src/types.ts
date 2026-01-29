@@ -75,6 +75,7 @@ export type RequestCard = {
   creator: RequestCreator;
   likeCount: number;
   likedByUser?: boolean;
+  helpedByUser?: boolean;
   city?: string | null;
   isRemote?: boolean;
 };

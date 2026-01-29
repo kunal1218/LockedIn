@@ -97,6 +97,7 @@ export default function RequestsPage() {
       const next =
         Array.isArray(response) ? response : response?.requests ?? [];
       setRequests(next);
+      setHelpedIds(new Set(next.filter((item) => item.helpedByUser).map((item) => item.id)));
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -162,9 +163,19 @@ export default function RequestsPage() {
           next.delete(request.id);
           return next;
         });
+        setRequests((prev) =>
+          prev.map((item) =>
+            item.id === request.id ? { ...item, helpedByUser: false } : item
+          )
+        );
       } else {
         await apiPost(`/requests/${encodeURIComponent(request.id)}/help`, {}, token);
         setHelpedIds((prev) => new Set(prev).add(request.id));
+        setRequests((prev) =>
+          prev.map((item) =>
+            item.id === request.id ? { ...item, helpedByUser: true } : item
+          )
+        );
       }
     } catch (helpError) {
       setError(

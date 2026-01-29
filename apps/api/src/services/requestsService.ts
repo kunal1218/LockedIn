@@ -24,6 +24,7 @@ type RequestRow = {
   creator_college_domain?: string | null;
   like_count?: number | string | null;
   liked_by_user?: boolean | null;
+  helped_by_user?: boolean | null;
 };
 
 export class RequestError extends Error {
@@ -139,6 +140,7 @@ const mapRequest = (row: RequestRow): RequestCard => ({
   },
   likeCount: Number(row.like_count ?? 0),
   likedByUser: Boolean(row.liked_by_user),
+  helpedByUser: Boolean(row.helped_by_user),
 });
 
 export const fetchRequests = async (params: {
@@ -149,6 +151,7 @@ export const fetchRequests = async (params: {
 } = {}): Promise<RequestCard[]> => {
   await ensureRequestsTable();
   await ensureRequestLikesTable();
+  await ensureHelpOffersTable();
 
   const conditions: string[] = [];
   const queryParams: Array<string | number | null> = [];
@@ -185,10 +188,12 @@ export const fetchRequests = async (params: {
             u.college_name AS creator_college_name,
             u.college_domain AS creator_college_domain,
             COUNT(l.user_id)::int AS like_count,
-            BOOL_OR(l.user_id = $${viewerPosition}) AS liked_by_user
+            BOOL_OR(l.user_id = $${viewerPosition}) AS liked_by_user,
+            BOOL_OR(h.helper_id = $${viewerPosition}) AS helped_by_user
      FROM requests r
      JOIN users u ON u.id = r.creator_id
      LEFT JOIN request_likes l ON l.request_id = r.id
+     LEFT JOIN request_help_offers h ON h.request_id = r.id
      ${where}
      GROUP BY r.id, r.city, r.is_remote, u.id
      ORDER BY ${orderBy}
