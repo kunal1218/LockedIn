@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RequestCard as RequestCardType } from "@lockedin/shared";
 import {
@@ -28,6 +29,7 @@ export default function RequestsPage() {
   const [isPosting, setIsPosting] = useState(false);
   const [helpingIds, setHelpingIds] = useState<Set<string>>(new Set());
   const [helpedIds, setHelpedIds] = useState<Set<string>>(new Set());
+  const [isComposerOpen, setComposerOpen] = useState(false);
 
   const sortedRequests = useMemo(() => {
     return [...requests].sort(
@@ -85,6 +87,7 @@ export default function RequestsPage() {
         token
       );
       setRequests((prev) => [response.request, ...prev]);
+      setComposerOpen(false);
     } catch (postError) {
       setError(
         postError instanceof Error
@@ -131,18 +134,19 @@ export default function RequestsPage() {
               Ask for help, offer help, or start a spontaneous mission.
             </p>
           </div>
-          {!isAuthenticated && (
-            <Button requiresAuth={false} onClick={() => openAuthModal("signup")}>
-              Join to post
-            </Button>
-          )}
+          <Button
+            requiresAuth={false}
+            onClick={() => {
+              if (!isAuthenticated) {
+                openAuthModal("signup");
+                return;
+              }
+              setComposerOpen(true);
+            }}
+          >
+            Post a request
+          </Button>
         </div>
-
-        <RequestComposer
-          onSubmit={handleCreateRequest}
-          isSaving={isPosting}
-          disabled={!isAuthenticated}
-        />
 
         <div className="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
           <RequestFilters recency={recency} onRecencyChange={setRecency} />
@@ -177,6 +181,45 @@ export default function RequestsPage() {
           </div>
         </div>
       </div>
+
+      {isComposerOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-[90] flex items-center justify-center px-4 py-8">
+            <div
+              className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
+              onClick={() => setComposerOpen(false)}
+              aria-hidden="true"
+            />
+            <div className="relative z-10 w-full max-w-2xl">
+              <div className="flex items-center justify-between rounded-t-[24px] border border-card-border/70 bg-white/90 px-4 py-3 md:px-6">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                    Requests
+                  </p>
+                  <h2 className="font-display text-xl font-semibold text-ink">
+                    Post a request
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
+                  onClick={() => setComposerOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+              <div className="rounded-b-[24px] border border-card-border/70 bg-white/95 shadow-[0_32px_80px_rgba(27,26,23,0.18)]">
+                <RequestComposer
+                  onSubmit={handleCreateRequest}
+                  isSaving={isPosting}
+                  disabled={!isAuthenticated}
+                />
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
