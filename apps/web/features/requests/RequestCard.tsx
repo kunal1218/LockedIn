@@ -43,9 +43,18 @@ export const RequestCard = ({
           <span className="font-semibold text-ink">{request.creator.handle}</span>
           {collegeLabel ? ` · ${collegeLabel}` : ""}
         </p>
-        <span className="text-xs text-muted">
-          {formatRelativeTime(request.createdAt)}
-        </span>
+        <button
+          type="button"
+          className={`rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold transition ${
+            request.likedByUser
+              ? "border-accent/50 text-accent"
+              : "text-muted hover:border-accent/40 hover:text-ink"
+          }`}
+          onClick={() => onLike?.(request)}
+          disabled={isLiking}
+        >
+          {isLiking ? "…" : request.likedByUser ? "♥" : "♡"} {request.likeCount}
+        </button>
       </div>
       <div>
         <h3 className="text-lg font-semibold text-ink">{request.title}</h3>
@@ -58,18 +67,6 @@ export const RequestCard = ({
           <span className="capitalize">{urgency} urgency</span>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className={`rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold transition ${
-              request.likedByUser
-                ? "border-accent/50 text-accent"
-                : "text-muted hover:border-accent/40 hover:text-ink"
-            }`}
-            onClick={() => onLike?.(request)}
-            disabled={isLiking}
-          >
-            {isLiking ? "…" : request.likedByUser ? "♥" : "♡"} {request.likeCount}
-          </button>
           {isOwnRequest && (
             <button
               type="button"
@@ -93,6 +90,11 @@ export const RequestCard = ({
                   : "I can help"}
           </Button>
         </div>
+      </div>
+      <div className="flex items-center justify-end">
+        <span className="text-xs text-muted">
+          {formatRelativeTime(request.createdAt)}
+        </span>
       </div>
     </Card>
   );
