@@ -360,25 +360,15 @@ export const PostComposerModal = ({
                   </span>
                 ))}
               </div>
-              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="mt-3">
                 <input
                   className={inputBaseClasses}
                   value={tagInput}
                   onChange={(event) => setTagInput(event.target.value)}
                   onKeyDown={handleTagKeyDown}
-                  placeholder="Add a tag and press enter"
+                  placeholder="Type a tag and press Enter"
                   disabled={tags.length >= MAX_TAGS}
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  requiresAuth={false}
-                  onClick={() => handleAddTag(tagInput)}
-                  disabled={!tagInput.trim() || tags.length >= MAX_TAGS}
-                  className="w-full sm:w-auto"
-                >
-                  Add tag
-                </Button>
               </div>
             </div>
 
