@@ -111,9 +111,9 @@ export const RequestCard = ({
           </span>
         </button>
       </div>
-      <div>
+      <div className="space-y-1">
         <h3 className="text-lg font-semibold text-ink">{request.title}</h3>
-        <p className="mt-2 text-sm text-muted">{request.description}</p>
+        <p className="text-sm text-muted">{request.description}</p>
       </div>
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-muted">
