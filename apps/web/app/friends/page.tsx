@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
@@ -69,7 +69,7 @@ const inputClasses =
 const normalizeHandle = (handle: string) => handle.replace(/^@/, "").trim();
 const LAST_HANDLE_KEY = "friends:lastHandle";
 
-export default function FriendsPage() {
+function FriendsPageContent() {
   const { token, user, isAuthenticated, openAuthModal } = useAuth();
   const searchParams = useSearchParams();
   const [summary, setSummary] = useState<FriendSummary | null>(null);
@@ -914,5 +914,13 @@ export default function FriendsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function FriendsPage() {
+  return (
+    <Suspense fallback={null}>
+      <FriendsPageContent />
+    </Suspense>
   );
 }
