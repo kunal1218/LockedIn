@@ -5,9 +5,6 @@ import { Card } from "@/components/Card";
 export type RequestComposerPayload = {
   title: string;
   description: string;
-  location: string;
-  city: string | null;
-  isRemote: boolean;
   tags: string[];
   urgency: "low" | "medium" | "high";
 };
@@ -32,9 +29,6 @@ export const RequestComposer = ({
 }: RequestComposerProps) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [location, setLocation] = useState("");
-  const [city, setCity] = useState("");
-  const [isRemote, setIsRemote] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [urgency, setUrgency] = useState<RequestComposerPayload["urgency"]>("low");
@@ -43,8 +37,6 @@ export const RequestComposer = ({
   const canSubmit =
     title.trim().length > 0 &&
     description.trim().length > 0 &&
-    location.trim().length > 0 &&
-    (isRemote || city.trim().length > 0) &&
     !isSaving &&
     !disabled;
 
@@ -82,17 +74,11 @@ export const RequestComposer = ({
       await onSubmit({
         title: title.trim(),
         description: description.trim(),
-        location: location.trim(),
-        city: isRemote ? null : city.trim(),
-        isRemote,
         tags,
         urgency,
       });
       setTitle("");
       setDescription("");
-      setLocation("");
-      setCity("");
-      setIsRemote(false);
       setTags([]);
       setTagInput("");
       setUrgency("low");
@@ -135,41 +121,6 @@ export const RequestComposer = ({
           />
         </label>
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="block space-y-2">
-            <span className={labelClasses}>Location</span>
-            <input
-              className={inputClasses}
-              value={location}
-              onChange={(event) => setLocation(event.target.value)}
-              placeholder="Where to meet"
-              disabled={disabled}
-              required
-            />
-          </label>
-          <label className="block space-y-2">
-            <span className={labelClasses}>City</span>
-            <input
-              className={inputClasses}
-              value={city}
-              onChange={(event) => setCity(event.target.value)}
-              placeholder="City of the meetup"
-              disabled={disabled || isRemote}
-              required={!isRemote}
-            />
-            <div className="mt-2 flex items-center gap-2 text-xs text-muted">
-              <input
-                id="remote-toggle"
-                type="checkbox"
-                className="h-4 w-4 rounded border-card-border/70 text-accent focus:ring-accent/40"
-                checked={isRemote}
-                onChange={(event) => setIsRemote(event.target.checked)}
-                disabled={disabled}
-              />
-              <label htmlFor="remote-toggle" className="cursor-pointer">
-                Remote request
-              </label>
-            </div>
-          </label>
           <label className="block space-y-2">
             <span className={labelClasses}>Urgency</span>
             <select
