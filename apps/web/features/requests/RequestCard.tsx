@@ -83,7 +83,7 @@ export const RequestCard = ({
             <button
               type="button"
               aria-label="Delete request"
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-card-border/70 text-muted transition hover:border-accent/50 hover:text-accent"
+              className="flex h-5 w-5 items-center justify-center text-muted transition hover:text-accent"
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete?.(request);
