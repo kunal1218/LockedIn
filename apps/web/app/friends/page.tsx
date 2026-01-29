@@ -767,50 +767,6 @@ function FriendsPageContent() {
       </div>
 
       <div className="mt-6 space-y-4">
-        {isAuthenticated && summary && summary.outgoing.length > 0 && (
-          <Card className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-lg font-semibold">Requests sent</h3>
-              <span className="text-xs text-muted">
-                {summary.outgoing.length} active
-              </span>
-            </div>
-            {summary.outgoing.map((request) => {
-              const recipient = request.recipient;
-              const collegeLabel = getCollegeLabel(recipient);
-              return (
-                <div
-                  key={request.id}
-                  className="flex flex-wrap items-center gap-3 rounded-2xl border border-card-border/70 bg-white/70 px-4 py-3"
-                >
-                  <Avatar name={recipient.name} size={32} />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-ink">
-                      {recipient.handle}
-                    </p>
-                    <p className="text-xs text-muted">
-                      {collegeLabel ? `${collegeLabel}` : "Campus member"} ·{" "}
-                      {formatRelativeTime(request.createdAt)}
-                    </p>
-                  </div>
-                  <div className="ml-auto flex items-center gap-2">
-                    <span className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted">
-                      Pending
-                    </span>
-                    <button
-                      type="button"
-                      className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
-                      onClick={() => handleCancelRequest(recipient.handle)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </Card>
-        )}
-
         {isAuthenticated && summary && summary.blocked.length > 0 && (
           <Card className="space-y-3">
             <div className="flex items-center justify-between">
