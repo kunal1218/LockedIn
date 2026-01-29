@@ -2,6 +2,7 @@
 
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
@@ -70,6 +71,7 @@ const LAST_HANDLE_KEY = "friends:lastHandle";
 
 export default function FriendsPage() {
   const { token, user, isAuthenticated, openAuthModal } = useAuth();
+  const searchParams = useSearchParams();
   const [summary, setSummary] = useState<FriendSummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,19 +129,47 @@ export default function FriendsPage() {
     if (!summary || initializedSelectionRef.current) {
       return;
     }
-    initializedSelectionRef.current = true;
     const handles = summary.friends.map((friend) => normalizeHandle(friend.handle));
+    const queryHandleRaw = searchParams.get("handle") ?? "";
+    const queryHandle = normalizeHandle(queryHandleRaw);
     const stored =
       typeof window !== "undefined"
         ? normalizeHandle(localStorage.getItem(LAST_HANDLE_KEY) ?? "")
         : "";
     const firstHandle = handles[0] ?? null;
-    if (stored && handles.includes(stored)) {
-      setSelectedHandle(stored);
+
+    let next: string | null = null;
+    if (queryHandle && handles.includes(queryHandle)) {
+      next = queryHandle;
+    } else if (stored && handles.includes(stored)) {
+      next = stored;
     } else if (firstHandle) {
-      setSelectedHandle(firstHandle);
+      next = firstHandle;
     }
-  }, [summary]);
+
+    if (next) {
+      setSelectedHandle(next);
+      initializedSelectionRef.current = true;
+      if (typeof window !== "undefined") {
+        localStorage.setItem(LAST_HANDLE_KEY, next);
+      }
+    }
+  }, [summary, searchParams]);
+
+  useEffect(() => {
+    if (!summary) return;
+    const queryHandle = normalizeHandle(searchParams.get("handle") ?? "");
+    if (
+      queryHandle &&
+      queryHandle !== selectedHandle &&
+      summary.friends.some((f) => normalizeHandle(f.handle) === queryHandle)
+    ) {
+      setSelectedHandle(queryHandle);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(LAST_HANDLE_KEY, queryHandle);
+      }
+    }
+  }, [searchParams, summary, selectedHandle]);
 
   useEffect(() => {
     if (!summary) return;

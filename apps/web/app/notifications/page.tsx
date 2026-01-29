@@ -417,7 +417,7 @@ export default function NotificationsPage() {
                     )}
                     {notification.type === "message" && actorSlug && (
                       <Link
-                        href={`/messages/${encodeURIComponent(actorSlug)}`}
+                        href={`/friends?handle=${encodeURIComponent(actorSlug)}`}
                         className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
                       >
                         View chat
