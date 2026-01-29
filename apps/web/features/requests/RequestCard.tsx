@@ -57,18 +57,6 @@ export const RequestCard = ({
             {hasHelped ? "Help sent" : isHelping ? "Sending..." : "I can help"}
           </Button>
         )}
-        {isOwnRequest && (
-          <button
-            type="button"
-            className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete?.(request);
-            }}
-          >
-            Delete
-          </button>
-        )}
         <Button
           variant="outline"
           onClick={(e) => {
@@ -85,11 +73,26 @@ export const RequestCard = ({
   const renderContent = () => (
     <>
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-muted">
-          Posted by{" "}
-          <span className="font-semibold text-ink">{request.creator.handle}</span>
-          {collegeLabel ? ` · ${collegeLabel}` : ""}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-semibold text-muted">
+            Posted by{" "}
+            <span className="font-semibold text-ink">{request.creator.handle}</span>
+            {collegeLabel ? ` · ${collegeLabel}` : ""}
+          </p>
+          {isOwnRequest && (
+            <button
+              type="button"
+              aria-label="Delete request"
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-card-border/70 text-muted transition hover:border-accent/50 hover:text-accent"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete?.(request);
+              }}
+            >
+              🗑️
+            </button>
+          )}
+        </div>
         <button
           type="button"
           className={`inline-flex items-center gap-2 rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold transition ${
