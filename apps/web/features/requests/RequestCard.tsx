@@ -1,15 +1,8 @@
 import type { RequestCard as RequestCardType } from "@lockedin/shared";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
-import { Tag } from "@/components/Tag";
 import { formatRelativeTime } from "@/lib/time";
 import { deriveCollegeFromDomain } from "@/lib/college";
-
-const urgencyTone = {
-  low: "default",
-  medium: "sun",
-  high: "accent",
-} as const;
 
 type RequestCardProps = {
   request: RequestCardType;
@@ -45,24 +38,18 @@ export const RequestCard = ({
   return (
     <Card className="space-y-4">
       <div className="flex items-center justify-between">
-        <Tag tone={urgencyTone[urgency]}>{urgency} urgency</Tag>
+        <p className="text-xs font-semibold text-muted">
+          Posted by{" "}
+          <span className="font-semibold text-ink">{request.creator.handle}</span>
+          {collegeLabel ? ` · ${collegeLabel}` : ""}
+        </p>
         <span className="text-xs text-muted">
           {formatRelativeTime(request.createdAt)}
         </span>
       </div>
       <div>
         <h3 className="text-lg font-semibold text-ink">{request.title}</h3>
-        <p className="text-sm text-muted">{request.description}</p>
-        <p className="mt-2 text-xs text-muted">
-          Posted by{" "}
-          <span className="font-semibold text-ink">{request.creator.handle}</span>
-          {collegeLabel ? ` · ${collegeLabel}` : ""}
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {request.tags.map((tag) => (
-          <Tag key={tag}>{tag}</Tag>
-        ))}
+        <p className="mt-2 text-sm text-muted">{request.description}</p>
       </div>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-semibold text-muted">

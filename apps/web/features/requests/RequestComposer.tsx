@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
@@ -7,7 +9,6 @@ export type RequestComposerPayload = {
   description: string;
   city: string | null;
   isRemote: boolean;
-  tags: string[];
   urgency: "low" | "medium" | "high";
 };
 
@@ -22,8 +23,6 @@ const labelClasses =
 const inputClasses =
   "w-full rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-ink placeholder:text-muted/60 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20";
 
-const MAX_TAGS = 8;
-
 export const RequestComposer = ({
   onSubmit,
   isSaving = false,
@@ -31,8 +30,6 @@ export const RequestComposer = ({
 }: RequestComposerProps) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState("");
   const [urgency, setUrgency] = useState<RequestComposerPayload["urgency"]>("low");
   const [city, setCity] = useState("");
   const [isRemote, setIsRemote] = useState(false);
@@ -46,33 +43,11 @@ export const RequestComposer = ({
     !isSaving &&
     !disabled;
 
-  const addTag = (raw: string) => {
-    if (tags.length >= MAX_TAGS) {
-      setTagInput("");
-      return;
-    }
-    const cleaned = raw
-      .trim()
-      .replace(/^#/, "")
-      .replace(/\s+/g, "-")
-      .toLowerCase();
-    if (!cleaned || tags.includes(cleaned)) {
-      setTagInput("");
-      return;
-    }
-    setTags((prev) => [...prev, cleaned]);
-    setTagInput("");
-  };
-
-  const removeTag = (target: string) => {
-    setTags((prev) => prev.filter((tag) => tag !== target));
-  };
-
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
     if (!canSubmit) {
-      setError("Add a title, description, and location.");
+      setError("Add a title, description, and a city or mark it remote.");
       return;
     }
 
@@ -82,13 +57,10 @@ export const RequestComposer = ({
         description: description.trim(),
         city: isRemote ? null : city.trim(),
         isRemote,
-        tags,
         urgency,
       });
       setTitle("");
       setDescription("");
-      setTags([]);
-      setTagInput("");
       setUrgency("low");
       setCity("");
       setIsRemote(false);
@@ -203,52 +175,6 @@ export const RequestComposer = ({
           </label>
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className={labelClasses}>Tags</span>
-            <span className="text-xs font-semibold text-muted">
-              {tags.length}/{MAX_TAGS}
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {tags.map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center gap-2 rounded-full border border-card-border/70 bg-white/80 px-3 py-1 text-xs font-semibold text-ink"
-              >
-                {tag}
-                <button
-                  type="button"
-                  className="text-muted transition hover:text-ink"
-                  onClick={() => removeTag(tag)}
-                  aria-label={`Remove ${tag}`}
-                  disabled={disabled}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-            {tags.length === 0 && (
-              <span className="text-xs text-muted">No tags yet.</span>
-            )}
-          </div>
-          <div className="flex flex-col gap-3">
-            <input
-              className={inputClasses}
-              value={tagInput}
-              onChange={(event) => setTagInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  addTag(tagInput);
-                }
-              }}
-              placeholder="Add a tag and press enter"
-              disabled={disabled || tags.length >= MAX_TAGS}
-            />
-          </div>
-        </div>
-
         {error && (
           <p className="rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent">
             {error}
@@ -256,7 +182,7 @@ export const RequestComposer = ({
         )}
 
         <div className="flex justify-end">
-          <Button type="submit" disabled={!canSubmit} requiresAuth={false}>
+          <Button type="submit" disabled={!canSubmit || isSaving} requiresAuth={false}>
             {isSaving ? "Posting..." : "Post request"}
           </Button>
         </div>
