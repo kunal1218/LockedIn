@@ -248,7 +248,7 @@ function FriendsPageContent() {
   useEffect(() => {
     if (selectedHandle) {
       window.setTimeout(() => {
-        inputRef.current?.focus();
+        inputRef.current?.focus({ preventScroll: true });
       }, 0);
     }
   }, [selectedHandle]);
@@ -278,7 +278,7 @@ function FriendsPageContent() {
   useEffect(() => {
     if (editingMessageId) {
       window.setTimeout(() => {
-        editInputRef.current?.focus();
+        editInputRef.current?.focus({ preventScroll: true });
       }, 0);
     }
   }, [editingMessageId]);
