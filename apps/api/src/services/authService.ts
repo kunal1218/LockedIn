@@ -1,7 +1,9 @@
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
+import nodemailer from "nodemailer";
 import { db } from "../db";
 import { getRedis } from "../db/redis";
+import type { PoolClient } from "pg";
 
 type UserRow = {
   id: string;
@@ -38,6 +40,7 @@ export class AuthError extends Error {
 }
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
+const RESET_TOKEN_TTL_MINUTES = 60;
 let didBackfillHandles = false;
 let cachedAdminEmails: Set<string> | null = null;
 
@@ -84,6 +87,28 @@ export const ensureUsersTable = async () => {
   `);
 
   await backfillInvalidHandles();
+};
+
+export const ensurePasswordResetTable = async () => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      token uuid PRIMARY KEY,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at timestamptz NOT NULL,
+      used_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS password_reset_tokens_user_idx
+      ON password_reset_tokens (user_id);
+  `);
+
+  await db.query(`
+    DELETE FROM password_reset_tokens
+     WHERE expires_at < now() - interval '30 days';
+  `);
 };
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
@@ -242,6 +267,188 @@ const createSession = async (userId: string) => {
     EX: SESSION_TTL_SECONDS,
   });
   return token;
+};
+
+const insertResetToken = async (client: PoolClient, userId: string) => {
+  const token = randomUUID();
+  const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000);
+
+  await client.query(
+    `INSERT INTO password_reset_tokens (token, user_id, expires_at)
+     VALUES ($1, $2, $3)`,
+    [token, userId, expiresAt]
+  );
+
+  return { token, expiresAt };
+};
+
+const sendPasswordResetEmail = async (params: {
+  to: string;
+  name?: string | null;
+  resetLink: string;
+}) => {
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT ?? "587");
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const from = process.env.PASSWORD_RESET_FROM ?? user ?? "no-reply@lockedin.app";
+
+  if (!host || !user || !pass) {
+    console.info(
+      `[auth] Password reset email for ${params.to}: ${params.resetLink} (SMTP not configured; link logged only)`
+    );
+    return;
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
+    });
+
+    const previewName = params.name ? `Hi ${params.name},` : "Hi there,";
+
+    await transporter.sendMail({
+      from,
+      to: params.to,
+      subject: "Reset your LockedIn password",
+      text: `${previewName}\n\nUse this link to reset your password: ${params.resetLink}\n\nThe link expires in ${RESET_TOKEN_TTL_MINUTES} minutes.`,
+      html: `
+        <p>${previewName}</p>
+        <p>Use this link to reset your password:</p>
+        <p><a href="${params.resetLink}">${params.resetLink}</a></p>
+        <p>This link expires in ${RESET_TOKEN_TTL_MINUTES} minutes.</p>
+      `,
+    });
+  } catch (error) {
+    console.error("Failed to send password reset email", error);
+  }
+};
+
+export const requestPasswordReset = async (email: string) => {
+  await ensureUsersTable();
+  await ensurePasswordResetTable();
+
+  const normalized = normalizeEmail(email);
+  if (!normalized) {
+    throw new AuthError("Email is required", 400);
+  }
+
+  const userResult = await db.query(
+    `SELECT id, email, name FROM users WHERE email = $1`,
+    [normalized]
+  );
+
+  if ((userResult.rowCount ?? 0) === 0) {
+    // Always respond the same way to avoid leaking which emails exist.
+    return { token: null, email: normalized };
+  }
+
+  const user = userResult.rows[0] as { id: string; email: string; name: string };
+
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `DELETE FROM password_reset_tokens
+        WHERE user_id = $1 AND (used_at IS NOT NULL OR expires_at < now())`,
+      [user.id]
+    );
+
+    const { token, expiresAt } = await insertResetToken(client, user.id);
+    await client.query("COMMIT");
+
+    const baseUrl =
+      process.env.PASSWORD_RESET_URL ?? "http://localhost:3000/reset-password";
+    const resetLink = `${baseUrl}?token=${token}`;
+
+    await sendPasswordResetEmail({
+      to: user.email,
+      name: user.name,
+      resetLink,
+    });
+
+    return { token, email: user.email, name: user.name, expiresAt };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+export const resetPasswordWithToken = async (params: {
+  token: string;
+  password: string;
+}) => {
+  await ensureUsersTable();
+  await ensurePasswordResetTable();
+
+  const token = params.token.trim();
+  const password = params.password.trim();
+
+  if (!token) {
+    throw new AuthError("Reset token is required", 400);
+  }
+  if (password.length < 8) {
+    throw new AuthError("Password must be at least 8 characters", 400);
+  }
+
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+
+    const tokenResult = await client.query(
+      `SELECT user_id, expires_at, used_at
+         FROM password_reset_tokens
+        WHERE token = $1
+        LIMIT 1`,
+      [token]
+    );
+
+    if ((tokenResult.rowCount ?? 0) === 0) {
+      throw new AuthError("Invalid or expired reset link", 400);
+    }
+
+    const { user_id: userId, expires_at: expiresAt, used_at: usedAt } =
+      tokenResult.rows[0] as { user_id: string; expires_at: Date; used_at?: Date | null };
+
+    if (usedAt) {
+      throw new AuthError("This reset link has already been used", 400);
+    }
+    if (new Date(expiresAt).getTime() < Date.now()) {
+      throw new AuthError("This reset link has expired", 400);
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    await client.query(
+      `UPDATE users SET password_hash = $2 WHERE id = $1`,
+      [userId, passwordHash]
+    );
+
+    await client.query(
+      `UPDATE password_reset_tokens
+          SET used_at = now()
+        WHERE token = $1`,
+      [token]
+    );
+
+    await client.query(
+      `DELETE FROM password_reset_tokens
+        WHERE user_id = $1 AND token <> $2`,
+      [userId, token]
+    );
+
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 export const signUpUser = async (params: {

@@ -2,6 +2,8 @@ import type { Request, Response } from "express";
 import {
   AuthError,
   getUserFromToken,
+  requestPasswordReset,
+  resetPasswordWithToken,
   signInUser,
   signUpUser,
 } from "../services/authService";
@@ -53,6 +55,27 @@ export const signIn = async (req: Request, res: Response) => {
       password: asString(req.body?.password),
     });
     res.json(payload);
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    await requestPasswordReset(asString(req.body?.email));
+    res.json({ ok: true });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    await resetPasswordWithToken({
+      token: asString(req.body?.token),
+      password: asString(req.body?.password),
+    });
+    res.json({ ok: true });
   } catch (error) {
     handleError(res, error);
   }

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/Button";
+import { apiPost } from "@/lib/api";
 import { useAuth } from "./AuthProvider";
 
 const inputClasses =
@@ -49,6 +50,7 @@ export const AuthModal = () => {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const [email, setEmail] = useState("");
@@ -63,13 +65,24 @@ export const AuthModal = () => {
             action: "Sign in",
             toggle: "Need an account?",
             toggleAction: "Create one",
+            showPassword: true,
           }
-        : {
+        : authModalMode === "signup"
+        ? {
             title: "Jump into the action",
             subtitle: "Create your profile and start connecting.",
             action: "Create account",
             toggle: "Already have an account?",
             toggleAction: "Sign in",
+            showPassword: true,
+          }
+        : {
+            title: "Reset your password",
+            subtitle: "Tell us your email and we’ll send a reset link.",
+            action: "Send reset link",
+            toggle: "Remembered it?",
+            toggleAction: "Back to sign in",
+            showPassword: false,
           },
     [authModalMode]
   );
@@ -91,6 +104,7 @@ export const AuthModal = () => {
     if (isAuthModalOpen) {
       setPending(false);
       setError(null);
+      setInfo(null);
       setPassword("");
     }
   }, [authModalMode, isAuthModalOpen]);
@@ -103,6 +117,7 @@ export const AuthModal = () => {
     event.preventDefault();
     setPending(true);
     setError(null);
+    setInfo(null);
 
     try {
       if (authModalMode === "login") {
@@ -111,14 +126,22 @@ export const AuthModal = () => {
         return;
       }
 
-      await signup({
-        name,
-        email,
-        password,
-        handle: handle.trim() ? handle : undefined,
-      });
-      closeAuthModal();
-      router.push("/profile");
+      if (authModalMode === "signup") {
+        await signup({
+          name,
+          email,
+          password,
+          handle: handle.trim() ? handle : undefined,
+        });
+        closeAuthModal();
+        router.push("/profile");
+        return;
+      }
+
+      await apiPost("/auth/forgot", { email });
+      setInfo(
+        "If an account exists for that email, you’ll get a link to reset your password."
+      );
     } catch (submitError) {
       const message =
         submitError instanceof Error
@@ -131,7 +154,11 @@ export const AuthModal = () => {
   };
 
   const switchMode = () => {
-    setAuthModalMode(authModalMode === "login" ? "signup" : "login");
+    if (authModalMode === "login") {
+      setAuthModalMode("signup");
+      return;
+    }
+    setAuthModalMode("login");
   };
 
   return (
@@ -240,25 +267,43 @@ export const AuthModal = () => {
                 required
               />
             </label>
-            <label className="block">
-              <span className={labelClasses}>Password</span>
-              <input
-                className={inputClasses}
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="At least 8 characters"
-                autoComplete={
-                  authModalMode === "login" ? "current-password" : "new-password"
-                }
-                minLength={8}
-                required
-              />
-            </label>
+            {modeCopy.showPassword && (
+              <label className="block">
+                <div className="flex items-center justify-between">
+                  <span className={labelClasses}>Password</span>
+                  {authModalMode === "login" && (
+                    <button
+                      type="button"
+                      className="text-[11px] font-semibold text-accent hover:text-ink"
+                      onClick={() => setAuthModalMode("forgot")}
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
+                <input
+                  className={inputClasses}
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="At least 8 characters"
+                  autoComplete={
+                    authModalMode === "login" ? "current-password" : "new-password"
+                  }
+                  minLength={8}
+                  required
+                />
+              </label>
+            )}
 
             {error && (
               <div className="rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-xs font-semibold text-ink">
                 {error}
+              </div>
+            )}
+            {info && (
+              <div className="rounded-2xl border border-accent/25 bg-accent/5 px-4 py-3 text-xs font-semibold text-ink/80">
+                {info}
               </div>
             )}
 

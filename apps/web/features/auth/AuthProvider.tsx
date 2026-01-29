@@ -28,7 +28,7 @@ type AuthPayload = {
   token: string;
 };
 
-type AuthModalMode = "login" | "signup";
+type AuthModalMode = "login" | "signup" | "forgot";
 
 type AuthContextValue = {
   user: AuthUser | null;
