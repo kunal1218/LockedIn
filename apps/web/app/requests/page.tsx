@@ -120,9 +120,17 @@ export default function RequestsPage() {
     setIsPosting(true);
     setError(null);
     try {
+      const requestBody = {
+        ...payload,
+        location: payload.isRemote
+          ? "Remote"
+          : payload.city && payload.city.trim()
+            ? payload.city.trim()
+            : "Unknown",
+      };
       const response = await apiPost<{ request: RequestCardType }>(
         "/requests",
-        payload,
+        requestBody,
         token
       );
       setRequests((prev) => [response.request, ...prev]);

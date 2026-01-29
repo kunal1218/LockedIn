@@ -200,7 +200,7 @@ export const createRequest = async (params: {
   creatorId: string;
   title: string;
   description: string;
-  location: string;
+  location?: string;
   city?: string | null;
   isRemote?: boolean;
   tags?: unknown;
@@ -210,8 +210,10 @@ export const createRequest = async (params: {
 
   const title = (params.title ?? "").trim();
   const description = (params.description ?? "").trim();
-  const location = (params.location ?? "").trim();
-   const city = (params.city ?? "").trim() || null;
+  const location =
+    (params.location ?? params.city ?? "").trim() ||
+    (params.isRemote ? "Remote" : "");
+  const city = (params.city ?? "").trim() || null;
   const isRemote = Boolean(params.isRemote);
   const tags = normalizeTags(params.tags ?? []);
   const urgency = (params.urgency ?? "low").toLowerCase();

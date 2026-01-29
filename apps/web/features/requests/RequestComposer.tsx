@@ -5,6 +5,8 @@ import { Card } from "@/components/Card";
 export type RequestComposerPayload = {
   title: string;
   description: string;
+  city: string | null;
+  isRemote: boolean;
   tags: string[];
   urgency: "low" | "medium" | "high";
 };
@@ -32,11 +34,15 @@ export const RequestComposer = ({
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [urgency, setUrgency] = useState<RequestComposerPayload["urgency"]>("low");
+  const [city, setCity] = useState("");
+  const [isRemote, setIsRemote] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canSubmit =
     title.trim().length > 0 &&
     description.trim().length > 0 &&
+    (isRemote || city.trim().length > 0) &&
     !isSaving &&
     !disabled;
 
@@ -74,6 +80,8 @@ export const RequestComposer = ({
       await onSubmit({
         title: title.trim(),
         description: description.trim(),
+        city: isRemote ? null : city.trim(),
+        isRemote,
         tags,
         urgency,
       });
@@ -82,9 +90,34 @@ export const RequestComposer = ({
       setTags([]);
       setTagInput("");
       setUrgency("low");
+      setCity("");
+      setIsRemote(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to post request.");
     }
+  };
+
+  const handleLocate = () => {
+    if (disabled || isLocating) return;
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setError("Geolocation not available.");
+      return;
+    }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const approx = `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+        setCity(approx);
+        setIsLocating(false);
+        setError(null);
+      },
+      (geoError) => {
+        setIsLocating(false);
+        setError(geoError.message || "Unable to detect location.");
+      },
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+    );
   };
 
   return (
@@ -121,6 +154,38 @@ export const RequestComposer = ({
           />
         </label>
         <div className="grid gap-4 md:grid-cols-2">
+          <label className="block space-y-2">
+            <span className={labelClasses}>City</span>
+            <input
+              className={inputClasses}
+              value={city}
+              onChange={(event) => setCity(event.target.value)}
+              placeholder="City for in-person meetups"
+              disabled={disabled || isRemote}
+              required={!isRemote}
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
+              <button
+                type="button"
+                className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink disabled:opacity-60"
+                onClick={handleLocate}
+                disabled={disabled || isRemote || isLocating}
+              >
+                {isLocating ? "Detecting..." : "Use my location"}
+              </button>
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-card-border/70 text-accent focus:ring-accent/40"
+                  checked={isRemote}
+                  onChange={(event) => setIsRemote(event.target.checked)}
+                  disabled={disabled}
+                />
+                Remote request
+              </label>
+            </div>
+          </label>
+
           <label className="block space-y-2">
             <span className={labelClasses}>Urgency</span>
             <select
