@@ -37,7 +37,7 @@ export const RequestCard = ({
 
   return (
     <Card className="space-y-3 pt-1">
-      <div className="flex items-center justify-between mt-2">
+      <div className="flex items-center justify-between mt-2.5">
         <div className="flex items-center gap-2">
           <p className="text-xs font-semibold text-muted">
             Posted by{" "}
