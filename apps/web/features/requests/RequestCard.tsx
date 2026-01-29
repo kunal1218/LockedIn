@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { RequestCard as RequestCardType } from "@lockedin/shared";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
@@ -25,6 +26,7 @@ export const RequestCard = ({
   isLiking = false,
   onDelete,
 }: RequestCardProps) => {
+  const [showActions, setShowActions] = useState(false);
   const urgency = request.urgency ?? "low";
   const collegeLabel = deriveCollegeFromDomain(
     request.creator.collegeDomain ?? ""
@@ -35,8 +37,53 @@ export const RequestCard = ({
       ? `${request.city} · ${request.location}`
       : request.location;
 
-  return (
-    <Card className="space-y-4">
+  const renderActions = () => (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-2 text-xs font-semibold text-muted">
+        <span>{locationLabel}</span>
+        <span className="h-1 w-1 rounded-full bg-card-border/70" />
+        <span className="capitalize">{urgency} urgency</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {!isOwnRequest && (
+          <Button
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              onHelp?.(request);
+            }}
+            disabled={isHelping || hasHelped}
+          >
+            {hasHelped ? "Help sent" : isHelping ? "Sending..." : "I can help"}
+          </Button>
+        )}
+        {isOwnRequest && (
+          <button
+            type="button"
+            className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete?.(request);
+            }}
+          >
+            Delete
+          </button>
+        )}
+        <Button
+          variant="outline"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowActions(false);
+          }}
+        >
+          Close
+        </Button>
+      </div>
+    </div>
+  );
+
+  const renderContent = () => (
+    <>
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold text-muted">
           Posted by{" "}
@@ -50,7 +97,10 @@ export const RequestCard = ({
               ? "border-accent/50 text-accent"
               : "text-muted hover:border-accent/40 hover:text-ink"
           }`}
-          onClick={() => onLike?.(request)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onLike?.(request);
+          }}
           disabled={isLiking}
         >
           {isLiking ? "…" : request.likedByUser ? "♥" : "♡"} {request.likeCount}
@@ -66,36 +116,21 @@ export const RequestCard = ({
           <span className="h-1 w-1 rounded-full bg-card-border/70" />
           <span className="capitalize">{urgency} urgency</span>
         </div>
-        <div className="flex items-center gap-2">
-          {isOwnRequest && (
-            <button
-              type="button"
-              className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
-              onClick={() => onDelete?.(request)}
-            >
-              Delete
-            </button>
-          )}
-          <Button
-            variant="outline"
-            onClick={() => onHelp?.(request)}
-            disabled={isHelping || hasHelped || isOwnRequest}
-          >
-            {isOwnRequest
-              ? "Yours"
-              : hasHelped
-                ? "Help sent"
-                : isHelping
-                  ? "Sending..."
-                  : "I can help"}
-          </Button>
-        </div>
       </div>
       <div className="flex items-center justify-end">
         <span className="text-xs text-muted">
           {formatRelativeTime(request.createdAt)}
         </span>
       </div>
+    </>
+  );
+
+  return (
+    <Card
+      className="space-y-4 cursor-pointer"
+      onClick={() => setShowActions((prev) => !prev)}
+    >
+      {showActions ? renderActions() : renderContent()}
     </Card>
   );
 };
