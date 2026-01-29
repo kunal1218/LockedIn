@@ -120,10 +120,10 @@ export const RequestCard = ({
           <span>{locationLabel}</span>
           <span className="h-1 w-1 rounded-full bg-card-border/70" />
           <span className="capitalize">{urgency} urgency</span>
-          <span className="text-xs text-muted">
-            {formatRelativeTime(request.createdAt)}
-          </span>
         </div>
+        <span className="text-xs text-muted">
+          {formatRelativeTime(request.createdAt)}
+        </span>
       </div>
     </>
   );
