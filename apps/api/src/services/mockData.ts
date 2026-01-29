@@ -121,6 +121,7 @@ export const requests: RequestCard[] = [
     tags: ["sports", "fun"],
     urgency: "low",
     creator: users[2],
+    likeCount: 7,
   },
   {
     id: "request-2",
@@ -131,6 +132,7 @@ export const requests: RequestCard[] = [
     tags: ["help", "moving"],
     urgency: "high",
     creator: users[0],
+    likeCount: 18,
   },
   {
     id: "request-3",
@@ -141,6 +143,7 @@ export const requests: RequestCard[] = [
     tags: ["build", "cofounder"],
     urgency: "medium",
     creator: users[1],
+    likeCount: 12,
   },
 ];
 

@@ -8,6 +8,8 @@ import {
   RequestComposer,
   RequestFilters,
   type RecencyFilter,
+  type UrgencyFilter,
+  type SortOption,
 } from "@/features/requests";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -26,16 +28,48 @@ export default function RequestsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [recency, setRecency] = useState<RecencyFilter>("24h");
+  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
+  const [sortBy, setSortBy] = useState<SortOption>("recency");
   const [isPosting, setIsPosting] = useState(false);
   const [helpingIds, setHelpingIds] = useState<Set<string>>(new Set());
   const [helpedIds, setHelpedIds] = useState<Set<string>>(new Set());
+  const [likingIds, setLikingIds] = useState<Set<string>>(new Set());
   const [isComposerOpen, setComposerOpen] = useState(false);
 
   const sortedRequests = useMemo(() => {
-    return [...requests].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-  }, [requests]);
+    const filtered =
+      urgencyFilter === "all"
+        ? requests
+        : requests.filter((req) => (req.urgency ?? "low") === urgencyFilter);
+
+    const byRecency = (a: RequestCardType, b: RequestCardType) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+
+    const byLikes = (a: RequestCardType, b: RequestCardType) => {
+      if (b.likeCount !== a.likeCount) {
+        return b.likeCount - a.likeCount;
+      }
+      return byRecency(a, b);
+    };
+
+    const urgencyRank = (value?: string | null) => {
+      const u = (value ?? "low").toLowerCase();
+      if (u === "high") return 3;
+      if (u === "medium") return 2;
+      return 1;
+    };
+
+    const byUrgency = (a: RequestCardType, b: RequestCardType) => {
+      const diff = urgencyRank(b.urgency) - urgencyRank(a.urgency);
+      if (diff !== 0) return diff;
+      return byRecency(a, b);
+    };
+
+    const sorter =
+      sortBy === "likes" ? byLikes : sortBy === "urgency" ? byUrgency : byRecency;
+
+    return [...filtered].sort(sorter);
+  }, [requests, urgencyFilter, sortBy]);
 
   const loadRequests = useCallback(async () => {
     setIsLoading(true);
@@ -47,7 +81,8 @@ export default function RequestsPage() {
     }
     try {
       const response = await apiGet<{ requests: RequestCardType[] } | RequestCardType[]>(
-        `/requests?${params.toString()}`
+        `/requests?${params.toString()}`,
+        token ?? undefined
       );
       const next =
         Array.isArray(response) ? response : response?.requests ?? [];
@@ -61,7 +96,7 @@ export default function RequestsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [recency]);
+  }, [recency, token]);
 
   useEffect(() => {
     void loadRequests();
@@ -105,11 +140,11 @@ export default function RequestsPage() {
       return;
     }
     setError(null);
-    setHelpingIds((prev) => new Set(prev).add(request.id));
-    try {
-      await apiPost(`/requests/${encodeURIComponent(request.id)}/help`, {}, token);
-      setHelpedIds((prev) => new Set(prev).add(request.id));
-    } catch (helpError) {
+      setHelpingIds((prev) => new Set(prev).add(request.id));
+      try {
+        await apiPost(`/requests/${encodeURIComponent(request.id)}/help`, {}, token);
+        setHelpedIds((prev) => new Set(prev).add(request.id));
+      } catch (helpError) {
       setError(
         helpError instanceof Error
           ? helpError.message
@@ -117,6 +152,41 @@ export default function RequestsPage() {
       );
     } finally {
       setHelpingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(request.id);
+        return next;
+      });
+    }
+  };
+
+  const handleLike = async (request: RequestCardType) => {
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    setError(null);
+    setLikingIds((prev) => new Set(prev).add(request.id));
+    try {
+      const response = await apiPost<{ likeCount: number; liked: boolean }>(
+        `/requests/${encodeURIComponent(request.id)}/like`,
+        {},
+        token
+      );
+      setRequests((prev) =>
+        prev.map((item) =>
+          item.id === request.id
+            ? { ...item, likeCount: response.likeCount, likedByUser: response.liked }
+            : item
+        )
+      );
+    } catch (likeError) {
+      setError(
+        likeError instanceof Error
+          ? likeError.message
+          : "Unable to update likes."
+      );
+    } finally {
+      setLikingIds((prev) => {
         const next = new Set(prev);
         next.delete(request.id);
         return next;
@@ -149,7 +219,14 @@ export default function RequestsPage() {
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <RequestFilters recency={recency} onRecencyChange={setRecency} />
+          <RequestFilters
+            recency={recency}
+            onRecencyChange={setRecency}
+            urgency={urgencyFilter}
+            onUrgencyChange={setUrgencyFilter}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+          />
           <div className="space-y-4">
             {error && (
               <Card className="border border-accent/30 bg-accent/10 py-3">
@@ -174,6 +251,8 @@ export default function RequestsPage() {
                     isHelping={helpingIds.has(request.id)}
                     hasHelped={helpedIds.has(request.id)}
                     isOwnRequest={request.creator.id === user?.id}
+                    onLike={handleLike}
+                    isLiking={likingIds.has(request.id)}
                   />
                 ))}
               </div>

@@ -14,6 +14,7 @@ export const requests: RequestCard[] = [
       name: "Avery Cho",
       handle: "@averycodes",
     },
+    likeCount: 7,
   },
   {
     id: "request-2",
@@ -28,6 +29,7 @@ export const requests: RequestCard[] = [
       name: "Samira Patel",
       handle: "@samirawins",
     },
+    likeCount: 18,
   },
   {
     id: "request-3",
@@ -42,6 +44,7 @@ export const requests: RequestCard[] = [
       name: "Miles Grant",
       handle: "@milesmoves",
     },
+    likeCount: 12,
   },
   {
     id: "request-4",
@@ -56,5 +59,6 @@ export const requests: RequestCard[] = [
       name: "Jess Rivera",
       handle: "@jesssnaps",
     },
+    likeCount: 3,
   },
 ];

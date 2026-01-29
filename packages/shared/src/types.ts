@@ -73,6 +73,8 @@ export type RequestCard = {
   tags: string[];
   urgency?: "low" | "medium" | "high";
   creator: RequestCreator;
+  likeCount: number;
+  likedByUser?: boolean;
 };
 
 export type MapEvent = {

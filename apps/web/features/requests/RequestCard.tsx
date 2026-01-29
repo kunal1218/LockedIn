@@ -17,6 +17,8 @@ type RequestCardProps = {
   isHelping?: boolean;
   hasHelped?: boolean;
   isOwnRequest?: boolean;
+  onLike?: (request: RequestCardType) => void | Promise<void>;
+  isLiking?: boolean;
 };
 
 export const RequestCard = ({
@@ -25,6 +27,8 @@ export const RequestCard = ({
   isHelping = false,
   hasHelped = false,
   isOwnRequest = false,
+  onLike,
+  isLiking = false,
 }: RequestCardProps) => {
   const urgency = request.urgency ?? "low";
   const collegeLabel = deriveCollegeFromDomain(
@@ -53,23 +57,39 @@ export const RequestCard = ({
           <Tag key={tag}>{tag}</Tag>
         ))}
       </div>
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-muted">
-          {request.location}
-        </span>
-        <Button
-          variant="outline"
-          onClick={() => onHelp?.(request)}
-          disabled={isHelping || hasHelped || isOwnRequest}
-        >
-          {isOwnRequest
-            ? "Yours"
-            : hasHelped
-              ? "Help sent"
-              : isHelping
-                ? "Sending..."
-                : "I can help"}
-        </Button>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-xs font-semibold text-muted">
+          <span>{request.location}</span>
+          <span className="h-1 w-1 rounded-full bg-card-border/70" />
+          <span className="capitalize">{urgency} urgency</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className={`rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold transition ${
+              request.likedByUser
+                ? "border-accent/50 text-accent"
+                : "text-muted hover:border-accent/40 hover:text-ink"
+            }`}
+            onClick={() => onLike?.(request)}
+            disabled={isLiking}
+          >
+            {isLiking ? "…" : request.likedByUser ? "♥" : "♡"} {request.likeCount}
+          </button>
+          <Button
+            variant="outline"
+            onClick={() => onHelp?.(request)}
+            disabled={isHelping || hasHelped || isOwnRequest}
+          >
+            {isOwnRequest
+              ? "Yours"
+              : hasHelped
+                ? "Help sent"
+                : isHelping
+                  ? "Sending..."
+                  : "I can help"}
+          </Button>
+        </div>
       </div>
     </Card>
   );

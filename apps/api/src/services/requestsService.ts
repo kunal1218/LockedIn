@@ -17,6 +17,8 @@ type RequestRow = {
   creator_handle: string;
   creator_college_name?: string | null;
   creator_college_domain?: string | null;
+  like_count?: number | string | null;
+  liked_by_user?: boolean | null;
 };
 
 export class RequestError extends Error {
@@ -69,6 +71,24 @@ const ensureRequestsTable = async () => {
   `);
 };
 
+const ensureRequestLikesTable = async () => {
+  await ensureRequestsTable();
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS request_likes (
+      request_id uuid NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (request_id, user_id)
+    );
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS request_likes_request_idx
+      ON request_likes (request_id);
+  `);
+};
+
 const ensureHelpOffersTable = async () => {
   await ensureRequestsTable();
 
@@ -102,28 +122,37 @@ const mapRequest = (row: RequestRow): RequestCard => ({
     collegeName: row.creator_college_name ?? null,
     collegeDomain: row.creator_college_domain ?? null,
   },
+  likeCount: Number(row.like_count ?? 0),
+  likedByUser: Boolean(row.liked_by_user),
 });
 
 export const fetchRequests = async (params: {
   sinceHours?: number;
   order?: "newest" | "oldest";
   limit?: number;
+  viewerId?: string | null;
 } = {}): Promise<RequestCard[]> => {
   await ensureRequestsTable();
+  await ensureRequestLikesTable();
 
   const conditions: string[] = [];
-  const values: Array<string | number> = [];
+  const queryParams: Array<string | number | null> = [];
 
   if (params.sinceHours && Number.isFinite(params.sinceHours)) {
-    conditions.push(`r.created_at >= now() - $${values.length + 1}::interval`);
-    values.push(`${params.sinceHours} hours`);
+    conditions.push(
+      `r.created_at >= now() - $${queryParams.length + 1}::interval`
+    );
+    queryParams.push(`${params.sinceHours} hours`);
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
   const orderBy = params.order === "oldest" ? "r.created_at ASC" : "r.created_at DESC";
 
-  values.push(params.limit ?? 50);
-  const limitPosition = values.length;
+  queryParams.push(params.limit ?? 50);
+  const limitPosition = queryParams.length;
+
+  queryParams.push(params.viewerId ?? null);
+  const viewerPosition = queryParams.length;
 
   const result = await db.query(
     `SELECT r.id,
@@ -137,13 +166,17 @@ export const fetchRequests = async (params: {
             u.name AS creator_name,
             u.handle AS creator_handle,
             u.college_name AS creator_college_name,
-            u.college_domain AS creator_college_domain
+            u.college_domain AS creator_college_domain,
+            COUNT(l.user_id)::int AS like_count,
+            BOOL_OR(l.user_id = $${viewerPosition}) AS liked_by_user
      FROM requests r
      JOIN users u ON u.id = r.creator_id
+     LEFT JOIN request_likes l ON l.request_id = r.id
      ${where}
+     GROUP BY r.id, u.id
      ORDER BY ${orderBy}
      LIMIT $${limitPosition}`,
-    values
+    queryParams
   );
 
   return (result.rows as RequestRow[]).map(mapRequest);
@@ -207,6 +240,40 @@ export const createRequest = async (params: {
   );
 
   return mapRequest(result.rows[0] as RequestRow);
+};
+
+export const toggleRequestLike = async (params: {
+  requestId: string;
+  userId: string;
+}): Promise<{ likeCount: number; liked: boolean }> => {
+  await ensureRequestLikesTable();
+
+  const existing = await db.query(
+    `SELECT 1 FROM request_likes WHERE request_id = $1 AND user_id = $2 LIMIT 1`,
+    [params.requestId, params.userId]
+  );
+
+  let liked = true;
+  if ((existing.rowCount ?? 0) > 0) {
+    await db.query(
+      `DELETE FROM request_likes WHERE request_id = $1 AND user_id = $2`,
+      [params.requestId, params.userId]
+    );
+    liked = false;
+  } else {
+    await db.query(
+      `INSERT INTO request_likes (request_id, user_id) VALUES ($1, $2)`,
+      [params.requestId, params.userId]
+    );
+  }
+
+  const countResult = await db.query(
+    `SELECT COUNT(*)::int AS like_count FROM request_likes WHERE request_id = $1`,
+    [params.requestId]
+  );
+  const likeCount = Number(countResult.rows[0]?.like_count ?? 0);
+
+  return { likeCount, liked };
 };
 
 export const recordHelpOffer = async (params: {
