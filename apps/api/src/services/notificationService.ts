@@ -173,6 +173,22 @@ export const createRequestHelpNotification = async (params: {
   );
 };
 
+export const deleteRequestHelpNotification = async (params: {
+  recipientId: string;
+  actorId: string;
+  requestId: string;
+}) => {
+  await ensureNotificationsTable();
+  await db.query(
+    `DELETE FROM notifications
+     WHERE user_id = $1
+       AND actor_id = $2
+       AND type = 'request_help'
+       AND context_id = $3`,
+    [params.recipientId, params.actorId, params.requestId]
+  );
+};
+
 export const fetchNotificationsForUser = async (
   userId: string,
   limit = 50

@@ -2,7 +2,10 @@ import { randomUUID } from "crypto";
 import type { RequestCard } from "@lockedin/shared";
 import { db } from "../db";
 import { ensureUsersTable } from "./authService";
-import { createRequestHelpNotification } from "./notificationService";
+import {
+  createRequestHelpNotification,
+  deleteRequestHelpNotification,
+} from "./notificationService";
 
 type RequestRow = {
   id: string;
@@ -357,6 +360,39 @@ export const recordHelpOffer = async (params: {
     requestId: request.id,
     requestTitle: request.title,
     requestDescription: request.description,
+  });
+};
+
+export const removeHelpOffer = async (params: {
+  requestId: string;
+  helperId: string;
+}): Promise<void> => {
+  await ensureHelpOffersTable();
+
+  const requestResult = await db.query(
+    `SELECT r.id, r.creator_id
+     FROM requests r
+     WHERE r.id = $1
+     LIMIT 1`,
+    [params.requestId]
+  );
+
+  if ((requestResult.rowCount ?? 0) === 0) {
+    throw new RequestError("Request not found", 404);
+  }
+
+  const request = requestResult.rows[0] as { id: string; creator_id: string };
+
+  await db.query(
+    `DELETE FROM request_help_offers
+     WHERE request_id = $1 AND helper_id = $2`,
+    [params.requestId, params.helperId]
+  );
+
+  await deleteRequestHelpNotification({
+    recipientId: request.creator_id,
+    actorId: params.helperId,
+    requestId: request.id,
   });
 };
 

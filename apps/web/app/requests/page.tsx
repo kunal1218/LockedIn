@@ -152,11 +152,21 @@ export default function RequestsPage() {
       return;
     }
     setError(null);
-      setHelpingIds((prev) => new Set(prev).add(request.id));
-      try {
+    const isAlreadyHelped = helpedIds.has(request.id);
+    setHelpingIds((prev) => new Set(prev).add(request.id));
+    try {
+      if (isAlreadyHelped) {
+        await apiDelete(`/requests/${encodeURIComponent(request.id)}/help`, token);
+        setHelpedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(request.id);
+          return next;
+        });
+      } else {
         await apiPost(`/requests/${encodeURIComponent(request.id)}/help`, {}, token);
         setHelpedIds((prev) => new Set(prev).add(request.id));
-      } catch (helpError) {
+      }
+    } catch (helpError) {
       setError(
         helpError instanceof Error
           ? helpError.message

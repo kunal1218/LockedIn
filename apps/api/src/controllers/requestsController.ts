@@ -6,6 +6,7 @@ import {
   fetchRequests,
   toggleRequestLike,
   recordHelpOffer,
+  removeHelpOffer,
   deleteRequest,
 } from "../services/requestsService";
 
@@ -103,6 +104,20 @@ export const helpWithRequest = async (req: Request, res: Response) => {
     }
     await recordHelpOffer({ requestId, helperId: user.id });
     res.status(201).json({ status: "notified" });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const unhelpWithRequest = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const requestId = asString(req.params?.requestId);
+    if (!requestId) {
+      throw new RequestError("Request id is required", 400);
+    }
+    await removeHelpOffer({ requestId, helperId: user.id });
+    res.status(204).send();
   } catch (error) {
     handleError(res, error);
   }
