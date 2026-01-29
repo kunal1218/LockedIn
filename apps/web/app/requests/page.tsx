@@ -10,11 +10,13 @@ import {
   type RecencyFilter,
   type UrgencyFilter,
   type SortOption,
+  type ProximityFilter,
+  type RequestComposerPayload,
 } from "@/features/requests";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { useAuth } from "@/features/auth";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiDelete, apiGet, apiPost } from "@/lib/api";
 
 const recencyToHours: Record<Exclude<RecencyFilter, "all">, number> = {
   "1h": 1,
@@ -30,6 +32,7 @@ export default function RequestsPage() {
   const [recency, setRecency] = useState<RecencyFilter>("24h");
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("recency");
+  const [proximity, setProximity] = useState<ProximityFilter>("all");
   const [isPosting, setIsPosting] = useState(false);
   const [helpingIds, setHelpingIds] = useState<Set<string>>(new Set());
   const [helpedIds, setHelpedIds] = useState<Set<string>>(new Set());
@@ -37,10 +40,17 @@ export default function RequestsPage() {
   const [isComposerOpen, setComposerOpen] = useState(false);
 
   const sortedRequests = useMemo(() => {
-    const filtered =
+    const filteredByUrgency =
       urgencyFilter === "all"
         ? requests
         : requests.filter((req) => (req.urgency ?? "low") === urgencyFilter);
+
+    const filtered =
+      proximity === "all"
+        ? filteredByUrgency
+        : filteredByUrgency.filter((req) =>
+            proximity === "remote" ? req.isRemote : !req.isRemote
+          );
 
     const byRecency = (a: RequestCardType, b: RequestCardType) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -102,13 +112,7 @@ export default function RequestsPage() {
     void loadRequests();
   }, [loadRequests]);
 
-  const handleCreateRequest = async (payload: {
-    title: string;
-    description: string;
-    location: string;
-    tags: string[];
-    urgency: "low" | "medium" | "high";
-  }) => {
+  const handleCreateRequest = async (payload: RequestComposerPayload) => {
     if (!token) {
       openAuthModal("login");
       return;
@@ -194,6 +198,26 @@ export default function RequestsPage() {
     }
   };
 
+  const handleDelete = async (request: RequestCardType) => {
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    const confirmed = window.confirm("Delete this request? This cannot be undone.");
+    if (!confirmed) return;
+    setError(null);
+    try {
+      await apiDelete(`/requests/${encodeURIComponent(request.id)}`, token);
+      setRequests((prev) => prev.filter((item) => item.id !== request.id));
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Unable to delete request."
+      );
+    }
+  };
+
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-2">
       <div className="space-y-8">
@@ -226,6 +250,8 @@ export default function RequestsPage() {
             onUrgencyChange={setUrgencyFilter}
             sortBy={sortBy}
             onSortChange={setSortBy}
+            proximity={proximity}
+            onProximityChange={setProximity}
           />
           <div className="space-y-4">
             {error && (
@@ -253,6 +279,7 @@ export default function RequestsPage() {
                     isOwnRequest={request.creator.id === user?.id}
                     onLike={handleLike}
                     isLiking={likingIds.has(request.id)}
+                    onDelete={handleDelete}
                   />
                 ))}
               </div>

@@ -19,6 +19,7 @@ type RequestCardProps = {
   isOwnRequest?: boolean;
   onLike?: (request: RequestCardType) => void | Promise<void>;
   isLiking?: boolean;
+  onDelete?: (request: RequestCardType) => void | Promise<void>;
 };
 
 export const RequestCard = ({
@@ -29,11 +30,17 @@ export const RequestCard = ({
   isOwnRequest = false,
   onLike,
   isLiking = false,
+  onDelete,
 }: RequestCardProps) => {
   const urgency = request.urgency ?? "low";
   const collegeLabel = deriveCollegeFromDomain(
     request.creator.collegeDomain ?? ""
   );
+  const locationLabel = request.isRemote
+    ? "Remote"
+    : request.city
+      ? `${request.city} · ${request.location}`
+      : request.location;
 
   return (
     <Card className="space-y-4">
@@ -59,7 +66,7 @@ export const RequestCard = ({
       </div>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-semibold text-muted">
-          <span>{request.location}</span>
+          <span>{locationLabel}</span>
           <span className="h-1 w-1 rounded-full bg-card-border/70" />
           <span className="capitalize">{urgency} urgency</span>
         </div>
@@ -76,6 +83,15 @@ export const RequestCard = ({
           >
             {isLiking ? "…" : request.likedByUser ? "♥" : "♡"} {request.likeCount}
           </button>
+          {isOwnRequest && (
+            <button
+              type="button"
+              className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
+              onClick={() => onDelete?.(request)}
+            >
+              Delete
+            </button>
+          )}
           <Button
             variant="outline"
             onClick={() => onHelp?.(request)}

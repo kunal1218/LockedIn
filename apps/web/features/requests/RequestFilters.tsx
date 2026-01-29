@@ -3,6 +3,7 @@ import { Tag } from "@/components/Tag";
 export type RecencyFilter = "all" | "1h" | "24h" | "168h";
 export type UrgencyFilter = "all" | "low" | "medium" | "high";
 export type SortOption = "recency" | "likes" | "urgency";
+export type ProximityFilter = "all" | "remote" | "local";
 
 const recencyOptions: Array<{ label: string; value: RecencyFilter }> = [
   { label: "Past hour", value: "1h" },
@@ -24,6 +25,12 @@ const sortOptions: Array<{ label: string; value: SortOption }> = [
   { label: "Highest urgency", value: "urgency" },
 ];
 
+const proximityOptions: Array<{ label: string; value: ProximityFilter }> = [
+  { label: "All", value: "all" },
+  { label: "Remote", value: "remote" },
+  { label: "In-person", value: "local" },
+];
+
 type RequestFiltersProps = {
   recency: RecencyFilter;
   onRecencyChange: (value: RecencyFilter) => void;
@@ -31,6 +38,8 @@ type RequestFiltersProps = {
   onUrgencyChange: (value: UrgencyFilter) => void;
   sortBy: SortOption;
   onSortChange: (value: SortOption) => void;
+  proximity: ProximityFilter;
+  onProximityChange: (value: ProximityFilter) => void;
 };
 
 export const RequestFilters = ({
@@ -40,6 +49,8 @@ export const RequestFilters = ({
   onUrgencyChange,
   sortBy,
   onSortChange,
+  proximity,
+  onProximityChange,
 }: RequestFiltersProps) => {
   return (
     <div className="space-y-4">
@@ -54,6 +65,24 @@ export const RequestFilters = ({
               tone={recency === option.value ? "accent" : "default"}
               className="cursor-pointer"
               onClick={() => onRecencyChange(option.value)}
+            >
+              {option.label}
+            </Tag>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+          Proximity
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {proximityOptions.map((option) => (
+            <Tag
+              key={option.value}
+              tone={proximity === option.value ? "accent" : "default"}
+              className="cursor-pointer"
+              onClick={() => onProximityChange(option.value)}
             >
               {option.label}
             </Tag>

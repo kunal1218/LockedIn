@@ -75,6 +75,8 @@ export type RequestCard = {
   creator: RequestCreator;
   likeCount: number;
   likedByUser?: boolean;
+  city?: string | null;
+  isRemote?: boolean;
 };
 
 export type MapEvent = {

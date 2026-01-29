@@ -9,6 +9,8 @@ type RequestRow = {
   title: string;
   description: string;
   location: string;
+  city?: string | null;
+  is_remote?: boolean | null;
   tags: string[] | null;
   urgency: string | null;
   created_at: string | Date;
@@ -59,10 +61,18 @@ const ensureRequestsTable = async () => {
       title text NOT NULL,
       description text NOT NULL,
       location text NOT NULL,
+      city text,
+      is_remote boolean NOT NULL DEFAULT false,
       tags text[] NOT NULL DEFAULT ARRAY[]::text[],
       urgency text NOT NULL DEFAULT 'low',
       created_at timestamptz NOT NULL DEFAULT now()
     );
+  `);
+
+  await db.query(`
+    ALTER TABLE requests
+    ADD COLUMN IF NOT EXISTS city text,
+    ADD COLUMN IF NOT EXISTS is_remote boolean NOT NULL DEFAULT false;
   `);
 
   await db.query(`
@@ -112,6 +122,8 @@ const mapRequest = (row: RequestRow): RequestCard => ({
   title: row.title,
   description: row.description,
   location: row.location,
+  city: row.city ?? null,
+  isRemote: Boolean(row.is_remote),
   createdAt: toIsoString(row.created_at),
   tags: row.tags ?? [],
   urgency: (row.urgency as RequestCard["urgency"]) ?? "low",
@@ -159,6 +171,8 @@ export const fetchRequests = async (params: {
             r.title,
             r.description,
             r.location,
+            r.city,
+            r.is_remote,
             r.tags,
             r.urgency,
             r.created_at,
@@ -173,7 +187,7 @@ export const fetchRequests = async (params: {
      JOIN users u ON u.id = r.creator_id
      LEFT JOIN request_likes l ON l.request_id = r.id
      ${where}
-     GROUP BY r.id, u.id
+     GROUP BY r.id, r.city, r.is_remote, u.id
      ORDER BY ${orderBy}
      LIMIT $${limitPosition}`,
     queryParams
@@ -187,6 +201,8 @@ export const createRequest = async (params: {
   title: string;
   description: string;
   location: string;
+  city?: string | null;
+  isRemote?: boolean;
   tags?: unknown;
   urgency?: string;
 }): Promise<RequestCard> => {
@@ -195,6 +211,8 @@ export const createRequest = async (params: {
   const title = (params.title ?? "").trim();
   const description = (params.description ?? "").trim();
   const location = (params.location ?? "").trim();
+   const city = (params.city ?? "").trim() || null;
+  const isRemote = Boolean(params.isRemote);
   const tags = normalizeTags(params.tags ?? []);
   const urgency = (params.urgency ?? "low").toLowerCase();
 
@@ -207,6 +225,9 @@ export const createRequest = async (params: {
   if (!location) {
     throw new RequestError("Location is required", 400);
   }
+  if (!isRemote && !city) {
+    throw new RequestError("City is required for in-person requests", 400);
+  }
 
   if (!["low", "medium", "high"].includes(urgency)) {
     throw new RequestError("Urgency must be low, medium, or high", 400);
@@ -215,9 +236,9 @@ export const createRequest = async (params: {
   const id = randomUUID();
 
   await db.query(
-    `INSERT INTO requests (id, creator_id, title, description, location, tags, urgency)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [id, params.creatorId, title, description, location, tags, urgency]
+    `INSERT INTO requests (id, creator_id, title, description, location, city, is_remote, tags, urgency)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [id, params.creatorId, title, description, location, city, isRemote, tags, urgency]
   );
 
   const result = await db.query(
@@ -225,6 +246,8 @@ export const createRequest = async (params: {
             r.title,
             r.description,
             r.location,
+            r.city,
+            r.is_remote,
             r.tags,
             r.urgency,
             r.created_at,
@@ -287,6 +310,8 @@ export const recordHelpOffer = async (params: {
             r.title,
             r.description,
             r.location,
+            r.city,
+            r.is_remote,
             r.tags,
             r.urgency,
             r.created_at,
@@ -331,4 +356,18 @@ export const recordHelpOffer = async (params: {
     requestTitle: request.title,
     requestDescription: request.description,
   });
+};
+
+export const deleteRequest = async (params: {
+  requestId: string;
+  userId: string;
+}): Promise<void> => {
+  await ensureRequestsTable();
+  const result = await db.query(
+    `DELETE FROM requests WHERE id = $1 AND creator_id = $2`,
+    [params.requestId, params.userId]
+  );
+  if ((result.rowCount ?? 0) === 0) {
+    throw new RequestError("Request not found or not yours", 404);
+  }
 };

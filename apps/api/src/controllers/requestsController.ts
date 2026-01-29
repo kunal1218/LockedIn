@@ -6,6 +6,7 @@ import {
   fetchRequests,
   toggleRequestLike,
   recordHelpOffer,
+  deleteRequest,
 } from "../services/requestsService";
 
 const asString = (value: unknown) => (typeof value === "string" ? value : "");
@@ -117,6 +118,20 @@ export const likeRequest = async (req: Request, res: Response) => {
       userId: user.id,
     });
     res.json(result);
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const removeRequest = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const requestId = asString(req.params?.requestId);
+    if (!requestId) {
+      throw new RequestError("Request id is required", 400);
+    }
+    await deleteRequest({ requestId, userId: user.id });
+    res.status(204).send();
   } catch (error) {
     handleError(res, error);
   }
