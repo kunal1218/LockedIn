@@ -44,10 +44,12 @@ export default function RequestsPage() {
       params.set("sinceHours", recencyToHours[recency].toString());
     }
     try {
-      const response = await apiGet<{ requests: RequestCardType[] }>(
+      const response = await apiGet<{ requests: RequestCardType[] } | RequestCardType[]>(
         `/requests?${params.toString()}`
       );
-      setRequests(response.requests);
+      const next =
+        Array.isArray(response) ? response : response?.requests ?? [];
+      setRequests(next);
     } catch (loadError) {
       setError(
         loadError instanceof Error
