@@ -111,11 +111,11 @@ export const RequestCard = ({
           </span>
         </button>
       </div>
-      <div className="space-y-1">
+      <div className="space-y-2">
         <h3 className="text-lg font-semibold text-ink">{request.title}</h3>
         <p className="text-sm text-muted">{request.description}</p>
       </div>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 pt-2">
         <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-muted">
           <span>{locationLabel}</span>
           <span className="h-1 w-1 rounded-full bg-card-border/70" />
