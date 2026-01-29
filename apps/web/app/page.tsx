@@ -1,8 +1,15 @@
-import { CampusPulse, DailyChallenge, Feed, UniChat } from "@/features/home";
+import {
+  CampusPulse,
+  DailyChallenge,
+  Feed,
+  ScrollToTopOnMount,
+  UniChat,
+} from "@/features/home";
 
 export default function HomePage() {
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-2">
+      <ScrollToTopOnMount />
       <div className="space-y-8">
         <div className="reveal-up">
           <DailyChallenge />
