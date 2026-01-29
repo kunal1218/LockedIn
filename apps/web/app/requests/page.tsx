@@ -259,11 +259,10 @@ export default function RequestsPage() {
                 <p className="text-sm font-semibold text-accent">{error}</p>
               </Card>
             )}
-            {isLoading ? (
-              <Card className="py-10 text-center text-sm text-muted">
-                Loading requests...
-              </Card>
-            ) : sortedRequests.length === 0 ? (
+            {isLoading && (
+              <p className="text-xs text-muted">Updating requests…</p>
+            )}
+            {sortedRequests.length === 0 ? (
               <Card className="py-10 text-center text-sm text-muted">
                 No requests right now. Start the first one.
               </Card>
