@@ -525,7 +525,7 @@ function FriendsPageContent() {
           ) : error ? (
             <p className="mt-4 text-sm font-semibold text-accent">{error}</p>
           ) : summary && summary.friends.length > 0 ? (
-            <div className="mt-3 flex-1 overflow-y-auto overflow-x-hidden space-y-1 pr-1">
+            <div className="mt-3 flex-1 overflow-y-auto overflow-x-hidden space-y-1 pr-1 pt-2">
               {summary.friends.map((friend) => {
                 const collegeLabel = getCollegeLabel(friend);
                 const slug = normalizeHandle(friend.handle);
