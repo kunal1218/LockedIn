@@ -1,7 +1,95 @@
 import type { Request, Response } from "express";
-import { fetchRequests } from "../services/requestsService";
+import { AuthError, getUserFromToken } from "../services/authService";
+import {
+  RequestError,
+  createRequest,
+  fetchRequests,
+  recordHelpOffer,
+} from "../services/requestsService";
+
+const asString = (value: unknown) => (typeof value === "string" ? value : "");
+
+const getToken = (req: Request) => {
+  const header = req.header("authorization");
+  if (!header) {
+    return null;
+  }
+
+  const [type, token] = header.split(" ");
+  if (type?.toLowerCase() !== "bearer" || !token) {
+    return null;
+  }
+
+  return token.trim();
+};
+
+const requireUser = async (req: Request) => {
+  const token = getToken(req);
+  if (!token) {
+    throw new AuthError("Missing session token", 401);
+  }
+
+  const user = await getUserFromToken(token);
+  if (!user) {
+    throw new AuthError("Invalid session", 401);
+  }
+
+  return user;
+};
+
+const handleError = (res: Response, error: unknown) => {
+  if (error instanceof AuthError || error instanceof RequestError) {
+    res.status(error.status).json({ error: error.message });
+    return;
+  }
+
+  console.error("Request error:", error);
+  res.status(500).json({ error: "Unable to process request" });
+};
 
 export const getRequests = async (_req: Request, res: Response) => {
-  const requests = await fetchRequests();
-  res.json(requests);
+  try {
+    const sinceHoursRaw = _req.query?.sinceHours;
+    const order = _req.query?.order === "oldest" ? "oldest" : "newest";
+    const sinceHours =
+      typeof sinceHoursRaw === "string" ? parseFloat(sinceHoursRaw) : undefined;
+    const requests = await fetchRequests({
+      sinceHours: Number.isFinite(sinceHours) ? sinceHours : undefined,
+      order,
+    });
+    res.json({ requests });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const postRequest = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const request = await createRequest({
+      creatorId: user.id,
+      title: req.body?.title,
+      description: req.body?.description,
+      location: req.body?.location,
+      tags: req.body?.tags ?? [],
+      urgency: req.body?.urgency,
+    });
+    res.status(201).json({ request });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const helpWithRequest = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const requestId = asString(req.params?.requestId);
+    if (!requestId) {
+      throw new RequestError("Request id is required", 400);
+    }
+    await recordHelpOffer({ requestId, helperId: user.id });
+    res.status(201).json({ status: "notified" });
+  } catch (error) {
+    handleError(res, error);
+  }
 };

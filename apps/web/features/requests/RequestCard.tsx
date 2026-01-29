@@ -3,6 +3,7 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
 import { formatRelativeTime } from "@/lib/time";
+import { deriveCollegeFromDomain } from "@/lib/college";
 
 const urgencyTone = {
   low: "default",
@@ -12,10 +13,23 @@ const urgencyTone = {
 
 type RequestCardProps = {
   request: RequestCardType;
+  onHelp?: (request: RequestCardType) => void | Promise<void>;
+  isHelping?: boolean;
+  hasHelped?: boolean;
+  isOwnRequest?: boolean;
 };
 
-export const RequestCard = ({ request }: RequestCardProps) => {
+export const RequestCard = ({
+  request,
+  onHelp,
+  isHelping = false,
+  hasHelped = false,
+  isOwnRequest = false,
+}: RequestCardProps) => {
   const urgency = request.urgency ?? "low";
+  const collegeLabel = deriveCollegeFromDomain(
+    request.creator.collegeDomain ?? ""
+  );
 
   return (
     <Card className="space-y-4">
@@ -28,6 +42,11 @@ export const RequestCard = ({ request }: RequestCardProps) => {
       <div>
         <h3 className="text-lg font-semibold text-ink">{request.title}</h3>
         <p className="text-sm text-muted">{request.description}</p>
+        <p className="mt-2 text-xs text-muted">
+          Posted by{" "}
+          <span className="font-semibold text-ink">{request.creator.handle}</span>
+          {collegeLabel ? ` · ${collegeLabel}` : ""}
+        </p>
       </div>
       <div className="flex flex-wrap gap-2">
         {request.tags.map((tag) => (
@@ -38,7 +57,19 @@ export const RequestCard = ({ request }: RequestCardProps) => {
         <span className="text-xs font-semibold text-muted">
           {request.location}
         </span>
-        <Button variant="outline">I can help</Button>
+        <Button
+          variant="outline"
+          onClick={() => onHelp?.(request)}
+          disabled={isHelping || hasHelped || isOwnRequest}
+        >
+          {isOwnRequest
+            ? "Yours"
+            : hasHelped
+              ? "Help sent"
+              : isHelping
+                ? "Sending..."
+                : "I can help"}
+        </Button>
       </div>
     </Card>
   );

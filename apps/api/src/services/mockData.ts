@@ -120,6 +120,7 @@ export const requests: RequestCard[] = [
     createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
     tags: ["sports", "fun"],
     urgency: "low",
+    creator: users[2],
   },
   {
     id: "request-2",
@@ -129,6 +130,7 @@ export const requests: RequestCard[] = [
     createdAt: new Date(Date.now() - 1000 * 60 * 55).toISOString(),
     tags: ["help", "moving"],
     urgency: "high",
+    creator: users[0],
   },
   {
     id: "request-3",
@@ -138,6 +140,7 @@ export const requests: RequestCard[] = [
     createdAt: new Date(Date.now() - 1000 * 60 * 110).toISOString(),
     tags: ["build", "cofounder"],
     urgency: "medium",
+    creator: users[1],
   },
 ];
 

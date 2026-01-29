@@ -9,6 +9,11 @@ export const requests: RequestCard[] = [
     createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
     tags: ["sports", "fun"],
     urgency: "low",
+    creator: {
+      id: "user-1",
+      name: "Avery Cho",
+      handle: "@averycodes",
+    },
   },
   {
     id: "request-2",
@@ -18,6 +23,11 @@ export const requests: RequestCard[] = [
     createdAt: new Date(Date.now() - 1000 * 60 * 55).toISOString(),
     tags: ["help", "moving"],
     urgency: "high",
+    creator: {
+      id: "user-2",
+      name: "Samira Patel",
+      handle: "@samirawins",
+    },
   },
   {
     id: "request-3",
@@ -27,6 +37,11 @@ export const requests: RequestCard[] = [
     createdAt: new Date(Date.now() - 1000 * 60 * 110).toISOString(),
     tags: ["build", "cofounder"],
     urgency: "medium",
+    creator: {
+      id: "user-3",
+      name: "Miles Grant",
+      handle: "@milesmoves",
+    },
   },
   {
     id: "request-4",
@@ -36,5 +51,10 @@ export const requests: RequestCard[] = [
     createdAt: new Date(Date.now() - 1000 * 60 * 160).toISOString(),
     tags: ["creative", "help"],
     urgency: "low",
+    creator: {
+      id: "user-4",
+      name: "Jess Rivera",
+      handle: "@jesssnaps",
+    },
   },
 ];

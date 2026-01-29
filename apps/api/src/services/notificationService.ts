@@ -16,6 +16,7 @@ export type NotificationItem = {
   actor: NotificationActor | null;
   messageId: string | null;
   messagePreview: string | null;
+  contextId: string | null;
 };
 
 type NotificationRow = {
@@ -28,6 +29,7 @@ type NotificationRow = {
   actor_handle?: string | null;
   message_id: string | null;
   message_preview: string | null;
+  context_id: string | null;
 };
 
 export class NotificationError extends Error {
@@ -71,9 +73,15 @@ const ensureNotificationsTable = async () => {
       type text NOT NULL,
       message_id uuid,
       message_preview text,
+      context_id uuid,
       created_at timestamptz NOT NULL DEFAULT now(),
       read_at timestamptz
     );
+  `);
+
+  await db.query(`
+    ALTER TABLE notifications
+    ADD COLUMN IF NOT EXISTS context_id uuid;
   `);
 
   await db.query(`
@@ -101,6 +109,7 @@ const mapNotification = (row: NotificationRow): NotificationItem => ({
     : null,
   messageId: row.message_id ?? null,
   messagePreview: trimPreview(row.message_preview),
+  contextId: row.context_id ?? null,
 });
 
 export const createMessageNotification = async (params: {
@@ -132,6 +141,38 @@ export const createMessageNotification = async (params: {
   );
 };
 
+export const createRequestHelpNotification = async (params: {
+  recipientId: string;
+  actorId: string;
+  requestId: string;
+  requestTitle: string;
+  requestDescription: string;
+}) => {
+  if (params.recipientId === params.actorId) {
+    return;
+  }
+
+  await ensureNotificationsTable();
+  const id = randomUUID();
+  const previewSource = params.requestDescription || params.requestTitle || "";
+  const preview = trimPreview(previewSource);
+
+  await db.query(
+    `INSERT INTO notifications (
+      id, user_id, actor_id, type, message_id, message_preview, context_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      id,
+      params.recipientId,
+      params.actorId,
+      "request_help",
+      params.requestId,
+      preview,
+      params.requestId,
+    ]
+  );
+};
+
 export const fetchNotificationsForUser = async (
   userId: string,
   limit = 50
@@ -142,12 +183,13 @@ export const fetchNotificationsForUser = async (
     `SELECT n.id,
             n.type,
             n.created_at,
-            n.read_at,
-            n.message_id,
-            n.message_preview,
-            actor.id AS actor_id,
-            actor.name AS actor_name,
-            actor.handle AS actor_handle
+     n.read_at,
+     n.message_id,
+     n.message_preview,
+      n.context_id,
+      actor.id AS actor_id,
+      actor.name AS actor_name,
+      actor.handle AS actor_handle
      FROM notifications n
      LEFT JOIN users actor ON actor.id = n.actor_id
      WHERE n.user_id = $1

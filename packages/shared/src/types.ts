@@ -56,6 +56,14 @@ export type ChatMessage = {
   createdAt: string;
 };
 
+export type RequestCreator = {
+  id: string;
+  name: string;
+  handle: string;
+  collegeName?: string | null;
+  collegeDomain?: string | null;
+};
+
 export type RequestCard = {
   id: string;
   title: string;
@@ -64,6 +72,7 @@ export type RequestCard = {
   createdAt: string;
   tags: string[];
   urgency?: "low" | "medium" | "high";
+  creator: RequestCreator;
 };
 
 export type MapEvent = {

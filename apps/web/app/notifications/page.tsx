@@ -24,6 +24,7 @@ type NotificationItem = {
   actor: NotificationActor | null;
   messageId: string | null;
   messagePreview: string | null;
+  contextId: string | null;
 };
 
 type NotificationsResponse = {
@@ -49,6 +50,15 @@ type FriendSummary = {
   incoming: FriendRequest[];
 };
 
+type RelationshipStatus =
+  | "none"
+  | "incoming"
+  | "outgoing"
+  | "friends"
+  | "blocked"
+  | "blocked_by"
+  | "unknown";
+
 const getCollegeLabel = (user: FriendUser) => {
   return (
     user.collegeName ??
@@ -69,6 +79,13 @@ export default function NotificationsPage() {
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
   const [requestsError, setRequestsError] = useState<string | null>(null);
+  const [relationshipByHandle, setRelationshipByHandle] = useState<
+    Record<string, RelationshipStatus>
+  >({});
+  const [connectingHandles, setConnectingHandles] = useState<Set<string>>(
+    new Set()
+  );
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   const refreshFriendRequests = useCallback(async () => {
     if (!token) {
@@ -155,6 +172,83 @@ export default function NotificationsPage() {
     refreshFriendRequests();
   }, [refreshFriendRequests]);
 
+  useEffect(() => {
+    if (!token) {
+      setRelationshipByHandle({});
+      return;
+    }
+
+    const handles = Array.from(
+      new Set(
+        notifications
+          .filter((notification) => notification.type === "request_help")
+          .map((notification) => notification.actor?.handle ?? "")
+          .filter(Boolean)
+          .map((handle) => handle.replace(/^@/, ""))
+      )
+    );
+
+    if (handles.length === 0) {
+      setRelationshipByHandle({});
+      return;
+    }
+
+    let isActive = true;
+    const loadStatuses = async () => {
+      const entries = await Promise.all(
+        handles.map(async (handle) => {
+          try {
+            const response = await apiGet<{ status: RelationshipStatus }>(
+              `/friends/relationship/${encodeURIComponent(handle)}`,
+              token
+            );
+            return [handle, response.status as RelationshipStatus] as const;
+          } catch {
+            return [handle, "unknown" as RelationshipStatus] as const;
+          }
+        })
+      );
+      if (!isActive) return;
+      const next: Record<string, RelationshipStatus> = {};
+      entries.forEach(([handle, status]) => {
+        next[handle] = status;
+      });
+      setRelationshipByHandle(next);
+    };
+
+    void loadStatuses();
+
+    return () => {
+      isActive = false;
+    };
+  }, [notifications, token]);
+
+  const handleConnect = async (handle: string) => {
+    if (!token) {
+      openAuthModal();
+      return;
+    }
+    const slug = handle.replace(/^@/, "");
+    setConnectError(null);
+    setConnectingHandles((prev) => new Set(prev).add(slug));
+    try {
+      await apiPost("/friends/requests", { handle }, token);
+      setRelationshipByHandle((prev) => ({ ...prev, [slug]: "outgoing" }));
+    } catch (connectErr) {
+      setConnectError(
+        connectErr instanceof Error
+          ? connectErr.message
+          : "Unable to send connect request."
+      );
+    } finally {
+      setConnectingHandles((prev) => {
+        const next = new Set(prev);
+        next.delete(slug);
+        return next;
+      });
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="mx-auto max-w-4xl px-4 pb-16 pt-2">
@@ -187,6 +281,12 @@ export default function NotificationsPage() {
         {requestsError && (
           <Card className="border border-accent/30 bg-accent/10 py-4">
             <p className="text-sm font-semibold text-accent">{requestsError}</p>
+          </Card>
+        )}
+
+        {connectError && (
+          <Card className="border border-accent/30 bg-accent/10 py-4">
+            <p className="text-sm font-semibold text-accent">{connectError}</p>
           </Card>
         )}
 
@@ -263,6 +363,23 @@ export default function NotificationsPage() {
               const messageLabel = notification.messagePreview
                 ? `"${notification.messagePreview}"`
                 : "Open the chat to respond.";
+              const relationship = actorSlug
+                ? relationshipByHandle[actorSlug] ?? "unknown"
+                : "unknown";
+              const canConnect =
+                notification.type === "request_help" &&
+                actorSlug &&
+                !["friends", "outgoing", "incoming", "blocked", "blocked_by"].includes(
+                  relationship
+                );
+              const statusLabel =
+                relationship === "friends"
+                  ? "Friends"
+                  : relationship === "outgoing"
+                    ? "Request sent"
+                    : relationship === "incoming"
+                      ? "They requested you"
+                      : null;
               return (
                 <div
                   key={notification.id}
@@ -272,10 +389,21 @@ export default function NotificationsPage() {
                     <p className="text-sm font-semibold text-ink">
                       {notification.type === "message"
                         ? `New message from ${actorHandle || "someone"}`
-                        : "New update"}
+                        : notification.type === "request_help"
+                          ? `${notification.actor?.name ?? "Someone"} wants to help`
+                          : "New update"}
                     </p>
                     {notification.type === "message" && (
                       <p className="text-xs text-muted">{messageLabel}</p>
+                    )}
+                    {notification.type === "request_help" && (
+                      <p className="text-xs text-muted">
+                        {notification.actor?.name ?? "Someone"} wants to help with{" "}
+                        {notification.messagePreview
+                          ? `"${notification.messagePreview}"`
+                          : "your request"}
+                        .
+                      </p>
                     )}
                     <p className="text-xs text-muted">
                       {formatRelativeTime(notification.createdAt)}
@@ -294,6 +422,25 @@ export default function NotificationsPage() {
                       >
                         View chat
                       </Link>
+                    )}
+                    {notification.type === "request_help" && actorSlug && (
+                      <>
+                        {statusLabel && (
+                          <span className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted">
+                            {statusLabel}
+                          </span>
+                        )}
+                        {canConnect && (
+                          <button
+                            type="button"
+                            className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
+                            onClick={() => handleConnect(actorHandle || actorSlug)}
+                            disabled={connectingHandles.has(actorSlug)}
+                          >
+                            {connectingHandles.has(actorSlug) ? "Sending..." : "Connect"}
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
