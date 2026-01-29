@@ -36,7 +36,7 @@ export const RequestCard = ({
       : request.location;
 
   return (
-    <Card className="space-y-3">
+    <Card className="space-y-3 pt-1">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <p className="text-xs font-semibold text-muted">
