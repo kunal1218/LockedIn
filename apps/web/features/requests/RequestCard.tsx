@@ -58,7 +58,25 @@ export const RequestCard = ({
             </button>
           )}
         </div>
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex items-center gap-2">
+          {!isOwnRequest && (
+            <button
+              type="button"
+              aria-label="Offer help"
+              className={`inline-flex items-center justify-center rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold transition ${
+                hasHelped
+                  ? "border-emerald-500 bg-emerald-500 text-white"
+                  : "text-muted hover:border-emerald-400 hover:text-emerald-600"
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onHelp?.(request);
+              }}
+              disabled={isHelping}
+            >
+              ✓
+            </button>
+          )}
           <button
             type="button"
             className={`inline-flex items-center gap-2 rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold transition ${
@@ -79,20 +97,6 @@ export const RequestCard = ({
               {request.likeCount}
             </span>
           </button>
-          {!isOwnRequest && (
-            <button
-              type="button"
-              aria-label="Offer help"
-              className="inline-flex items-center justify-center rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-emerald-400 hover:text-emerald-600"
-              onClick={(e) => {
-                e.stopPropagation();
-                onHelp?.(request);
-              }}
-              disabled={isHelping || hasHelped}
-            >
-              ✓
-            </button>
-          )}
         </div>
       </div>
       <div className="space-y-2">
