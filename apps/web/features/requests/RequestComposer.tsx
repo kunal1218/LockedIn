@@ -232,7 +232,7 @@ export const RequestComposer = ({
               <span className="text-xs text-muted">No tags yet.</span>
             )}
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-3">
             <input
               className={inputClasses}
               value={tagInput}
@@ -246,18 +246,6 @@ export const RequestComposer = ({
               placeholder="Add a tag and press enter"
               disabled={disabled || tags.length >= MAX_TAGS}
             />
-            <Button
-              type="button"
-              variant="outline"
-              requiresAuth={false}
-              onClick={() => addTag(tagInput)}
-              disabled={
-                disabled || !tagInput.trim() || tags.length >= MAX_TAGS || isSaving
-              }
-              className="w-full sm:w-auto"
-            >
-              Add tag
-            </Button>
           </div>
         </div>
 
