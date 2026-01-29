@@ -129,11 +129,21 @@ export const RequestCard = ({
   );
 
   return (
-    <Card
-      className="space-y-4 cursor-pointer"
-      onClick={() => setShowActions((prev) => !prev)}
-    >
-      {showActions ? renderActions() : renderContent()}
+    <Card className="space-y-4">
+      <div
+        role="button"
+        tabIndex={0}
+        className="space-y-4 cursor-pointer"
+        onClick={() => setShowActions((prev) => !prev)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setShowActions((prev) => !prev);
+          }
+        }}
+      >
+        {showActions ? renderActions() : renderContent()}
+      </div>
     </Card>
   );
 };
