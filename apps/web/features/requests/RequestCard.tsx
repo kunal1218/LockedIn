@@ -129,11 +129,11 @@ export const RequestCard = ({
   );
 
   return (
-    <Card className="space-y-4">
+    <Card className="space-y-4 min-h-[220px]">
       <div
         role="button"
         tabIndex={0}
-        className="space-y-4 cursor-pointer"
+        className="space-y-4 cursor-pointer h-full"
         onClick={() => setShowActions((prev) => !prev)}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
