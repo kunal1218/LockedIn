@@ -92,7 +92,7 @@ export const RequestCard = ({
         </p>
         <button
           type="button"
-          className={`rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold transition ${
+          className={`inline-flex items-center gap-2 rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold transition ${
             request.likedByUser
               ? "border-accent/50 text-accent"
               : "text-muted hover:border-accent/40 hover:text-ink"
@@ -103,7 +103,12 @@ export const RequestCard = ({
           }}
           disabled={isLiking}
         >
-          {isLiking ? "…" : request.likedByUser ? "♥" : "♡"} {request.likeCount}
+          <span className="inline-block min-w-[14px] text-center">
+            {request.likedByUser ? "♥" : "♡"}
+          </span>
+          <span className="inline-block min-w-[10px] text-center">
+            {request.likeCount}
+          </span>
         </button>
       </div>
       <div>
@@ -111,16 +116,14 @@ export const RequestCard = ({
         <p className="mt-2 text-sm text-muted">{request.description}</p>
       </div>
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-xs font-semibold text-muted">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-muted">
           <span>{locationLabel}</span>
           <span className="h-1 w-1 rounded-full bg-card-border/70" />
           <span className="capitalize">{urgency} urgency</span>
+          <span className="text-xs text-muted">
+            {formatRelativeTime(request.createdAt)}
+          </span>
         </div>
-      </div>
-      <div className="flex items-center justify-end">
-        <span className="text-xs text-muted">
-          {formatRelativeTime(request.createdAt)}
-        </span>
       </div>
     </>
   );
