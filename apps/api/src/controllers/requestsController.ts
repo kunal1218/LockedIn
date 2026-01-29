@@ -83,6 +83,8 @@ export const postRequest = async (req: Request, res: Response) => {
       title: req.body?.title,
       description: req.body?.description,
       location: req.body?.location,
+      city: req.body?.city,
+      isRemote: Boolean(req.body?.isRemote),
       tags: req.body?.tags ?? [],
       urgency: req.body?.urgency,
     });
