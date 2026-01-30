@@ -48,88 +48,103 @@ const fetchUserById = async (userId: string): Promise<MessageUser> => {
   return mapUser(result.rows[0] as { id: string; name: string; handle: string });
 };
 
+let rankedTablesReady: Promise<void> | null = null;
+
 const ensureRankedTables = async () => {
-  await ensureUsersTable();
+  if (rankedTablesReady) {
+    return rankedTablesReady;
+  }
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS ranked_queue (
-      user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      enqueued_at timestamptz NOT NULL DEFAULT now()
-    );
-  `);
+  rankedTablesReady = (async () => {
+    try {
+      await ensureUsersTable();
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS ranked_matches (
-      id uuid PRIMARY KEY,
-      user_a_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      user_b_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      started_at timestamptz NOT NULL DEFAULT now(),
-      timed_out boolean NOT NULL DEFAULT false,
-      user_a_lives integer NOT NULL DEFAULT ${DEFAULT_LIVES},
-      user_b_lives integer NOT NULL DEFAULT ${DEFAULT_LIVES},
-      turn_started_at timestamptz NOT NULL DEFAULT now(),
-      current_turn_user_id uuid REFERENCES users(id) ON DELETE CASCADE
-    );
-  `);
+      await db.query(`
+      CREATE TABLE IF NOT EXISTS ranked_queue (
+        user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        enqueued_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
 
-  await db.query(`
-    ALTER TABLE ranked_matches
-    ADD COLUMN IF NOT EXISTS timed_out boolean NOT NULL DEFAULT false;
-  `);
+      await db.query(`
+      CREATE TABLE IF NOT EXISTS ranked_matches (
+        id uuid PRIMARY KEY,
+        user_a_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_b_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        started_at timestamptz NOT NULL DEFAULT now(),
+        timed_out boolean NOT NULL DEFAULT false,
+        user_a_lives integer NOT NULL DEFAULT ${DEFAULT_LIVES},
+        user_b_lives integer NOT NULL DEFAULT ${DEFAULT_LIVES},
+        turn_started_at timestamptz NOT NULL DEFAULT now(),
+        current_turn_user_id uuid REFERENCES users(id) ON DELETE CASCADE
+      );
+    `);
 
-  await db.query(`
-    ALTER TABLE ranked_matches
-    ADD COLUMN IF NOT EXISTS user_a_lives integer NOT NULL DEFAULT ${DEFAULT_LIVES};
-  `);
+      await db.query(`
+      ALTER TABLE ranked_matches
+      ADD COLUMN IF NOT EXISTS timed_out boolean NOT NULL DEFAULT false;
+    `);
 
-  await db.query(`
-    ALTER TABLE ranked_matches
-    ADD COLUMN IF NOT EXISTS user_b_lives integer NOT NULL DEFAULT ${DEFAULT_LIVES};
-  `);
+      await db.query(`
+      ALTER TABLE ranked_matches
+      ADD COLUMN IF NOT EXISTS user_a_lives integer NOT NULL DEFAULT ${DEFAULT_LIVES};
+    `);
 
-  await db.query(`
-    ALTER TABLE ranked_matches
-    ADD COLUMN IF NOT EXISTS turn_started_at timestamptz NOT NULL DEFAULT now();
-  `);
+      await db.query(`
+      ALTER TABLE ranked_matches
+      ADD COLUMN IF NOT EXISTS user_b_lives integer NOT NULL DEFAULT ${DEFAULT_LIVES};
+    `);
 
-  await db.query(`
-    ALTER TABLE ranked_matches
-    ADD COLUMN IF NOT EXISTS current_turn_user_id uuid REFERENCES users(id) ON DELETE CASCADE;
-  `);
+      await db.query(`
+      ALTER TABLE ranked_matches
+      ADD COLUMN IF NOT EXISTS turn_started_at timestamptz NOT NULL DEFAULT now();
+    `);
 
-  await db.query(`
-    CREATE INDEX IF NOT EXISTS ranked_matches_user_idx
-      ON ranked_matches (user_a_id, user_b_id, started_at DESC);
-  `);
+      await db.query(`
+      ALTER TABLE ranked_matches
+      ADD COLUMN IF NOT EXISTS current_turn_user_id uuid REFERENCES users(id) ON DELETE CASCADE;
+    `);
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS ranked_messages (
-      id uuid PRIMARY KEY,
-      match_id uuid NOT NULL REFERENCES ranked_matches(id) ON DELETE CASCADE,
-      sender_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      body text NOT NULL,
-      edited boolean NOT NULL DEFAULT false,
-      created_at timestamptz NOT NULL DEFAULT now()
-    );
-  `);
+      await db.query(`
+      CREATE INDEX IF NOT EXISTS ranked_matches_user_idx
+        ON ranked_matches (user_a_id, user_b_id, started_at DESC);
+    `);
 
-  await db.query(`
-    ALTER TABLE ranked_messages
-    ADD COLUMN IF NOT EXISTS edited boolean NOT NULL DEFAULT false;
-  `);
+      await db.query(`
+      CREATE TABLE IF NOT EXISTS ranked_messages (
+        id uuid PRIMARY KEY,
+        match_id uuid NOT NULL REFERENCES ranked_matches(id) ON DELETE CASCADE,
+        sender_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        body text NOT NULL,
+        edited boolean NOT NULL DEFAULT false,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
 
-  await db.query(`
-    CREATE INDEX IF NOT EXISTS ranked_messages_match_idx
-      ON ranked_messages (match_id, created_at ASC);
-  `);
+      await db.query(`
+      ALTER TABLE ranked_messages
+      ADD COLUMN IF NOT EXISTS edited boolean NOT NULL DEFAULT false;
+    `);
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS ranked_transcripts (
-      match_id uuid PRIMARY KEY REFERENCES ranked_matches(id) ON DELETE CASCADE,
-      transcript jsonb NOT NULL,
-      saved_at timestamptz NOT NULL DEFAULT now()
-    );
-  `);
+      await db.query(`
+      CREATE INDEX IF NOT EXISTS ranked_messages_match_idx
+        ON ranked_messages (match_id, created_at ASC);
+    `);
+
+      await db.query(`
+      CREATE TABLE IF NOT EXISTS ranked_transcripts (
+        match_id uuid PRIMARY KEY REFERENCES ranked_matches(id) ON DELETE CASCADE,
+        transcript jsonb NOT NULL,
+        saved_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+    } catch (error) {
+      rankedTablesReady = null;
+      throw error;
+    }
+  })();
+
+  return rankedTablesReady;
 };
 
 const removeFromQueue = async (userId: string) => {
