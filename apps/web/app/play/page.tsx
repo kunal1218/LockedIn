@@ -919,8 +919,8 @@ export default function RankedPlayPage() {
         )}
       </Card>
       {showMatchModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-          <div className="w-full max-w-sm rounded-2xl border border-card-border/70 bg-white/95 p-5 shadow-lg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 pointer-events-none">
+          <div className="w-full max-w-sm rounded-2xl border border-card-border/70 bg-white/95 p-5 shadow-lg pointer-events-auto">
             <p className="text-base font-semibold text-ink">{matchModalTitle}</p>
             <p className="mt-2 text-sm text-muted">{matchModalBody}</p>
             <div className="mt-5 flex justify-end">
