@@ -88,6 +88,17 @@ export default function RankedPlayPage() {
       : true;
   const activeMatchId =
     rankedStatus.status === "matched" ? rankedStatus.matchId : null;
+  const matchStateMessage =
+    rankedStatus.status === "matched"
+      ? isTimeout
+        ? "Match over."
+        : !isMyTurn
+          ? `Waiting for ${rankedStatus.partner.handle}...`
+          : ""
+      : "";
+  const matchStateTone = isTimeout
+    ? "border-red-200 bg-red-50 text-red-700"
+    : "border-card-border/70 bg-white/80 text-muted";
   const getRemainingSeconds = useCallback((turnStartedAt: string) => {
     const startedMs = Date.parse(turnStartedAt);
     if (!Number.isFinite(startedMs)) {
@@ -221,9 +232,6 @@ export default function RankedPlayPage() {
         setIsTimeout(false);
       } else {
         syncTimer(payload.turnStartedAt, payload.serverTime, payload.timedOut);
-      }
-      if (payload.timedOut) {
-        setChatError("Match ended: timer expired for this round.");
       }
       setMessages(payload.messages);
     } catch (error) {
@@ -627,7 +635,7 @@ export default function RankedPlayPage() {
                         : "bg-emerald-100 text-emerald-700"
                   }`}
                 >
-                  {isTimeout ? "Timer expired · turn missed" : `Timer: ${timeLeft}s`}
+                  {isTimeout ? "Turn missed" : `Timer: ${timeLeft}s`}
                 </span>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                   You: {lives.me} lives
@@ -709,23 +717,20 @@ export default function RankedPlayPage() {
                     Press play to start looking for a partner. We will drop them here once matched.
                   </p>
                 </div>
-              ) : isChatLoading ? (
-                <p className="text-sm text-muted">Loading chat...</p>
               ) : (
                 <>
-                  {isTimeout && (
-                    <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700">
-                      {isMyTurn
-                        ? "Timer expired. You missed your turn."
-                        : `Timer expired. ${rankedStatus.partner.handle} missed their turn.`}
-                    </div>
-                  )}
-                  {!isTimeout && rankedStatus.status === "matched" && !isMyTurn && (
-                    <div className="mb-3 rounded-2xl border border-card-border/70 bg-white/80 px-4 py-2 text-sm font-semibold text-muted">
-                      Waiting for {rankedStatus.partner.handle}...
-                    </div>
-                  )}
-                  {messages.length === 0 ? (
+                  <div
+                    className={`mb-3 rounded-2xl border px-4 py-2 text-sm font-semibold ${matchStateTone}`}
+                  >
+                    {matchStateMessage || (
+                      <span className="text-transparent" aria-hidden="true">
+                        .
+                      </span>
+                    )}
+                  </div>
+                  {isChatLoading ? (
+                    <p className="text-sm text-muted">Loading chat...</p>
+                  ) : messages.length === 0 ? (
                     <p className="text-sm text-muted">
                       {isMyTurn
                         ? "You matched! The 15s timer is running — send the first line."
