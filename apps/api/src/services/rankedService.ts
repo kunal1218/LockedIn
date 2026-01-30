@@ -4,7 +4,13 @@ import { ensureUsersTable } from "./authService";
 import type { MessageUser } from "./messageService";
 
 export type RankedStatus =
-  | { status: "matched"; matchId: string; partner: MessageUser; startedAt: string }
+  | {
+      status: "matched";
+      matchId: string;
+      partner: MessageUser;
+      startedAt: string;
+      lives: { me: number; partner: number };
+    }
   | { status: "waiting" }
   | { status: "idle" };
 
@@ -15,6 +21,8 @@ export type RankedMessage = {
   sender: MessageUser;
   edited?: boolean;
 };
+
+const DEFAULT_LIVES = 3;
 
 const mapUser = (row: { id: string; name: string; handle: string }): MessageUser => ({
   id: row.id,
@@ -52,13 +60,25 @@ const ensureRankedTables = async () => {
       user_a_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       user_b_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       started_at timestamptz NOT NULL DEFAULT now(),
-      timed_out boolean NOT NULL DEFAULT false
+      timed_out boolean NOT NULL DEFAULT false,
+      user_a_lives integer NOT NULL DEFAULT ${DEFAULT_LIVES},
+      user_b_lives integer NOT NULL DEFAULT ${DEFAULT_LIVES}
     );
   `);
 
   await db.query(`
     ALTER TABLE ranked_matches
     ADD COLUMN IF NOT EXISTS timed_out boolean NOT NULL DEFAULT false;
+  `);
+
+  await db.query(`
+    ALTER TABLE ranked_matches
+    ADD COLUMN IF NOT EXISTS user_a_lives integer NOT NULL DEFAULT ${DEFAULT_LIVES};
+  `);
+
+  await db.query(`
+    ALTER TABLE ranked_matches
+    ADD COLUMN IF NOT EXISTS user_b_lives integer NOT NULL DEFAULT ${DEFAULT_LIVES};
   `);
 
   await db.query(`
@@ -128,15 +148,16 @@ const findWaitingPartner = async (userId: string): Promise<string | null> => {
 const createMatch = async (userId: string, partnerId: string) => {
   const matchId = randomUUID();
   await db.query(
-    `INSERT INTO ranked_matches (id, user_a_id, user_b_id) VALUES ($1, $2, $3)`,
-    [matchId, userId, partnerId]
+    `INSERT INTO ranked_matches (id, user_a_id, user_b_id, user_a_lives, user_b_lives)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [matchId, userId, partnerId, DEFAULT_LIVES, DEFAULT_LIVES]
   );
   return matchId;
 };
 
 const getMatch = async (matchId: string) => {
   const result = await db.query(
-    `SELECT id, user_a_id, user_b_id, started_at, timed_out
+    `SELECT id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives
      FROM ranked_matches WHERE id = $1 LIMIT 1`,
     [matchId]
   );
@@ -149,6 +170,8 @@ const getMatch = async (matchId: string) => {
     user_b_id: string;
     started_at: string | Date;
     timed_out: boolean;
+    user_a_lives: number;
+    user_b_lives: number;
   };
 };
 
@@ -191,6 +214,7 @@ export const enqueueAndMatch = async (userId: string): Promise<RankedStatus> => 
       matchId,
       partner,
       startedAt: new Date().toISOString(),
+      lives: { me: DEFAULT_LIVES, partner: DEFAULT_LIVES },
     };
   }
 
@@ -202,7 +226,7 @@ export const getRankedStatusForUser = async (userId: string): Promise<RankedStat
   await ensureRankedTables();
 
   const matchResult = await db.query(
-    `SELECT id, user_a_id, user_b_id, started_at
+    `SELECT id, user_a_id, user_b_id, started_at, user_a_lives, user_b_lives
      FROM ranked_matches
      WHERE (user_a_id = $1 OR user_b_id = $1) AND timed_out = false
      ORDER BY started_at DESC
@@ -216,9 +240,14 @@ export const getRankedStatusForUser = async (userId: string): Promise<RankedStat
       user_a_id: string;
       user_b_id: string;
       started_at: string | Date;
+      user_a_lives: number;
+      user_b_lives: number;
     };
     const partnerId = row.user_a_id === userId ? row.user_b_id : row.user_a_id;
     const partner = await fetchUserById(partnerId);
+    const meLives = row.user_a_id === userId ? row.user_a_lives : row.user_b_lives;
+    const partnerLives =
+      row.user_a_id === userId ? row.user_b_lives : row.user_a_lives;
     return {
       status: "matched",
       matchId: row.id,
@@ -227,6 +256,7 @@ export const getRankedStatusForUser = async (userId: string): Promise<RankedStat
         row.started_at instanceof Date
           ? row.started_at.toISOString()
           : new Date(row.started_at).toISOString(),
+      lives: { me: meLives, partner: partnerLives },
     };
   }
 

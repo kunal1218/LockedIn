@@ -26,7 +26,13 @@ type RankedMessage = {
 type RankedStatus =
   | { status: "idle" }
   | { status: "waiting" }
-  | { status: "matched"; matchId: string; partner: MessageUser; startedAt: string };
+  | {
+      status: "matched";
+      matchId: string;
+      partner: MessageUser;
+      startedAt: string;
+      lives?: { me: number; partner: number };
+    };
 
 const inputClasses =
   "w-full rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-ink outline-none transition focus:border-accent/60 focus:bg-white";
@@ -61,6 +67,10 @@ export default function RankedPlayPage() {
   const justSentRef = useRef<boolean>(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const progress = Math.max(0, Math.min(1, timeLeft / TURN_SECONDS));
+  const lives =
+    rankedStatus.status === "matched"
+      ? rankedStatus.lives ?? { me: 3, partner: 3 }
+      : null;
   const sessionStartRef = useRef<number>(0);
   const isMyTurn = useMemo(() => {
     if (!user?.id) return true;
@@ -526,8 +536,8 @@ export default function RankedPlayPage() {
                   : "Queue to get paired with someone new."}
               </p>
             </div>
-            {rankedStatus.status === "matched" && (
-              <div className="flex items-center gap-3">
+            {rankedStatus.status === "matched" && lives && (
+              <div className="flex flex-wrap items-center gap-2">
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-semibold ${
                     isTimeout
@@ -538,6 +548,12 @@ export default function RankedPlayPage() {
                   }`}
                 >
                   {isTimeout ? "Timer out · both lose" : `Timer: ${timeLeft}s`}
+                </span>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                  You: {lives.me} lives
+                </span>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                  {rankedStatus.partner.handle}: {lives.partner} lives
                 </span>
                 <div className="flex items-center gap-2">
                   <div className="relative h-2 w-32 overflow-hidden rounded-full bg-card-border/60">
@@ -552,7 +568,9 @@ export default function RankedPlayPage() {
                       style={{ width: `${progress * 100}%` }}
                     />
                   </div>
-                  <p className="text-xs text-muted">Started {formatRelativeTime(rankedStatus.startedAt)}</p>
+                  <p className="text-xs text-muted">
+                    Started {formatRelativeTime(rankedStatus.startedAt)}
+                  </p>
                 </div>
               </div>
             )}
