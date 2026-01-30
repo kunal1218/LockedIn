@@ -10,6 +10,8 @@ export type RankedStatus =
       partner: MessageUser;
       startedAt: string;
       lives: { me: number; partner: number };
+      turnStartedAt: string;
+      serverTime: string;
     }
   | { status: "waiting" }
   | { status: "idle" };
@@ -23,6 +25,7 @@ export type RankedMessage = {
 };
 
 const DEFAULT_LIVES = 3;
+const TURN_SECONDS = 15;
 
 const mapUser = (row: { id: string; name: string; handle: string }): MessageUser => ({
   id: row.id,
@@ -62,7 +65,8 @@ const ensureRankedTables = async () => {
       started_at timestamptz NOT NULL DEFAULT now(),
       timed_out boolean NOT NULL DEFAULT false,
       user_a_lives integer NOT NULL DEFAULT ${DEFAULT_LIVES},
-      user_b_lives integer NOT NULL DEFAULT ${DEFAULT_LIVES}
+      user_b_lives integer NOT NULL DEFAULT ${DEFAULT_LIVES},
+      turn_started_at timestamptz NOT NULL DEFAULT now()
     );
   `);
 
@@ -79,6 +83,11 @@ const ensureRankedTables = async () => {
   await db.query(`
     ALTER TABLE ranked_matches
     ADD COLUMN IF NOT EXISTS user_b_lives integer NOT NULL DEFAULT ${DEFAULT_LIVES};
+  `);
+
+  await db.query(`
+    ALTER TABLE ranked_matches
+    ADD COLUMN IF NOT EXISTS turn_started_at timestamptz NOT NULL DEFAULT now();
   `);
 
   await db.query(`
@@ -148,8 +157,8 @@ const findWaitingPartner = async (userId: string): Promise<string | null> => {
 const createMatch = async (userId: string, partnerId: string) => {
   const matchId = randomUUID();
   await db.query(
-    `INSERT INTO ranked_matches (id, user_a_id, user_b_id, user_a_lives, user_b_lives)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO ranked_matches (id, user_a_id, user_b_id, user_a_lives, user_b_lives, turn_started_at)
+     VALUES ($1, $2, $3, $4, $5, now())`,
     [matchId, userId, partnerId, DEFAULT_LIVES, DEFAULT_LIVES]
   );
   return matchId;
@@ -157,7 +166,7 @@ const createMatch = async (userId: string, partnerId: string) => {
 
 const getMatch = async (matchId: string) => {
   const result = await db.query(
-    `SELECT id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives
+    `SELECT id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at
      FROM ranked_matches WHERE id = $1 LIMIT 1`,
     [matchId]
   );
@@ -172,7 +181,40 @@ const getMatch = async (matchId: string) => {
     timed_out: boolean;
     user_a_lives: number;
     user_b_lives: number;
+    turn_started_at: string | Date;
   };
+};
+
+const parseTimestamp = (value: string | Date) =>
+  value instanceof Date ? value : new Date(value);
+
+const getTurnState = (match: {
+  id: string;
+  timed_out: boolean;
+  turn_started_at: string | Date;
+}) => {
+  const startedAt = parseTimestamp(match.turn_started_at);
+  const elapsedMs = Date.now() - startedAt.getTime();
+  const expired = elapsedMs >= TURN_SECONDS * 1000;
+  return { startedAt, expired };
+};
+
+const ensureMatchTimer = async (match: {
+  id: string;
+  timed_out: boolean;
+  turn_started_at: string | Date;
+}) => {
+  const { startedAt, expired } = getTurnState(match);
+  const timedOut = match.timed_out || expired;
+  if (expired && !match.timed_out) {
+    await db.query(
+      `UPDATE ranked_matches
+       SET timed_out = true
+       WHERE id = $1`,
+      [match.id]
+    );
+  }
+  return { startedAt, timedOut };
 };
 
 const assertParticipant = async (matchId: string, userId: string) => {
@@ -209,12 +251,15 @@ export const enqueueAndMatch = async (userId: string): Promise<RankedStatus> => 
     await removeFromQueue(partnerId);
     const matchId = await createMatch(userId, partnerId);
     const partner = await fetchUserById(partnerId);
+    const nowIso = new Date().toISOString();
     return {
       status: "matched",
       matchId,
       partner,
-      startedAt: new Date().toISOString(),
+      startedAt: nowIso,
       lives: { me: DEFAULT_LIVES, partner: DEFAULT_LIVES },
+      turnStartedAt: nowIso,
+      serverTime: nowIso,
     };
   }
 
@@ -226,13 +271,13 @@ export const getRankedStatusForUser = async (userId: string): Promise<RankedStat
   await ensureRankedTables();
 
   const matchResult = await db.query(
-    `SELECT id, user_a_id, user_b_id, started_at, user_a_lives, user_b_lives
+    `SELECT id, user_a_id, user_b_id, started_at, user_a_lives, user_b_lives, turn_started_at, timed_out
      FROM ranked_matches
      WHERE (user_a_id = $1 OR user_b_id = $1) AND timed_out = false
      ORDER BY started_at DESC
      LIMIT 1`,
-   [userId]
- );
+    [userId]
+  );
 
   if ((matchResult.rowCount ?? 0) > 0) {
     const row = matchResult.rows[0] as {
@@ -242,12 +287,23 @@ export const getRankedStatusForUser = async (userId: string): Promise<RankedStat
       started_at: string | Date;
       user_a_lives: number;
       user_b_lives: number;
+      turn_started_at: string | Date;
+      timed_out: boolean;
     };
+    const timerState = await ensureMatchTimer({
+      id: row.id,
+      timed_out: row.timed_out,
+      turn_started_at: row.turn_started_at,
+    });
+    if (timerState.timedOut) {
+      return { status: "idle" };
+    }
     const partnerId = row.user_a_id === userId ? row.user_b_id : row.user_a_id;
     const partner = await fetchUserById(partnerId);
     const meLives = row.user_a_id === userId ? row.user_a_lives : row.user_b_lives;
     const partnerLives =
       row.user_a_id === userId ? row.user_b_lives : row.user_a_lives;
+    const nowIso = new Date().toISOString();
     return {
       status: "matched",
       matchId: row.id,
@@ -257,6 +313,8 @@ export const getRankedStatusForUser = async (userId: string): Promise<RankedStat
           ? row.started_at.toISOString()
           : new Date(row.started_at).toISOString(),
       lives: { me: meLives, partner: partnerLives },
+      turnStartedAt: timerState.startedAt.toISOString(),
+      serverTime: nowIso,
     };
   }
 
@@ -280,9 +338,19 @@ export const cancelRankedQueue = async (userId: string) => {
 export const fetchRankedMessages = async (
   matchId: string,
   userId: string
-): Promise<{ messages: RankedMessage[]; timedOut: boolean }> => {
+): Promise<{
+  messages: RankedMessage[];
+  timedOut: boolean;
+  turnStartedAt: string;
+  serverTime: string;
+}> => {
   await ensureRankedTables();
   const { match } = await assertParticipant(matchId, userId);
+  const timerState = await ensureMatchTimer({
+    id: match.id,
+    timed_out: match.timed_out,
+    turn_started_at: match.turn_started_at,
+  });
 
   const result = await db.query(
     `SELECT m.id,
@@ -322,7 +390,12 @@ export const fetchRankedMessages = async (
     edited: row.edited,
   }));
 
-  return { messages, timedOut: match.timed_out };
+  return {
+    messages,
+    timedOut: timerState.timedOut,
+    turnStartedAt: timerState.startedAt.toISOString(),
+    serverTime: new Date().toISOString(),
+  };
 };
 
 export const sendRankedMessage = async (params: {
@@ -332,7 +405,12 @@ export const sendRankedMessage = async (params: {
 }): Promise<RankedMessage> => {
   await ensureRankedTables();
   const { match } = await assertParticipant(params.matchId, params.senderId);
-  if (match.timed_out) {
+  const timerState = await ensureMatchTimer({
+    id: match.id,
+    timed_out: match.timed_out,
+    turn_started_at: match.turn_started_at,
+  });
+  if (timerState.timedOut) {
     throw new Error("Match has ended");
   }
 
@@ -351,6 +429,13 @@ export const sendRankedMessage = async (params: {
      VALUES ($1, $2, $3, $4, false)
      RETURNING id, match_id, sender_id, body, created_at, edited`,
     [id, params.matchId, params.senderId, trimmed]
+  );
+
+  await db.query(
+    `UPDATE ranked_matches
+     SET turn_started_at = now()
+     WHERE id = $1`,
+    [params.matchId]
   );
 
   const row = result.rows[0] as {
