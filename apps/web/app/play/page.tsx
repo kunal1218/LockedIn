@@ -676,8 +676,8 @@ export default function RankedPlayPage() {
     <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-6">
       <Card className="grid h-full min-h-[520px] grid-rows-[auto_1fr_auto] gap-3 overflow-hidden border border-card-border/70 bg-white/85 shadow-sm">
         <div className="flex flex-col gap-4">
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="flex min-w-[240px] items-center gap-3">
+          <div className="grid gap-6 md:grid-cols-[1fr_auto]">
+            <div className="flex min-w-[240px] items-center gap-3 md:justify-self-start">
               {user?.name ? (
                 <Avatar name={myName} size={44} />
               ) : (
@@ -689,14 +689,14 @@ export default function RankedPlayPage() {
                     <p className="text-sm font-semibold text-ink">{myName}</p>
                     <p className="text-xs text-muted">{myHandle}</p>
                   </div>
-                  <div className="mt-4 flex flex-col items-start gap-1">
+                  <div className="mt-2 flex flex-col items-start gap-1">
                     {renderHearts(myLivesCount)}
                     {renderTimerBar(myTimerSeconds, isMatched && isMyTurn)}
                   </div>
                 </div>
               </div>
             </div>
-            <div className="flex w-full min-w-[240px] flex-row-reverse items-center justify-end gap-3 text-right md:justify-self-end">
+            <div className="flex min-w-[240px] flex-row-reverse items-center justify-end gap-3 text-right md:justify-self-end">
               {isMatched ? (
                 <Avatar name={partnerName} size={44} />
               ) : (
@@ -708,7 +708,7 @@ export default function RankedPlayPage() {
                     <p className="text-sm font-semibold text-ink">{partnerName}</p>
                     <p className="text-xs text-muted">{partnerHandle}</p>
                   </div>
-                  <div className="mt-4 flex flex-col items-end gap-1">
+                  <div className="mt-2 flex flex-col items-end gap-1">
                     {renderHearts(partnerLivesCount, true)}
                     {renderTimerBar(partnerTimerSeconds, isMatched && !isMyTurn, true)}
                   </div>
