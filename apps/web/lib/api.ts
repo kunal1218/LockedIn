@@ -5,12 +5,11 @@ type ApiRequestOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   token?: string;
-  signal?: AbortSignal;
 };
 
 const apiRequest = async <T>(
   path: string,
-  { method = "GET", body, token, signal }: ApiRequestOptions = {}
+  { method = "GET", body, token }: ApiRequestOptions = {}
 ): Promise<T> => {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method,
@@ -20,7 +19,6 @@ const apiRequest = async <T>(
     },
     body: body ? JSON.stringify(body) : undefined,
     cache: "no-store",
-    signal,
   });
 
   if (!response.ok) {
@@ -45,11 +43,8 @@ const apiRequest = async <T>(
   return response.json() as Promise<T>;
 };
 
-export const apiGet = async <T>(
-  path: string,
-  token?: string,
-  options: Pick<ApiRequestOptions, "signal"> = {}
-): Promise<T> => apiRequest<T>(path, { token, ...options });
+export const apiGet = async <T>(path: string, token?: string): Promise<T> =>
+  apiRequest<T>(path, { token });
 
 export const apiPost = async <T>(
   path: string,
