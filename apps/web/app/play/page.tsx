@@ -260,6 +260,15 @@ export default function RankedPlayPage() {
       const status = await apiGet<RankedStatus>("/ranked/status", token);
       setRankedStatus(status);
       if (status.status === "matched") {
+        if (status.serverTime) {
+          const serverMs = Date.parse(status.serverTime);
+          if (Number.isFinite(serverMs)) {
+            serverTimeOffsetRef.current = Date.now() - serverMs;
+          }
+        }
+        if (status.turnStartedAt) {
+          turnStartedAtRef.current = status.turnStartedAt;
+        }
         if (status.isMyTurn === false) {
           setTimeLeft(TURN_SECONDS);
           setIsTimeout(false);
@@ -297,6 +306,15 @@ export default function RankedPlayPage() {
       }>(`/ranked/match/${encodeURIComponent(activeMatchId)}/messages`, token, {
         signal: controller.signal,
       });
+      if (payload.serverTime) {
+        const serverMs = Date.parse(payload.serverTime);
+        if (Number.isFinite(serverMs)) {
+          serverTimeOffsetRef.current = Date.now() - serverMs;
+        }
+      }
+      if (payload.turnStartedAt) {
+        turnStartedAtRef.current = payload.turnStartedAt;
+      }
       setRankedStatus((prev) =>
         prev.status === "matched"
           ? { ...prev, isMyTurn: payload.isMyTurn ?? prev.isMyTurn }
@@ -658,8 +676,8 @@ export default function RankedPlayPage() {
     <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-6">
       <Card className="grid h-full min-h-[520px] grid-rows-[auto_1fr_auto] gap-3 overflow-hidden border border-card-border/70 bg-white/85 shadow-sm">
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-6">
-            <div className="flex min-w-[240px] flex-1 items-center gap-3">
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="flex min-w-[240px] items-center gap-3">
               {user?.name ? (
                 <Avatar name={myName} size={44} />
               ) : (
@@ -678,7 +696,7 @@ export default function RankedPlayPage() {
                 </div>
               </div>
             </div>
-            <div className="flex min-w-[240px] flex-1 flex-row-reverse items-center justify-end gap-3 text-right">
+            <div className="flex min-w-[240px] flex-row-reverse items-center justify-end gap-3 text-right md:justify-self-end">
               {isMatched ? (
                 <Avatar name={partnerName} size={44} />
               ) : (
