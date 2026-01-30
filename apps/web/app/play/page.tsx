@@ -720,9 +720,16 @@ export default function RankedPlayPage() {
                         : `Timer expired. ${rankedStatus.partner.handle} missed their turn.`}
                     </div>
                   )}
+                  {!isTimeout && rankedStatus.status === "matched" && !isMyTurn && (
+                    <div className="mb-3 rounded-2xl border border-card-border/70 bg-white/80 px-4 py-2 text-sm font-semibold text-muted">
+                      Waiting for {rankedStatus.partner.handle}...
+                    </div>
+                  )}
                   {messages.length === 0 ? (
                     <p className="text-sm text-muted">
-                      You matched! The 15s timer is running — send the first line.
+                      {isMyTurn
+                        ? "You matched! The 15s timer is running — send the first line."
+                        : `You're matched. Waiting for ${rankedStatus.partner.handle} to start.`}
                     </p>
                   ) : (
                     <div className="space-y-3">
