@@ -50,13 +50,18 @@ export const ProfileHeader = ({
               <p className="font-display text-2xl font-semibold text-ink">
                 {displayName}
               </p>
+            </div>
+            <p className="text-sm text-muted">
+              {displayHandle}
               {displayCollege && (
-                <span className="text-xs font-semibold text-muted">
+                <span className="text-muted">
+                  <span className="px-2" aria-hidden="true">
+                    ·
+                  </span>
                   {displayCollege}
                 </span>
               )}
-            </div>
-            <p className="text-sm text-muted">{displayHandle}</p>
+            </p>
             <p className="mt-2 text-sm text-ink/80">{profile.bio}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {profile.badges.map((badge) => (

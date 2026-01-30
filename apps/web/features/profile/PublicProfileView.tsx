@@ -516,13 +516,18 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
             <p className="font-display text-2xl font-semibold text-ink">
               {user.name}
             </p>
+          </div>
+          <p className="text-sm text-muted">
+            {user.handle}
             {collegeLabel && (
-              <span className="text-xs font-semibold text-muted">
+              <span className="text-muted">
+                <span className="px-2" aria-hidden="true">
+                  ·
+                </span>
                 {collegeLabel}
               </span>
             )}
-          </div>
-          <p className="text-sm text-muted">{user.handle}</p>
+          </p>
         </div>
         {!isSelf && (
           <div className="ml-auto flex flex-wrap items-center gap-2">
