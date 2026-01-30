@@ -34,6 +34,7 @@ type RankedStatus =
       lives?: { me: number; partner: number };
       turnStartedAt?: string;
       serverTime?: string;
+      isMyTurn?: boolean;
     };
 
 const inputClasses =
@@ -73,12 +74,16 @@ export default function RankedPlayPage() {
     rankedStatus.status === "matched"
       ? rankedStatus.lives ?? { me: 3, partner: 3 }
       : null;
-  const isMyTurn = useMemo(() => {
+  const derivedIsMyTurn = useMemo(() => {
     if (!user?.id) return true;
     const last = messages[messages.length - 1];
     if (!last) return true;
     return last.sender.id !== user.id;
   }, [messages, user?.id]);
+  const isMyTurn =
+    rankedStatus.status === "matched"
+      ? rankedStatus.isMyTurn ?? derivedIsMyTurn
+      : true;
   const getRemainingSeconds = useCallback((turnStartedAt: string) => {
     const startedMs = Date.parse(turnStartedAt);
     if (!Number.isFinite(startedMs)) {
@@ -165,7 +170,12 @@ export default function RankedPlayPage() {
       const status = await apiGet<RankedStatus>("/ranked/status", token);
       setRankedStatus(status);
       if (status.status === "matched") {
-        syncTimer(status.turnStartedAt ?? null, status.serverTime);
+        if (status.isMyTurn) {
+          syncTimer(status.turnStartedAt ?? null, status.serverTime);
+        } else {
+          setTimeLeft(TURN_SECONDS);
+          setIsTimeout(false);
+        }
       }
     } catch (error) {
       console.error("Ranked status error", error);
@@ -187,8 +197,17 @@ export default function RankedPlayPage() {
         timedOut: boolean;
         turnStartedAt: string;
         serverTime: string;
+        isMyTurn: boolean;
       }>(`/ranked/match/${encodeURIComponent(rankedStatus.matchId)}/messages`, token);
-      syncTimer(payload.turnStartedAt, payload.serverTime, payload.timedOut);
+      setRankedStatus((prev) =>
+        prev.status === "matched" ? { ...prev, isMyTurn: payload.isMyTurn } : prev
+      );
+      if (payload.isMyTurn) {
+        syncTimer(payload.turnStartedAt, payload.serverTime, payload.timedOut);
+      } else if (!payload.timedOut) {
+        setTimeLeft(TURN_SECONDS);
+        setIsTimeout(false);
+      }
       if (payload.timedOut) {
         setChatError("Match ended: timer expired for this round.");
       }
@@ -290,7 +309,12 @@ export default function RankedPlayPage() {
       const status = await apiPost<RankedStatus>("/ranked/play", {}, token);
       setRankedStatus(status);
       if (status.status === "matched") {
-        syncTimer(status.turnStartedAt ?? null, status.serverTime);
+        if (status.isMyTurn) {
+          syncTimer(status.turnStartedAt ?? null, status.serverTime);
+        } else {
+          setTimeLeft(TURN_SECONDS);
+          setIsTimeout(false);
+        }
       }
     } catch (error) {
       setQueueError(error instanceof Error ? error.message : "Unable to join queue.");
@@ -492,6 +516,10 @@ export default function RankedPlayPage() {
       if (!turnStartedAtRef.current) {
         return;
       }
+      if (!isMyTurn) {
+        setTimeLeft(TURN_SECONDS);
+        return;
+      }
       const remainingSeconds = getRemainingSeconds(turnStartedAtRef.current);
       setTimeLeft(remainingSeconds);
       if (remainingSeconds <= 0) {
@@ -502,7 +530,7 @@ export default function RankedPlayPage() {
     return () => {
       window.clearInterval(timer);
     };
-  }, [getRemainingSeconds, rankedStatus.status]);
+  }, [getRemainingSeconds, isMyTurn, rankedStatus.status]);
 
   useEffect(() => {
     if (
