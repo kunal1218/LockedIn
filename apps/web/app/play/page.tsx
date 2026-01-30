@@ -65,6 +65,7 @@ export default function RankedPlayPage() {
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const timeoutReportedRef = useRef<boolean>(false);
   const hasLoadedMessagesRef = useRef<boolean>(false);
+  const isLoadingMessagesRef = useRef<boolean>(false);
   const justSentRef = useRef<boolean>(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const serverTimeOffsetRef = useRef<number>(0);
@@ -185,10 +186,16 @@ export default function RankedPlayPage() {
     if (!token || rankedStatus.status !== "matched") {
       return;
     }
+    if (isLoadingMessagesRef.current) {
+      return;
+    }
+    isLoadingMessagesRef.current = true;
     if (!hasLoadedMessagesRef.current) {
       setIsChatLoading(true);
     }
     setChatError(null);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 8000);
     try {
       const payload = await apiGet<{
         messages: RankedMessage[];
@@ -196,7 +203,9 @@ export default function RankedPlayPage() {
         turnStartedAt: string;
         serverTime: string;
         isMyTurn?: boolean;
-      }>(`/ranked/match/${encodeURIComponent(rankedStatus.matchId)}/messages`, token);
+      }>(`/ranked/match/${encodeURIComponent(rankedStatus.matchId)}/messages`, token, {
+        signal: controller.signal,
+      });
       if (typeof payload.isMyTurn === "boolean") {
         setRankedStatus((prev) =>
           prev.status === "matched" ? { ...prev, isMyTurn: payload.isMyTurn } : prev
@@ -212,12 +221,18 @@ export default function RankedPlayPage() {
       setMessages(payload.messages);
       hasLoadedMessagesRef.current = true;
     } catch (error) {
-      setChatError(
-        error instanceof Error ? error.message : "Unable to load matched chat."
-      );
+      if ((error as Error).name === "AbortError") {
+        setChatError("Chat sync timed out. Retrying...");
+      } else {
+        setChatError(
+          error instanceof Error ? error.message : "Unable to load matched chat."
+        );
+      }
       setMessages([]);
     } finally {
+      window.clearTimeout(timeout);
       setIsChatLoading(false);
+      isLoadingMessagesRef.current = false;
     }
   }, [rankedStatus, syncTimer, token]);
 
