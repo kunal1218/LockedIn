@@ -674,7 +674,7 @@ export default function RankedPlayPage() {
 
   return (
     <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-6">
-      <Card className="grid h-full min-h-[520px] grid-rows-[auto_1fr_auto] gap-3 overflow-hidden border border-card-border/70 bg-white/85 shadow-sm">
+      <Card className="relative grid h-full min-h-[520px] grid-rows-[auto_1fr_auto] gap-3 overflow-hidden border border-card-border/70 bg-white/85 shadow-sm">
         <div className="flex flex-col gap-4">
           <div className="grid gap-6 md:grid-cols-[1fr_auto]">
             <div className="flex min-w-[240px] items-center gap-3 md:justify-self-start">
@@ -917,27 +917,27 @@ export default function RankedPlayPage() {
             </div>
           </div>
         )}
-      </Card>
-      {showMatchModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 pointer-events-none">
-          <div className="w-full max-w-sm rounded-2xl border border-card-border/70 bg-white/95 p-5 shadow-lg pointer-events-auto">
-            <p className="text-base font-semibold text-ink">{matchModalTitle}</p>
-            <p className="mt-2 text-sm text-muted">{matchModalBody}</p>
-            <div className="mt-5 flex justify-end">
-              <button
-                type="button"
-                className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)] transition hover:translate-y-[-1px] disabled:opacity-60"
-                onClick={
-                  rankedStatus.status === "waiting" ? handleCancel : handlePlay
-                }
-                disabled={isQueuing}
-              >
-                {matchModalActionLabel}
-              </button>
+        {showMatchModal && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
+            <div className="w-full max-w-sm rounded-2xl border border-card-border/70 bg-white/95 p-5 shadow-lg">
+              <p className="text-base font-semibold text-ink">{matchModalTitle}</p>
+              <p className="mt-2 text-sm text-muted">{matchModalBody}</p>
+              <div className="mt-5 flex justify-end">
+                <button
+                  type="button"
+                  className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)] transition hover:translate-y-[-1px] disabled:opacity-60"
+                  onClick={
+                    rankedStatus.status === "waiting" ? handleCancel : handlePlay
+                  }
+                  disabled={isQueuing}
+                >
+                  {matchModalActionLabel}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Card>
     </div>
   );
 }
