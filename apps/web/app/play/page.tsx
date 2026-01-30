@@ -34,6 +34,7 @@ type RankedStatus =
       lives?: { me: number; partner: number };
       turnStartedAt?: string;
       serverTime?: string;
+      isMyTurn?: boolean;
     };
 
 const inputClasses =
@@ -73,12 +74,16 @@ export default function RankedPlayPage() {
     rankedStatus.status === "matched"
       ? rankedStatus.lives ?? { me: 3, partner: 3 }
       : null;
-  const isMyTurn = useMemo(() => {
+  const derivedIsMyTurn = useMemo(() => {
     if (!user?.id) return true;
     const last = messages[messages.length - 1];
     if (!last) return true;
     return last.sender.id !== user.id;
   }, [messages, user?.id]);
+  const isMyTurn =
+    rankedStatus.status === "matched"
+      ? rankedStatus.isMyTurn ?? derivedIsMyTurn
+      : true;
   const getRemainingSeconds = useCallback((turnStartedAt: string) => {
     const startedMs = Date.parse(turnStartedAt);
     if (!Number.isFinite(startedMs)) {
@@ -166,6 +171,9 @@ export default function RankedPlayPage() {
       setRankedStatus(status);
       if (status.status === "matched") {
         syncTimer(status.turnStartedAt ?? null, status.serverTime);
+        if (status.isMyTurn === false) {
+          setTimeLeft(TURN_SECONDS);
+        }
       }
     } catch (error) {
       console.error("Ranked status error", error);
@@ -187,7 +195,16 @@ export default function RankedPlayPage() {
         timedOut: boolean;
         turnStartedAt: string;
         serverTime: string;
+        isMyTurn?: boolean;
       }>(`/ranked/match/${encodeURIComponent(rankedStatus.matchId)}/messages`, token);
+      if (typeof payload.isMyTurn === "boolean") {
+        setRankedStatus((prev) =>
+          prev.status === "matched" ? { ...prev, isMyTurn: payload.isMyTurn } : prev
+        );
+        if (payload.isMyTurn === false && !payload.timedOut) {
+          setTimeLeft(TURN_SECONDS);
+        }
+      }
       syncTimer(payload.turnStartedAt, payload.serverTime, payload.timedOut);
       if (payload.timedOut) {
         setChatError("Match ended: timer expired for this round.");
@@ -348,6 +365,9 @@ export default function RankedPlayPage() {
       setMessages((prev) => [...prev, response.message]);
       setDraft("");
       syncTimer(new Date(Date.now() - serverTimeOffsetRef.current).toISOString());
+      setRankedStatus((prev) =>
+        prev.status === "matched" ? { ...prev, isMyTurn: false } : prev
+      );
       justSentRef.current = true;
     } catch (error) {
       setChatError(
@@ -489,7 +509,14 @@ export default function RankedPlayPage() {
       return;
     }
     const timer = window.setInterval(() => {
+      if (isTimeout) {
+        return;
+      }
       if (!turnStartedAtRef.current) {
+        return;
+      }
+      if (!isMyTurn) {
+        setTimeLeft(TURN_SECONDS);
         return;
       }
       const remainingSeconds = getRemainingSeconds(turnStartedAtRef.current);
@@ -502,7 +529,7 @@ export default function RankedPlayPage() {
     return () => {
       window.clearInterval(timer);
     };
-  }, [getRemainingSeconds, rankedStatus.status]);
+  }, [getRemainingSeconds, isMyTurn, isTimeout, rankedStatus.status]);
 
   useEffect(() => {
     if (
