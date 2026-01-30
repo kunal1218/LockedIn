@@ -689,14 +689,14 @@ export default function RankedPlayPage() {
                     <p className="text-sm font-semibold text-ink">{myName}</p>
                     <p className="text-xs text-muted">{myHandle}</p>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    {renderHearts(myLivesCount, true)}
-                    {renderTimerBar(myTimerSeconds, isMatched && isMyTurn, true)}
+                  <div className="mt-4 flex flex-col items-start gap-1">
+                    {renderHearts(myLivesCount)}
+                    {renderTimerBar(myTimerSeconds, isMatched && isMyTurn)}
                   </div>
                 </div>
               </div>
             </div>
-            <div className="flex min-w-[240px] flex-row-reverse items-center justify-end gap-3 text-right md:justify-self-end">
+            <div className="flex w-full min-w-[240px] flex-row-reverse items-center justify-end gap-3 text-right md:justify-self-end">
               {isMatched ? (
                 <Avatar name={partnerName} size={44} />
               ) : (
@@ -708,7 +708,7 @@ export default function RankedPlayPage() {
                     <p className="text-sm font-semibold text-ink">{partnerName}</p>
                     <p className="text-xs text-muted">{partnerHandle}</p>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
+                  <div className="mt-4 flex flex-col items-end gap-1">
                     {renderHearts(partnerLivesCount, true)}
                     {renderTimerBar(partnerTimerSeconds, isMatched && !isMyTurn, true)}
                   </div>
