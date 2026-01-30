@@ -107,14 +107,6 @@ export default function RankedPlayPage() {
     : "Queue to get paired with someone new.";
   const myLivesCount = lives?.me ?? 3;
   const partnerLivesCount = lives?.partner ?? 3;
-  const myTimerSeconds = isMatched ? (isMyTurn ? timeLeft : TURN_SECONDS) : TURN_SECONDS;
-  const partnerTimerSeconds = isMatched
-    ? isMyTurn
-      ? TURN_SECONDS
-      : turnStartedAtRef.current
-        ? getRemainingSeconds(turnStartedAtRef.current)
-        : TURN_SECONDS
-    : TURN_SECONDS;
   const timerTone = (active: boolean, seconds: number) => {
     if (!active) {
       return "bg-slate-100 text-slate-500";
@@ -152,6 +144,14 @@ export default function RankedPlayPage() {
     const remainingMs = TURN_SECONDS * 1000 - (nowMs - startedMs);
     return Math.max(0, Math.ceil(remainingMs / 1000));
   }, []);
+  const myTimerSeconds = isMatched ? (isMyTurn ? timeLeft : TURN_SECONDS) : TURN_SECONDS;
+  const partnerTimerSeconds = isMatched
+    ? isMyTurn
+      ? TURN_SECONDS
+      : turnStartedAtRef.current
+        ? getRemainingSeconds(turnStartedAtRef.current)
+        : TURN_SECONDS
+    : TURN_SECONDS;
   const syncTimer = useCallback(
     (turnStartedAt: string | null, serverTime?: string, timedOut?: boolean) => {
       if (!turnStartedAt) {
