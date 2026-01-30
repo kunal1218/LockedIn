@@ -121,7 +121,7 @@ export default function RankedPlayPage() {
   const partnerName = isMatched ? rankedStatus.partner.name : "Waiting for a match";
   const partnerHandle = isMatched
     ? rankedStatus.partner.handle
-    : "Queue to get paired with someone new.";
+    : "Queue up to play.";
   const myLivesCount = lives?.me ?? 3;
   const partnerLivesCount = lives?.partner ?? 3;
   const renderHearts = (filledCount: number, alignRight = false) => (
@@ -689,7 +689,7 @@ export default function RankedPlayPage() {
                     <p className="text-sm font-semibold text-ink">{myName}</p>
                     <p className="text-xs text-muted">{myHandle}</p>
                   </div>
-                  <div className="mt-2 flex flex-col items-start gap-1">
+                  <div className="mt-[6px] flex flex-col items-start gap-1">
                     {renderHearts(myLivesCount)}
                     {renderTimerBar(myTimerSeconds, isMatched && isMyTurn)}
                   </div>
@@ -708,7 +708,7 @@ export default function RankedPlayPage() {
                     <p className="text-sm font-semibold text-ink">{partnerName}</p>
                     <p className="text-xs text-muted">{partnerHandle}</p>
                   </div>
-                  <div className="mt-2 flex flex-col items-end gap-1">
+                  <div className="mt-[6px] flex flex-col items-end gap-1">
                     {renderHearts(partnerLivesCount, true)}
                     {renderTimerBar(partnerTimerSeconds, isMatched && !isMyTurn, true)}
                   </div>
