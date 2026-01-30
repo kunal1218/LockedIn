@@ -98,6 +98,23 @@ export default function RankedPlayPage() {
   const matchStateTone = isTimeout
     ? "border-red-200 bg-red-50 text-red-700"
     : "border-card-border/70 bg-white/80 text-muted";
+  const showMatchModal =
+    isAuthenticated && (rankedStatus.status !== "matched" || isTimeout);
+  const matchModalTitle = isTimeout
+    ? "Match finished"
+    : rankedStatus.status === "waiting"
+      ? "Searching for a partner..."
+      : "Ready to play?";
+  const matchModalBody = isTimeout
+    ? "Start a new match when you're ready."
+    : rankedStatus.status === "waiting"
+      ? "Stay here — we will drop them into the chat once matched."
+      : "Press play to get paired with someone new.";
+  const matchModalActionLabel = isTimeout
+    ? "Play again"
+    : rankedStatus.status === "waiting"
+      ? "Cancel"
+      : "Play";
   const myName = user?.name ?? "You";
   const myHandle = user?.handle ?? "you";
   const isMatched = rankedStatus.status === "matched";
@@ -107,14 +124,6 @@ export default function RankedPlayPage() {
     : "Queue to get paired with someone new.";
   const myLivesCount = lives?.me ?? 3;
   const partnerLivesCount = lives?.partner ?? 3;
-  const timerTone = (active: boolean, seconds: number) => {
-    if (!active) {
-      return "bg-slate-100 text-slate-500";
-    }
-    return seconds <= 5
-      ? "bg-amber-100 text-amber-700"
-      : "bg-emerald-100 text-emerald-700";
-  };
   const renderHearts = (filledCount: number, alignRight = false) => (
     <div className={`flex items-center gap-1 ${alignRight ? "justify-end" : ""}`}>
       {Array.from({ length: 3 }).map((_, index) => {
@@ -135,6 +144,28 @@ export default function RankedPlayPage() {
       })}
     </div>
   );
+  const getTimerBarClass = (active: boolean, seconds: number) => {
+    if (!active) {
+      return "bg-slate-300";
+    }
+    return seconds <= 5 ? "bg-amber-500" : "bg-emerald-500";
+  };
+  const renderTimerBar = (seconds: number, active: boolean, alignRight = false) => {
+    const progress = Math.max(0, Math.min(1, seconds / TURN_SECONDS));
+    return (
+      <div className={`w-24 ${alignRight ? "ml-auto" : ""}`}>
+        <div className="h-2 w-full overflow-hidden rounded-full bg-card-border/60">
+          <div
+            className={`h-full transition-[width] duration-300 ${getTimerBarClass(
+              active,
+              seconds
+            )}`}
+            style={{ width: `${progress * 100}%` }}
+          />
+        </div>
+      </div>
+    );
+  };
   const getRemainingSeconds = useCallback((turnStartedAt: string) => {
     const startedMs = Date.parse(turnStartedAt);
     if (!Number.isFinite(startedMs)) {
@@ -580,29 +611,6 @@ export default function RankedPlayPage() {
     }
   };
 
-  const statusBadge = (() => {
-    switch (rankedStatus.status) {
-      case "waiting":
-        return (
-          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-            Searching for a partner...
-          </span>
-        );
-      case "matched":
-        return (
-          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-            Matched!
-          </span>
-        );
-      default:
-        return (
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-            Idle
-          </span>
-        );
-    }
-  })();
-
   useEffect(() => {
     if (rankedStatus.status !== "matched") {
       return;
@@ -665,19 +673,12 @@ export default function RankedPlayPage() {
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     {renderHearts(myLivesCount, true)}
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${timerTone(
-                        isMatched && isMyTurn,
-                        myTimerSeconds
-                      )}`}
-                    >
-                      Timer: {myTimerSeconds}s
-                    </span>
+                    {renderTimerBar(myTimerSeconds, isMatched && isMyTurn, true)}
                   </div>
                 </div>
               </div>
             </div>
-            <div className="flex min-w-[240px] flex-1 flex-row-reverse items-center justify-end gap-3">
+            <div className="flex min-w-[240px] flex-1 flex-row-reverse items-center justify-end gap-3 text-right">
               {isMatched ? (
                 <Avatar name={partnerName} size={44} />
               ) : (
@@ -689,41 +690,13 @@ export default function RankedPlayPage() {
                     <p className="text-sm font-semibold text-ink">{partnerName}</p>
                     <p className="text-xs text-muted">{partnerHandle}</p>
                   </div>
-                  <div className="flex flex-col items-start gap-1">
-                    {renderHearts(partnerLivesCount)}
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${timerTone(
-                        isMatched && !isMyTurn,
-                        partnerTimerSeconds
-                      )}`}
-                    >
-                      Timer: {partnerTimerSeconds}s
-                    </span>
+                  <div className="flex flex-col items-end gap-1">
+                    {renderHearts(partnerLivesCount, true)}
+                    {renderTimerBar(partnerTimerSeconds, isMatched && !isMyTurn, true)}
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {statusBadge}
-            {rankedStatus.status === "waiting" ? (
-              <Button variant="outline" onClick={handleCancel} disabled={isQueuing}>
-                Cancel
-              </Button>
-            ) : rankedStatus.status === "matched" && !isTimeout ? (
-              <Button
-                variant="outline"
-                disabled
-                requiresAuth={false}
-                className="pointer-events-none"
-              >
-                In match
-              </Button>
-            ) : (
-              <Button onClick={handlePlay} disabled={isQueuing}>
-                {rankedStatus.status === "matched" ? "Play again" : "Play"}
-              </Button>
-            )}
           </div>
         </div>
 
@@ -927,6 +900,26 @@ export default function RankedPlayPage() {
           </div>
         )}
       </Card>
+      {showMatchModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div className="w-full max-w-sm rounded-2xl border border-card-border/70 bg-white/95 p-5 shadow-lg">
+            <p className="text-base font-semibold text-ink">{matchModalTitle}</p>
+            <p className="mt-2 text-sm text-muted">{matchModalBody}</p>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)] transition hover:translate-y-[-1px] disabled:opacity-60"
+                onClick={
+                  rankedStatus.status === "waiting" ? handleCancel : handlePlay
+                }
+                disabled={isQueuing}
+              >
+                {matchModalActionLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
