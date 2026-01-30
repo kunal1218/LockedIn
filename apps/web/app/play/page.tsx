@@ -65,6 +65,7 @@ export default function RankedPlayPage() {
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const timeoutReportedRef = useRef<boolean>(false);
   const hasLoadedMessagesRef = useRef<boolean>(false);
+  const isLoadingMessagesRef = useRef<boolean>(false);
   const justSentRef = useRef<boolean>(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const serverTimeOffsetRef = useRef<number>(0);
@@ -170,11 +171,11 @@ export default function RankedPlayPage() {
       const status = await apiGet<RankedStatus>("/ranked/status", token);
       setRankedStatus(status);
       if (status.status === "matched") {
-        if (status.isMyTurn) {
-          syncTimer(status.turnStartedAt ?? null, status.serverTime);
-        } else {
+        if (status.isMyTurn === false) {
           setTimeLeft(TURN_SECONDS);
           setIsTimeout(false);
+        } else {
+          syncTimer(status.turnStartedAt ?? null, status.serverTime);
         }
       }
     } catch (error) {
@@ -187,10 +188,16 @@ export default function RankedPlayPage() {
     if (!token || rankedStatus.status !== "matched") {
       return;
     }
+    if (isLoadingMessagesRef.current) {
+      return;
+    }
+    isLoadingMessagesRef.current = true;
     if (!hasLoadedMessagesRef.current) {
       setIsChatLoading(true);
     }
     setChatError(null);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 8000);
     try {
       const payload = await apiGet<{
         messages: RankedMessage[];
@@ -198,28 +205,38 @@ export default function RankedPlayPage() {
         turnStartedAt: string;
         serverTime: string;
         isMyTurn: boolean;
-      }>(`/ranked/match/${encodeURIComponent(rankedStatus.matchId)}/messages`, token);
+      }>(`/ranked/match/${encodeURIComponent(rankedStatus.matchId)}/messages`, token, {
+        signal: controller.signal,
+      });
       setRankedStatus((prev) =>
-        prev.status === "matched" ? { ...prev, isMyTurn: payload.isMyTurn } : prev
+        prev.status === "matched"
+          ? { ...prev, isMyTurn: payload.isMyTurn ?? prev.isMyTurn }
+          : prev
       );
-      if (payload.isMyTurn) {
-        syncTimer(payload.turnStartedAt, payload.serverTime, payload.timedOut);
-      } else if (!payload.timedOut) {
+      if (payload.isMyTurn === false && !payload.timedOut) {
         setTimeLeft(TURN_SECONDS);
         setIsTimeout(false);
+      } else {
+        syncTimer(payload.turnStartedAt, payload.serverTime, payload.timedOut);
       }
       if (payload.timedOut) {
         setChatError("Match ended: timer expired for this round.");
       }
       setMessages(payload.messages);
-      hasLoadedMessagesRef.current = true;
     } catch (error) {
-      setChatError(
-        error instanceof Error ? error.message : "Unable to load matched chat."
-      );
+      if ((error as Error).name === "AbortError") {
+        setChatError("Chat sync timed out. Retrying...");
+      } else {
+        setChatError(
+          error instanceof Error ? error.message : "Unable to load matched chat."
+        );
+      }
       setMessages([]);
     } finally {
+      window.clearTimeout(timeout);
       setIsChatLoading(false);
+      hasLoadedMessagesRef.current = true;
+      isLoadingMessagesRef.current = false;
     }
   }, [rankedStatus, syncTimer, token]);
 
@@ -253,7 +270,12 @@ export default function RankedPlayPage() {
       setChatError(null);
       turnStartedAtRef.current = rankedStatus.turnStartedAt ?? null;
       if (rankedStatus.turnStartedAt) {
-        syncTimer(rankedStatus.turnStartedAt, rankedStatus.serverTime);
+        if (rankedStatus.isMyTurn === false) {
+          setTimeLeft(TURN_SECONDS);
+          setIsTimeout(false);
+        } else {
+          syncTimer(rankedStatus.turnStartedAt, rankedStatus.serverTime);
+        }
       }
       loadMessages();
     } else {
@@ -309,11 +331,11 @@ export default function RankedPlayPage() {
       const status = await apiPost<RankedStatus>("/ranked/play", {}, token);
       setRankedStatus(status);
       if (status.status === "matched") {
-        if (status.isMyTurn) {
-          syncTimer(status.turnStartedAt ?? null, status.serverTime);
-        } else {
+        if (status.isMyTurn === false) {
           setTimeLeft(TURN_SECONDS);
           setIsTimeout(false);
+        } else {
+          syncTimer(status.turnStartedAt ?? null, status.serverTime);
         }
       }
     } catch (error) {
@@ -371,7 +393,11 @@ export default function RankedPlayPage() {
       );
       setMessages((prev) => [...prev, response.message]);
       setDraft("");
-      syncTimer(new Date(Date.now() - serverTimeOffsetRef.current).toISOString());
+      setRankedStatus((prev) =>
+        prev.status === "matched" ? { ...prev, isMyTurn: false } : prev
+      );
+      setTimeLeft(TURN_SECONDS);
+      setIsTimeout(false);
       justSentRef.current = true;
     } catch (error) {
       setChatError(
