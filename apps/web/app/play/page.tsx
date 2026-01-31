@@ -86,6 +86,7 @@ export default function RankedPlayPage() {
   const [isTypingSubmitting, setIsTypingSubmitting] = useState(false);
   const [typingModalTick, setTypingModalTick] = useState(0);
   const [roleModalTick, setRoleModalTick] = useState(0);
+  const [roleModalStartMs, setRoleModalStartMs] = useState<number | null>(null);
   const [isSmiting, setIsSmiting] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -94,6 +95,7 @@ export default function RankedPlayPage() {
   const hasLoadedMessagesRef = useRef<boolean>(false);
   const isLoadingMessagesRef = useRef<boolean>(false);
   const activeMatchIdRef = useRef<string | null>(null);
+  const roleModalSeenRef = useRef<Record<string, boolean>>({});
   const justSentRef = useRef<boolean>(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const serverTimeOffsetRef = useRef<number>(0);
@@ -255,22 +257,18 @@ export default function RankedPlayPage() {
     return 0;
   }, [isTypingTestCountdown, isTypingTestResult, typingModalTick, typingTest.resultAt, typingTest.startedAt]);
   const roleModalProgress = useMemo(() => {
-    if (!characterRole || !characterRoleAssignedAt) {
+    if (!characterRole || roleModalStartMs === null) {
       return 0;
     }
-    return getModalProgress(characterRoleAssignedAt, ROLE_MODAL_SECONDS);
-  }, [characterRole, characterRoleAssignedAt, roleModalTick]);
+    const elapsed = Date.now() - roleModalStartMs;
+    return Math.min(1, elapsed / (ROLE_MODAL_SECONDS * 1000));
+  }, [characterRole, roleModalStartMs, roleModalTick]);
   const isRoleModalActive = useMemo(() => {
-    if (!characterRole || !characterRoleAssignedAt) {
+    if (!characterRole || roleModalStartMs === null) {
       return false;
     }
-    const startedMs = Date.parse(characterRoleAssignedAt);
-    if (!Number.isFinite(startedMs)) {
-      return false;
-    }
-    const nowMs = Date.now() - serverTimeOffsetRef.current;
-    return nowMs - startedMs < ROLE_MODAL_SECONDS * 1000;
-  }, [characterRole, characterRoleAssignedAt, roleModalTick]);
+    return Date.now() - roleModalStartMs < ROLE_MODAL_SECONDS * 1000;
+  }, [characterRole, roleModalStartMs, roleModalTick]);
   const showRoleModal = isRoleModalActive;
   const showBlockingModal = showTypingModal || showRoleModal;
   const showStatusBar =
@@ -401,6 +399,21 @@ export default function RankedPlayPage() {
   }, [typingTest.round, typingTest.state]);
 
   useEffect(() => {
+    if (rankedStatus.status !== "matched" || !activeMatchId) {
+      setRoleModalStartMs(null);
+      return;
+    }
+    if (!characterRole) {
+      return;
+    }
+    if (roleModalSeenRef.current[activeMatchId]) {
+      return;
+    }
+    roleModalSeenRef.current[activeMatchId] = true;
+    setRoleModalStartMs(Date.now());
+  }, [activeMatchId, characterRole, rankedStatus.status]);
+
+  useEffect(() => {
     if (!isTypingTestCountdown && !isTypingTestResult) {
       return;
     }
@@ -411,15 +424,10 @@ export default function RankedPlayPage() {
   }, [isTypingTestCountdown, isTypingTestResult]);
 
   useEffect(() => {
-    if (!characterRole || !characterRoleAssignedAt) {
+    if (roleModalStartMs === null) {
       return;
     }
-    const startedMs = Date.parse(characterRoleAssignedAt);
-    if (!Number.isFinite(startedMs)) {
-      return;
-    }
-    const nowMs = Date.now() - serverTimeOffsetRef.current;
-    const remainingMs = ROLE_MODAL_SECONDS * 1000 - (nowMs - startedMs);
+    const remainingMs = ROLE_MODAL_SECONDS * 1000 - (Date.now() - roleModalStartMs);
     if (remainingMs <= 0) {
       return;
     }
@@ -434,7 +442,7 @@ export default function RankedPlayPage() {
       window.clearInterval(interval);
       window.clearTimeout(timeout);
     };
-  }, [characterRole, characterRoleAssignedAt]);
+  }, [roleModalStartMs]);
 
   useEffect(() => {
     if (rankedStatus.status === "matched") {
