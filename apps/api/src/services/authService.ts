@@ -13,6 +13,8 @@ type UserRow = {
   password_hash: string;
   college_name?: string | null;
   college_domain?: string | null;
+  coins?: number | null;
+  last_ranked_win_reward_at?: string | Date | null;
 };
 
 export type AuthUser = {
@@ -23,6 +25,7 @@ export type AuthUser = {
   collegeName?: string | null;
   collegeDomain?: string | null;
   isAdmin?: boolean;
+  coins?: number;
 };
 
 export type AuthPayload = {
@@ -71,6 +74,8 @@ export const ensureUsersTable = async () => {
       password_hash text NOT NULL,
       college_name text,
       college_domain text,
+      coins integer NOT NULL DEFAULT 0,
+      last_ranked_win_reward_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now()
     );
   `);
@@ -78,7 +83,9 @@ export const ensureUsersTable = async () => {
   await db.query(`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS college_name text,
-    ADD COLUMN IF NOT EXISTS college_domain text;
+    ADD COLUMN IF NOT EXISTS college_domain text,
+    ADD COLUMN IF NOT EXISTS coins integer NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS last_ranked_win_reward_at timestamptz;
   `);
 
   await db.query(`
@@ -182,7 +189,13 @@ const isHandleAvailable = async (handle: string, userId: string) => {
 const mapUser = (
   row: Pick<
     UserRow,
-    "id" | "name" | "handle" | "email" | "college_name" | "college_domain"
+    | "id"
+    | "name"
+    | "handle"
+    | "email"
+    | "college_name"
+    | "college_domain"
+    | "coins"
   >
 ) => ({
   id: row.id,
@@ -192,6 +205,7 @@ const mapUser = (
   collegeName: row.college_name ?? null,
   collegeDomain: row.college_domain ?? null,
   isAdmin: isAdminEmail(row.email),
+  coins: row.coins ?? 0,
 });
 
 const handleExists = async (handle: string) => {
@@ -495,7 +509,7 @@ export const signUpUser = async (params: {
   const result = await db.query(
     `INSERT INTO users (id, name, handle, email, password_hash, college_name, college_domain)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING id, name, handle, email, college_name, college_domain`,
+     RETURNING id, name, handle, email, college_name, college_domain, coins`,
     [
       userId,
       name,
@@ -526,7 +540,7 @@ export const signInUser = async (params: {
   }
 
   const result = await db.query(
-    "SELECT id, name, handle, email, password_hash, college_name, college_domain FROM users WHERE email = $1",
+    "SELECT id, name, handle, email, password_hash, college_name, college_domain, coins FROM users WHERE email = $1",
     [email]
   );
   const row = result.rows[0] as UserRow | undefined;
@@ -547,7 +561,7 @@ export const signInUser = async (params: {
         `UPDATE users
          SET college_name = $2, college_domain = $3
          WHERE id = $1
-         RETURNING id, name, handle, email, college_name, college_domain`,
+         RETURNING id, name, handle, email, college_name, college_domain, coins`,
         [row.id, college.name, college.domain]
       );
       const updated = refreshed.rows[0] as UserRow | undefined;
@@ -580,7 +594,7 @@ export const getUserFromToken = async (
 
   const { userId } = JSON.parse(session) as { userId: string };
   const result = await db.query(
-    "SELECT id, name, handle, email, college_name, college_domain FROM users WHERE id = $1",
+    "SELECT id, name, handle, email, college_name, college_domain, coins FROM users WHERE id = $1",
     [userId]
   );
   const row = result.rows[0] as UserRow | undefined;
@@ -595,7 +609,7 @@ export const getUserFromToken = async (
         `UPDATE users
          SET college_name = $2, college_domain = $3
          WHERE id = $1
-         RETURNING id, name, handle, email, college_name, college_domain`,
+         RETURNING id, name, handle, email, college_name, college_domain, coins`,
         [row.id, college.name, college.domain]
       );
       const updated = refreshed.rows[0] as UserRow | undefined;

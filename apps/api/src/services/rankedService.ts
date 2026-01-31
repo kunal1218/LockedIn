@@ -27,6 +27,19 @@ export type RankedMessage = {
 
 const DEFAULT_LIVES = 3;
 const TURN_SECONDS = 15;
+const WIN_REWARD_COINS = 100;
+
+type RankedMatchRow = {
+  id: string;
+  user_a_id: string;
+  user_b_id: string;
+  started_at: string | Date;
+  timed_out: boolean;
+  user_a_lives: number;
+  user_b_lives: number;
+  turn_started_at: string | Date;
+  current_turn_user_id: string | null;
+};
 
 const mapUser = (row: { id: string; name: string; handle: string }): MessageUser => ({
   id: row.id,
@@ -195,7 +208,7 @@ const createMatch = async (userId: string, partnerId: string) => {
   return { matchId, startingTurnUserId };
 };
 
-const getMatch = async (matchId: string) => {
+const getMatch = async (matchId: string): Promise<RankedMatchRow | null> => {
   const result = await db.query(
     `SELECT id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id
      FROM ranked_matches WHERE id = $1 LIMIT 1`,
@@ -204,17 +217,7 @@ const getMatch = async (matchId: string) => {
   if ((result.rowCount ?? 0) === 0) {
     return null;
   }
-  const row = result.rows[0] as {
-    id: string;
-    user_a_id: string;
-    user_b_id: string;
-    started_at: string | Date;
-    timed_out: boolean;
-    user_a_lives: number;
-    user_b_lives: number;
-    turn_started_at: string | Date;
-    current_turn_user_id: string | null;
-  };
+  const row = result.rows[0] as RankedMatchRow;
   if (!row.current_turn_user_id) {
     await db.query(
       `UPDATE ranked_matches
@@ -230,33 +233,116 @@ const getMatch = async (matchId: string) => {
 const parseTimestamp = (value: string | Date) =>
   value instanceof Date ? value : new Date(value);
 
-const getTurnState = (match: {
-  id: string;
-  timed_out: boolean;
-  turn_started_at: string | Date;
-}) => {
+const getTurnState = (match: { turn_started_at: string | Date }) => {
   const startedAt = parseTimestamp(match.turn_started_at);
   const elapsedMs = Date.now() - startedAt.getTime();
   const expired = elapsedMs >= TURN_SECONDS * 1000;
   return { startedAt, expired };
 };
 
-const ensureMatchTimer = async (match: {
-  id: string;
-  timed_out: boolean;
-  turn_started_at: string | Date;
-}) => {
-  const { startedAt, expired } = getTurnState(match);
-  const timedOut = match.timed_out || expired;
-  if (expired && !match.timed_out) {
-    await db.query(
-      `UPDATE ranked_matches
-       SET timed_out = true
-       WHERE id = $1`,
-      [match.id]
-    );
+const awardDailyWin = async (winnerId: string) => {
+  await ensureUsersTable();
+  const result = await db.query(
+    `UPDATE users
+     SET coins = COALESCE(coins, 0) + $2,
+         last_ranked_win_reward_at = now()
+     WHERE id = $1
+       AND (
+         last_ranked_win_reward_at IS NULL
+         OR last_ranked_win_reward_at::date < now()::date
+       )
+     RETURNING coins`,
+    [winnerId, WIN_REWARD_COINS]
+  );
+  return (result.rowCount ?? 0) > 0;
+};
+
+const applyTurnTimeout = async (
+  match: RankedMatchRow
+): Promise<RankedMatchRow | null> => {
+  const result = await db.query(
+    `UPDATE ranked_matches
+     SET user_a_lives = CASE
+           WHEN current_turn_user_id = user_a_id
+             THEN GREATEST(user_a_lives - 1, 0)
+           ELSE user_a_lives
+         END,
+         user_b_lives = CASE
+           WHEN current_turn_user_id = user_b_id
+             THEN GREATEST(user_b_lives - 1, 0)
+           ELSE user_b_lives
+         END,
+         turn_started_at = now(),
+         current_turn_user_id = CASE
+           WHEN current_turn_user_id = user_a_id THEN user_b_id
+           WHEN current_turn_user_id = user_b_id THEN user_a_id
+           ELSE current_turn_user_id
+         END,
+         timed_out = CASE
+           WHEN (CASE
+             WHEN current_turn_user_id = user_a_id THEN GREATEST(user_a_lives - 1, 0)
+             ELSE user_a_lives
+           END) <= 0
+           OR (CASE
+             WHEN current_turn_user_id = user_b_id THEN GREATEST(user_b_lives - 1, 0)
+             ELSE user_b_lives
+           END) <= 0
+           THEN true
+           ELSE false
+         END
+     WHERE id = $1
+       AND timed_out = false
+       AND turn_started_at = $2
+     RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id`,
+    [match.id, match.turn_started_at]
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    return null;
   }
-  return { startedAt, timedOut };
+
+  const updated = result.rows[0] as RankedMatchRow;
+
+  if (updated.timed_out) {
+    const winnerId =
+      updated.user_a_lives <= 0
+        ? updated.user_b_id
+        : updated.user_b_lives <= 0
+          ? updated.user_a_id
+          : null;
+    if (winnerId) {
+      await awardDailyWin(winnerId);
+    }
+  }
+
+  return updated;
+};
+
+const ensureMatchTimer = async (match: RankedMatchRow) => {
+  const { startedAt, expired } = getTurnState(match);
+  if (!expired || match.timed_out) {
+    return { startedAt, timedOut: match.timed_out, match };
+  }
+
+  const updated = await applyTurnTimeout(match);
+  if (updated) {
+    return {
+      startedAt: parseTimestamp(updated.turn_started_at),
+      timedOut: updated.timed_out,
+      match: updated,
+    };
+  }
+
+  const refreshed = await getMatch(match.id);
+  if (!refreshed) {
+    return { startedAt, timedOut: true, match };
+  }
+
+  return {
+    startedAt: parseTimestamp(refreshed.turn_started_at),
+    timedOut: refreshed.timed_out,
+    match: refreshed,
+  };
 };
 
 const assertParticipant = async (matchId: string, userId: string) => {
@@ -323,25 +409,7 @@ export const getRankedStatusForUser = async (userId: string): Promise<RankedStat
   );
 
   if ((matchResult.rowCount ?? 0) > 0) {
-    const row = matchResult.rows[0] as {
-      id: string;
-      user_a_id: string;
-      user_b_id: string;
-      started_at: string | Date;
-      user_a_lives: number;
-      user_b_lives: number;
-      turn_started_at: string | Date;
-      timed_out: boolean;
-      current_turn_user_id: string | null;
-    };
-    const timerState = await ensureMatchTimer({
-      id: row.id,
-      timed_out: row.timed_out,
-      turn_started_at: row.turn_started_at,
-    });
-    if (timerState.timedOut) {
-      return { status: "idle" };
-    }
+    const row = matchResult.rows[0] as RankedMatchRow;
     if (!row.current_turn_user_id) {
       await db.query(
         `UPDATE ranked_matches
@@ -351,24 +419,35 @@ export const getRankedStatusForUser = async (userId: string): Promise<RankedStat
       );
       row.current_turn_user_id = row.user_a_id;
     }
-    const partnerId = row.user_a_id === userId ? row.user_b_id : row.user_a_id;
+    const timerState = await ensureMatchTimer(row);
+    if (timerState.timedOut) {
+      return { status: "idle" };
+    }
+    const activeMatch = timerState.match;
+    const partnerId =
+      activeMatch.user_a_id === userId ? activeMatch.user_b_id : activeMatch.user_a_id;
     const partner = await fetchUserById(partnerId);
-    const meLives = row.user_a_id === userId ? row.user_a_lives : row.user_b_lives;
+    const meLives =
+      activeMatch.user_a_id === userId
+        ? activeMatch.user_a_lives
+        : activeMatch.user_b_lives;
     const partnerLives =
-      row.user_a_id === userId ? row.user_b_lives : row.user_a_lives;
+      activeMatch.user_a_id === userId
+        ? activeMatch.user_b_lives
+        : activeMatch.user_a_lives;
     const nowIso = new Date().toISOString();
     return {
       status: "matched",
-      matchId: row.id,
+      matchId: activeMatch.id,
       partner,
       startedAt:
-        row.started_at instanceof Date
-          ? row.started_at.toISOString()
-          : new Date(row.started_at).toISOString(),
+        activeMatch.started_at instanceof Date
+          ? activeMatch.started_at.toISOString()
+          : new Date(activeMatch.started_at).toISOString(),
       lives: { me: meLives, partner: partnerLives },
       turnStartedAt: timerState.startedAt.toISOString(),
       serverTime: nowIso,
-      isMyTurn: row.current_turn_user_id === userId,
+      isMyTurn: activeMatch.current_turn_user_id === userId,
     };
   }
 
@@ -398,14 +477,12 @@ export const fetchRankedMessages = async (
   turnStartedAt: string;
   serverTime: string;
   isMyTurn: boolean;
+  lives: { me: number; partner: number };
 }> => {
   await ensureRankedTables();
   const { match } = await assertParticipant(matchId, userId);
-  const timerState = await ensureMatchTimer({
-    id: match.id,
-    timed_out: match.timed_out,
-    turn_started_at: match.turn_started_at,
-  });
+  const timerState = await ensureMatchTimer(match);
+  const activeMatch = timerState.match;
 
   const result = await db.query(
     `SELECT m.id,
@@ -445,12 +522,22 @@ export const fetchRankedMessages = async (
     edited: row.edited,
   }));
 
+  const meLives =
+    activeMatch.user_a_id === userId
+      ? activeMatch.user_a_lives
+      : activeMatch.user_b_lives;
+  const partnerLives =
+    activeMatch.user_a_id === userId
+      ? activeMatch.user_b_lives
+      : activeMatch.user_a_lives;
+
   return {
     messages,
     timedOut: timerState.timedOut,
     turnStartedAt: timerState.startedAt.toISOString(),
     serverTime: new Date().toISOString(),
-    isMyTurn: match.current_turn_user_id === userId,
+    isMyTurn: activeMatch.current_turn_user_id === userId,
+    lives: { me: meLives, partner: partnerLives },
   };
 };
 
@@ -461,16 +548,16 @@ export const sendRankedMessage = async (params: {
 }): Promise<RankedMessage> => {
   await ensureRankedTables();
   const { match } = await assertParticipant(params.matchId, params.senderId);
-  if (match.current_turn_user_id && match.current_turn_user_id !== params.senderId) {
-    throw new Error("Not your turn");
-  }
-  const timerState = await ensureMatchTimer({
-    id: match.id,
-    timed_out: match.timed_out,
-    turn_started_at: match.turn_started_at,
-  });
+  const timerState = await ensureMatchTimer(match);
   if (timerState.timedOut) {
     throw new Error("Match has ended");
+  }
+  const activeMatch = timerState.match;
+  if (
+    activeMatch.current_turn_user_id &&
+    activeMatch.current_turn_user_id !== params.senderId
+  ) {
+    throw new Error("Not your turn");
   }
 
   const trimmed = params.body.trim();
@@ -491,7 +578,9 @@ export const sendRankedMessage = async (params: {
   );
 
   const nextTurnUserId =
-    match.user_a_id === params.senderId ? match.user_b_id : match.user_a_id;
+    activeMatch.user_a_id === params.senderId
+      ? activeMatch.user_b_id
+      : activeMatch.user_a_id;
   await db.query(
     `UPDATE ranked_matches
      SET turn_started_at = now(),
@@ -645,11 +734,6 @@ export const saveRankedTranscript = async (matchId: string, userId: string) => {
 
 export const markRankedTimeout = async (matchId: string, userId: string) => {
   await ensureRankedTables();
-  await assertParticipant(matchId, userId);
-  await db.query(
-    `UPDATE ranked_matches
-     SET timed_out = true
-     WHERE id = $1`,
-    [matchId]
-  );
+  const { match } = await assertParticipant(matchId, userId);
+  await ensureMatchTimer(match);
 };

@@ -63,7 +63,7 @@ export default function RankedPlayPage() {
   const [editingDraft, setEditingDraft] = useState("");
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
-  const timeoutReportedRef = useRef<boolean>(false);
+  const turnTimeoutReportedRef = useRef<string | null>(null);
   const hasLoadedMessagesRef = useRef<boolean>(false);
   const isLoadingMessagesRef = useRef<boolean>(false);
   const activeMatchIdRef = useRef<string | null>(null);
@@ -124,6 +124,7 @@ export default function RankedPlayPage() {
     : "Queue up to play.";
   const myLivesCount = lives?.me ?? 3;
   const partnerLivesCount = lives?.partner ?? 3;
+  const isTurnExpired = isMatched && isMyTurn && timeLeft <= 0;
   const renderHearts = (filledCount: number, alignRight = false) => (
     <div className={`flex items-center gap-1 ${alignRight ? "justify-end" : ""}`}>
       {Array.from({ length: 3 }).map((_, index) => {
@@ -202,7 +203,7 @@ export default function RankedPlayPage() {
       }
       const remainingSeconds = getRemainingSeconds(turnStartedAt);
       setTimeLeft(remainingSeconds);
-      setIsTimeout(remainingSeconds <= 0);
+      setIsTimeout(false);
     },
     [getRemainingSeconds]
   );
@@ -303,6 +304,7 @@ export default function RankedPlayPage() {
         turnStartedAt: string;
         serverTime: string;
         isMyTurn: boolean;
+        lives?: { me: number; partner: number };
       }>(`/ranked/match/${encodeURIComponent(activeMatchId)}/messages`, token, {
         signal: controller.signal,
       });
@@ -317,7 +319,13 @@ export default function RankedPlayPage() {
       }
       setRankedStatus((prev) =>
         prev.status === "matched"
-          ? { ...prev, isMyTurn: payload.isMyTurn ?? prev.isMyTurn }
+          ? {
+              ...prev,
+              isMyTurn: payload.isMyTurn ?? prev.isMyTurn,
+              lives: payload.lives ?? prev.lives,
+              turnStartedAt: payload.turnStartedAt ?? prev.turnStartedAt,
+              serverTime: payload.serverTime ?? prev.serverTime,
+            }
           : prev
       );
       if (payload.isMyTurn === false && !payload.timedOut) {
@@ -368,7 +376,7 @@ export default function RankedPlayPage() {
       setMessages([]);
       setSavedAt(null);
       setIsTimeout(false);
-      timeoutReportedRef.current = false;
+      turnTimeoutReportedRef.current = null;
       hasLoadedMessagesRef.current = false;
       justSentRef.current = false;
       setChatError(null);
@@ -382,7 +390,7 @@ export default function RankedPlayPage() {
       setDraft("");
       setSavedAt(null);
       setIsTimeout(false);
-      timeoutReportedRef.current = false;
+      turnTimeoutReportedRef.current = null;
       hasLoadedMessagesRef.current = false;
       justSentRef.current = false;
       setChatError(null);
@@ -429,6 +437,7 @@ export default function RankedPlayPage() {
       rankedStatus.status === "matched" &&
       !isTimeout &&
       isMyTurn &&
+      !isTurnExpired &&
       !isSending &&
       !isChatLoading;
     if (canFocus) {
@@ -436,7 +445,16 @@ export default function RankedPlayPage() {
         inputRef.current?.focus();
       }, 0);
     }
-  }, [rankedStatus.status, isTimeout, isMyTurn, isSending, isChatLoading, draft, timeLeft]);
+  }, [
+    rankedStatus.status,
+    isTimeout,
+    isMyTurn,
+    isTurnExpired,
+    isSending,
+    isChatLoading,
+    draft,
+    timeLeft,
+  ]);
 
   const handlePlay = async () => {
     if (!token) {
@@ -492,6 +510,11 @@ export default function RankedPlayPage() {
       setChatError("Wait for your partner to reply before sending again.");
       return;
     }
+    if (isTurnExpired) {
+      setChatError("Your turn expired. Waiting for your partner.");
+      reportTurnTimeout();
+      return;
+    }
     if (rankedStatus.status !== "matched") {
       setChatError("You need a match before chatting.");
       return;
@@ -536,6 +559,7 @@ export default function RankedPlayPage() {
       rankedStatus.status === "matched" &&
       !isTimeout &&
       isMyTurn &&
+      !isTurnExpired &&
       !justSentRef.current &&
       !isSending &&
       !isChatLoading
@@ -629,6 +653,29 @@ export default function RankedPlayPage() {
     }
   };
 
+  const reportTurnTimeout = useCallback(async () => {
+    if (!token || rankedStatus.status !== "matched" || !activeMatchId) {
+      return;
+    }
+    const turnStartedAt = turnStartedAtRef.current;
+    if (!turnStartedAt) {
+      return;
+    }
+    if (turnTimeoutReportedRef.current === turnStartedAt) {
+      return;
+    }
+    turnTimeoutReportedRef.current = turnStartedAt;
+    try {
+      await apiPost(
+        `/ranked/match/${encodeURIComponent(activeMatchId)}/timeout`,
+        {},
+        token
+      );
+    } catch {
+      // swallow timeout reporting errors
+    }
+  }, [activeMatchId, rankedStatus.status, token]);
+
   useEffect(() => {
     if (rankedStatus.status !== "matched") {
       return;
@@ -644,33 +691,14 @@ export default function RankedPlayPage() {
       const remainingSeconds = getRemainingSeconds(turnStartedAtRef.current);
       setTimeLeft(remainingSeconds);
       if (remainingSeconds <= 0) {
-        setIsTimeout(true);
+        reportTurnTimeout();
       }
     }, 1000);
 
     return () => {
       window.clearInterval(timer);
     };
-  }, [getRemainingSeconds, isMyTurn, rankedStatus.status]);
-
-  useEffect(() => {
-    if (
-      rankedStatus.status !== "matched" ||
-      !isTimeout ||
-      !token ||
-      timeoutReportedRef.current
-    ) {
-      return;
-    }
-    timeoutReportedRef.current = true;
-    apiPost(
-      `/ranked/match/${encodeURIComponent(rankedStatus.matchId)}/timeout`,
-      {},
-      token
-    ).catch(() => {
-      // swallow timeout reporting errors
-    });
-  }, [isTimeout, rankedStatus, token]);
+  }, [getRemainingSeconds, isMyTurn, rankedStatus.status, reportTurnTimeout]);
 
   return (
     <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-6">
@@ -858,8 +886,11 @@ export default function RankedPlayPage() {
                 }
                 ref={inputRef}
                 disabled={
-                  rankedStatus.status !== "matched" || isChatLoading || isTimeout
-                  || !isMyTurn
+                  rankedStatus.status !== "matched" ||
+                  isChatLoading ||
+                  isTimeout ||
+                  !isMyTurn ||
+                  isTurnExpired
                 }
               />
               {chatError && (
@@ -878,7 +909,8 @@ export default function RankedPlayPage() {
                     isSending ||
                     isChatLoading ||
                     isTimeout ||
-                    !isMyTurn
+                    !isMyTurn ||
+                    isTurnExpired
                   }
                 >
                   {isSending
