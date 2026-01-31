@@ -324,6 +324,11 @@ export default function RankedPlayPage() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      if ((event.metaKey || event.ctrlKey) && ["c", "v", "x"].includes(key)) {
+        event.preventDefault();
+        return;
+      }
       const target = event.target as HTMLElement | null;
       if (
         target &&
@@ -337,8 +342,19 @@ export default function RankedPlayPage() {
         setSelectedMessageId(null);
       }
     };
+    const blockClipboard = (event: Event) => {
+      event.preventDefault();
+    };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("copy", blockClipboard);
+    window.addEventListener("cut", blockClipboard);
+    window.addEventListener("paste", blockClipboard);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("copy", blockClipboard);
+      window.removeEventListener("cut", blockClipboard);
+      window.removeEventListener("paste", blockClipboard);
+    };
   }, [selectedMessageId]);
 
   useEffect(() => {
