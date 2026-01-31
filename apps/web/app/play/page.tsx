@@ -406,12 +406,15 @@ export default function RankedPlayPage() {
     if (!characterRole) {
       return;
     }
+    if (!isAuthenticated) {
+      return;
+    }
     if (roleModalSeenRef.current[activeMatchId]) {
       return;
     }
     roleModalSeenRef.current[activeMatchId] = true;
     setRoleModalStartMs(Date.now());
-  }, [activeMatchId, characterRole, rankedStatus.status]);
+  }, [activeMatchId, characterRole, isAuthenticated, rankedStatus.status]);
 
   useEffect(() => {
     if (!isTypingTestCountdown && !isTypingTestResult) {
