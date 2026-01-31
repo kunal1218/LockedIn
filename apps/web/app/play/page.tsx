@@ -126,23 +126,13 @@ export default function RankedPlayPage() {
   const showTypingTestArena = isTypingTestRunning;
   const icebreakerQuestion =
     rankedStatus.status === "matched" ? rankedStatus.icebreakerQuestion : null;
-  const matchedPartnerHandle =
-    rankedStatus.status === "matched"
-      ? rankedStatus.partner.handle
-      : "your opponent";
-  const isMatchStart =
-    rankedStatus.status === "matched" && messages.length === 0 && !isChatLoading;
   const matchStateMessage =
     rankedStatus.status === "matched"
       ? isMatchOver
         ? "Match over."
         : isTypingTestActive
           ? "Typing test in progress."
-          : isMatchStart
-            ? icebreakerQuestion ?? "Start the conversation."
-            : isMyTurn
-              ? "Your Move."
-              : `Waiting for ${matchedPartnerHandle}...`
+          : icebreakerQuestion ?? "Start the conversation."
       : "";
   const matchStateTone = isMatchOver
     ? "border-red-200 bg-red-50 text-red-700"

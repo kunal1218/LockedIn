@@ -47,7 +47,10 @@ const getIcebreakerPath = () => {
     path.resolve(process.cwd(), "GameQuestions.csv"),
     path.resolve(process.cwd(), "apps", "api", "GameQuestions.csv"),
     path.resolve(process.cwd(), "..", "GameQuestions.csv"),
+    path.resolve(process.cwd(), "..", "..", "GameQuestions.csv"),
+    path.resolve(process.cwd(), "..", "..", "..", "GameQuestions.csv"),
     path.resolve(__dirname, "..", "..", "..", "GameQuestions.csv"),
+    path.resolve(__dirname, "..", "..", "..", "..", "GameQuestions.csv"),
   ].filter(Boolean) as string[];
 
   for (const candidate of candidates) {
