@@ -122,15 +122,25 @@ export default function RankedPlayPage() {
   const isTypingTestRunning = typingTest.state === "active";
   const showTypingModal = isTypingTestCountdown || isTypingTestResult;
   const showTypingTestArena = isTypingTestRunning;
+  const matchedPartnerHandle =
+    rankedStatus.status === "matched"
+      ? rankedStatus.partner.handle
+      : "your opponent";
+  const isMatchStart =
+    rankedStatus.status === "matched" && messages.length === 0 && !isChatLoading;
   const matchStateMessage =
     rankedStatus.status === "matched"
       ? isMatchOver
         ? "Match over."
         : isTypingTestActive
           ? "Typing test in progress."
-          : isMyTurn
-            ? "Your Move."
-            : `Waiting for ${rankedStatus.partner.handle}...`
+          : isMatchStart
+            ? isMyTurn
+              ? "You matched! The 15s timer is running — send the first line."
+              : `You're matched. Waiting for ${matchedPartnerHandle} to start.`
+            : isMyTurn
+              ? "Your Move."
+              : `Waiting for ${matchedPartnerHandle}...`
       : "";
   const matchStateTone = isMatchOver
     ? "border-red-200 bg-red-50 text-red-700"
@@ -1145,13 +1155,6 @@ export default function RankedPlayPage() {
                       <p className="text-sm text-muted">Loading chat...</p>
                     ) : messages.length === 0 ? (
                       <div className="space-y-3">
-                        <p className="text-sm text-muted">
-                          {isMyTurn
-                            ? "You matched! The 15s timer is running — send the first line."
-                            : `You're matched. Waiting for ${
-                                displayPartner?.handle ?? "your opponent"
-                              } to start.`}
-                        </p>
                         {partnerTyping && (
                           <div className="flex justify-start">
                             <div className="max-w-[90%] rounded-2xl border border-dashed border-card-border/70 bg-white/70 px-4 py-2 text-sm italic text-muted opacity-70">
