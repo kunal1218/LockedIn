@@ -581,7 +581,7 @@ const maybeStartTypingTest = async (
          typing_test_words = $2::jsonb,
          typing_test_winner_id = NULL,
          typing_test_result_at = NULL,
-         typing_test_round = typing_test_round + 1
+         typing_test_round = COALESCE(typing_test_round, 0) + 1
      WHERE id = $1 AND typing_test_state IS NULL
      RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
                user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
@@ -734,7 +734,7 @@ export const fetchRankedMessages = async (
   await ensureRankedTables();
   const { match } = await assertParticipant(matchId, userId);
   const timerState = await ensureMatchTimer(match);
-  const activeMatch = timerState.match;
+  const activeMatch = await maybeStartTypingTest(matchId, timerState.match);
 
   const result = await db.query(
     `SELECT m.id,
