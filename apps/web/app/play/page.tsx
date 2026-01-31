@@ -44,6 +44,7 @@ type RankedStatus =
       turnStartedAt?: string;
       serverTime?: string;
       isMyTurn?: boolean;
+      icebreakerQuestion?: string | null;
     };
 
 const inputClasses =
@@ -123,6 +124,8 @@ export default function RankedPlayPage() {
   const isTypingTestRunning = typingTest.state === "active";
   const showTypingModal = isTypingTestCountdown || isTypingTestResult;
   const showTypingTestArena = isTypingTestRunning;
+  const icebreakerQuestion =
+    rankedStatus.status === "matched" ? rankedStatus.icebreakerQuestion : null;
   const matchedPartnerHandle =
     rankedStatus.status === "matched"
       ? rankedStatus.partner.handle
@@ -136,9 +139,7 @@ export default function RankedPlayPage() {
         : isTypingTestActive
           ? "Typing test in progress."
           : isMatchStart
-            ? isMyTurn
-              ? "You matched! The 15s timer is running — send the first line."
-              : `You're matched. Waiting for ${matchedPartnerHandle} to start.`
+            ? icebreakerQuestion ?? "Start the conversation."
             : isMyTurn
               ? "Your Move."
               : `Waiting for ${matchedPartnerHandle}...`
@@ -469,6 +470,7 @@ export default function RankedPlayPage() {
         lives?: { me: number; partner: number };
         typing?: string;
         typingTest?: TypingTestPayload;
+        icebreakerQuestion?: string | null;
       }>(`/ranked/match/${encodeURIComponent(activeMatchId)}/messages`, token, {
         signal: controller.signal,
       });
@@ -489,6 +491,8 @@ export default function RankedPlayPage() {
               lives: payload.lives ?? prev.lives,
               turnStartedAt: payload.turnStartedAt ?? prev.turnStartedAt,
               serverTime: payload.serverTime ?? prev.serverTime,
+              icebreakerQuestion:
+                payload.icebreakerQuestion ?? prev.icebreakerQuestion ?? null,
             }
           : prev
       );
