@@ -1148,7 +1148,9 @@ export default function RankedPlayPage() {
                         <p className="text-sm text-muted">
                           {isMyTurn
                             ? "You matched! The 15s timer is running — send the first line."
-                            : `You're matched. Waiting for ${rankedStatus.partner.handle} to start.`}
+                            : `You're matched. Waiting for ${
+                                displayPartner?.handle ?? "your opponent"
+                              } to start.`}
                         </p>
                         {partnerTyping && (
                           <div className="flex justify-start">
