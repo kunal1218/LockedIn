@@ -7,7 +7,6 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { useAuth } from "@/features/auth";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
-import { formatRelativeTime } from "@/lib/time";
 
 type MessageUser = {
   id: string;
@@ -61,9 +60,6 @@ export default function RankedPlayPage() {
   const [partnerTyping, setPartnerTyping] = useState("");
   const endRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
-  const editInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [editingDraft, setEditingDraft] = useState("");
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const turnTimeoutReportedRef = useRef<string | null>(null);
@@ -252,14 +248,6 @@ export default function RankedPlayPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [messages, selectedMessageId, user?.id]);
-
-  useEffect(() => {
-    if (editingMessageId) {
-      window.setTimeout(() => {
-        editInputRef.current?.focus();
-      }, 0);
-    }
-  }, [editingMessageId]);
 
   const loadStatus = useCallback(async () => {
     if (!token) {
@@ -751,50 +739,6 @@ export default function RankedPlayPage() {
     }
   };
 
-  const beginEditMessage = (message: RankedMessage) => {
-    if (message.sender.id !== user?.id) return;
-    setEditingMessageId(message.id);
-    setEditingDraft(message.body);
-    setSelectedMessageId(message.id);
-  };
-
-  const cancelEditMessage = () => {
-    setEditingMessageId(null);
-    setEditingDraft("");
-  };
-
-  const saveEditedMessage = async () => {
-    if (!editingMessageId || !token || rankedStatus.status !== "matched") return;
-    const trimmed = editingDraft.trim();
-    if (!trimmed) {
-      setChatError("Write something to save.");
-      return;
-    }
-    const existing = messages.find((m) => m.id === editingMessageId);
-    if (existing && existing.body === trimmed) {
-      setEditingMessageId(null);
-      setEditingDraft("");
-      return;
-    }
-    try {
-      const response = await apiPatch<{ message: RankedMessage }>(
-        `/ranked/match/${encodeURIComponent(rankedStatus.matchId)}/messages/${encodeURIComponent(editingMessageId)}`,
-        { body: trimmed },
-        token
-      );
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === editingMessageId ? { ...response.message, edited: true } : msg
-        )
-      );
-      setEditingMessageId(null);
-      setEditingDraft("");
-      setChatError(null);
-    } catch (error) {
-      setChatError(error instanceof Error ? error.message : "Unable to update message.");
-    }
-  };
-
   const handleDeleteMessage = async () => {
     if (!messageToDelete || !token || rankedStatus.status !== "matched") return;
     try {
@@ -803,10 +747,6 @@ export default function RankedPlayPage() {
         token
       );
       setMessages((prev) => prev.filter((msg) => msg.id !== messageToDelete));
-      if (editingMessageId === messageToDelete) {
-        setEditingMessageId(null);
-        setEditingDraft("");
-      }
       setSelectedMessageId(null);
     } catch (error) {
       setChatError(error instanceof Error ? error.message : "Unable to delete message.");
@@ -988,7 +928,6 @@ export default function RankedPlayPage() {
                     <div className="space-y-3">
                       {messages.map((message) => {
                         const isMine = message.sender.id === user?.id;
-                        const isEditing = editingMessageId === message.id;
                         const isSelected = selectedMessageId === message.id;
                         return (
                           <div
@@ -997,55 +936,13 @@ export default function RankedPlayPage() {
                           >
                             <div
                               onClick={() => setSelectedMessageId(message.id)}
-                              onDoubleClick={() => beginEditMessage(message)}
                               className={`max-w-[90%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
                                 isMine
                                   ? "bg-accent text-white"
                                   : "border border-card-border/70 bg-white/90 text-ink"
                               } ${isSelected ? "ring-2 ring-accent/40" : ""}`}
                             >
-                              {isEditing ? (
-                                <div className="flex flex-col gap-1">
-                                  <textarea
-                                    ref={editInputRef}
-                                    className={`w-full resize-none bg-transparent text-current outline-none ${
-                                      isMine ? "placeholder-white/80" : "placeholder-ink/50"
-                                    }`}
-                                    value={editingDraft}
-                                    onChange={(e) => setEditingDraft(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter" && !e.shiftKey) {
-                                        e.preventDefault();
-                                        saveEditedMessage();
-                                      } else if (e.key === "Escape") {
-                                        e.preventDefault();
-                                        cancelEditMessage();
-                                      }
-                                    }}
-                                    rows={1}
-                                  />
-                                  <div
-                                    className={`flex items-center gap-2 text-xs ${
-                                      isMine ? "text-white/70" : "text-muted"
-                                    }`}
-                                  >
-                                    <span>{formatRelativeTime(message.createdAt)}</span>
-                                    {message.edited && <span>· edited</span>}
-                                  </div>
-                                </div>
-                              ) : (
-                                <>
-                                  <p className="whitespace-pre-wrap">{message.body}</p>
-                                  <div
-                                    className={`mt-2 flex items-center gap-2 text-xs ${
-                                      isMine ? "text-white/70" : "text-muted"
-                                    }`}
-                                  >
-                                    <span>{formatRelativeTime(message.createdAt)}</span>
-                                    {message.edited && <span>· edited</span>}
-                                  </div>
-                                </>
-                              )}
+                              <p className="whitespace-pre-wrap">{message.body}</p>
                             </div>
                           </div>
                         );
@@ -1065,7 +962,7 @@ export default function RankedPlayPage() {
             </div>
             </div>
 
-            {!showCenterPanel && (
+            {!isMatchOver && (
               <form
                 className="mt-auto space-y-3 border-t border-card-border/60 pt-4"
                 onSubmit={handleSubmit}
