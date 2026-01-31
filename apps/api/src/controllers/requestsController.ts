@@ -65,12 +65,12 @@ export const getRequests = async (_req: Request, res: Response) => {
     const sinceHours =
       typeof sinceHoursRaw === "string" ? parseFloat(sinceHoursRaw) : undefined;
     const viewer = await getOptionalUser(_req);
-    const requests = await fetchRequests({
+    const result = await fetchRequests({
       sinceHours: Number.isFinite(sinceHours) ? sinceHours : undefined,
       order,
       viewerId: viewer?.id ?? null,
     });
-    res.json({ requests });
+    res.json(result);
   } catch (error) {
     handleError(res, error);
   }

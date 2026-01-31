@@ -29,7 +29,7 @@ export default function RequestsPage() {
   const [requests, setRequests] = useState<RequestCardType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [recency, setRecency] = useState<RecencyFilter>("24h");
+  const [recency, setRecency] = useState<RecencyFilter>("all");
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("recency");
   const [proximity, setProximity] = useState<ProximityFilter>("all");
@@ -38,6 +38,11 @@ export default function RequestsPage() {
   const [helpedIds, setHelpedIds] = useState<Set<string>>(new Set());
   const [likingIds, setLikingIds] = useState<Set<string>>(new Set());
   const [isComposerOpen, setComposerOpen] = useState(false);
+  const [autoPruneActive, setAutoPruneActive] = useState(false);
+  const hasActiveRequest = useMemo(
+    () => Boolean(user?.id && requests.some((request) => request.creator.id === user.id)),
+    [requests, user?.id]
+  );
 
   const sortedRequests = useMemo(() => {
     const filteredByUrgency =
@@ -90,20 +95,26 @@ export default function RequestsPage() {
       params.set("sinceHours", recencyToHours[recency].toString());
     }
     try {
-      const response = await apiGet<{ requests: RequestCardType[] } | RequestCardType[]>(
+      const response = await apiGet<
+        | { requests: RequestCardType[]; meta?: { autoPruneActive?: boolean } }
+        | RequestCardType[]
+      >(
         `/requests?${params.toString()}`,
         token ?? undefined
       );
-      const next =
-        Array.isArray(response) ? response : response?.requests ?? [];
+      const next = Array.isArray(response) ? response : response?.requests ?? [];
       setRequests(next);
       setHelpedIds(new Set(next.filter((item) => item.helpedByUser).map((item) => item.id)));
+      setAutoPruneActive(
+        !Array.isArray(response) && Boolean(response?.meta?.autoPruneActive)
+      );
     } catch (loadError) {
       setError(
         loadError instanceof Error
           ? loadError.message
           : "Unable to load requests."
       );
+      setAutoPruneActive(false);
     } finally {
       setIsLoading(false);
     }
@@ -264,6 +275,10 @@ export default function RequestsPage() {
                 openAuthModal("signup");
                 return;
               }
+              if (hasActiveRequest) {
+                setError("You already have an active request. Delete it to post another.");
+                return;
+              }
               setComposerOpen(true);
             }}
           >
@@ -286,6 +301,13 @@ export default function RequestsPage() {
             {error && (
               <Card className="border border-accent/30 bg-accent/10 py-3">
                 <p className="text-sm font-semibold text-accent">{error}</p>
+              </Card>
+            )}
+            {autoPruneActive && (
+              <Card className="border border-amber-200/70 bg-amber-50/70 py-3">
+                <p className="text-sm font-semibold text-amber-700">
+                  High volume: requests older than two weeks may be automatically removed.
+                </p>
               </Card>
             )}
             {sortedRequests.length === 0 ? (

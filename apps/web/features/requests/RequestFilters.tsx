@@ -22,7 +22,6 @@ const urgencyOptions: Array<{ label: string; value: UrgencyFilter }> = [
 const sortOptions: Array<{ label: string; value: SortOption }> = [
   { label: "Most recent", value: "recency" },
   { label: "Most liked", value: "likes" },
-  { label: "Highest urgency", value: "urgency" },
 ];
 
 const proximityOptions: Array<{ label: string; value: ProximityFilter }> = [

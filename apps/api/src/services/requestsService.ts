@@ -55,6 +55,9 @@ const normalizeTags = (tags: unknown): string[] => {
 const toIsoString = (value: string | Date) =>
   value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 
+const AUTO_PRUNE_THRESHOLD = 100;
+const AUTO_PRUNE_AGE_DAYS = 14;
+
 const ensureRequestsTable = async () => {
   await ensureUsersTable();
 
@@ -148,10 +151,22 @@ export const fetchRequests = async (params: {
   order?: "newest" | "oldest";
   limit?: number;
   viewerId?: string | null;
-} = {}): Promise<RequestCard[]> => {
+} = {}): Promise<{ requests: RequestCard[]; meta: { autoPruneActive: boolean } }> => {
   await ensureRequestsTable();
   await ensureRequestLikesTable();
   await ensureHelpOffersTable();
+
+  const countResult = await db.query(
+    "SELECT COUNT(*)::int AS total FROM requests"
+  );
+  const totalCount = Number(countResult.rows[0]?.total ?? 0);
+  const autoPruneActive = totalCount > AUTO_PRUNE_THRESHOLD;
+  if (autoPruneActive) {
+    await db.query(
+      `DELETE FROM requests
+       WHERE created_at < now() - interval '${AUTO_PRUNE_AGE_DAYS} days'`
+    );
+  }
 
   const conditions: string[] = [];
   const queryParams: Array<string | number | null> = [];
@@ -201,7 +216,7 @@ export const fetchRequests = async (params: {
     queryParams
   );
 
-  return (result.rows as RequestRow[]).map(mapRequest);
+  return { requests: (result.rows as RequestRow[]).map(mapRequest), meta: { autoPruneActive } };
 };
 
 export const createRequest = async (params: {
@@ -237,6 +252,17 @@ export const createRequest = async (params: {
   }
   if (!isRemote && !city) {
     throw new RequestError("City is required for in-person requests", 400);
+  }
+
+  const existing = await db.query(
+    "SELECT 1 FROM requests WHERE creator_id = $1 LIMIT 1",
+    [params.creatorId]
+  );
+  if ((existing.rowCount ?? 0) > 0) {
+    throw new RequestError(
+      "You already have an active request. Delete it to post another.",
+      400
+    );
   }
 
   if (!["low", "medium", "high"].includes(urgency)) {
