@@ -1220,61 +1220,59 @@ export default function RankedPlayPage() {
               </div>
             </div>
 
-            {!isMatchOver && (
-              <form
-                className="mt-auto space-y-3 border-t border-card-border/60 pt-4"
-                onSubmit={handleSubmit}
-              >
-                <textarea
-                  className={`${inputClasses} min-h-[90px]`}
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={handleEnterToSend}
-                  placeholder={
-                    rankedStatus.status === "matched"
-                      ? `Message ${rankedStatus.partner.handle}`
-                      : "Queue up to unlock chat."
-                  }
-                  ref={inputRef}
+            <form
+              className="mt-auto space-y-3 border-t border-card-border/60 pt-4"
+              onSubmit={handleSubmit}
+            >
+              <textarea
+                className={`${inputClasses} min-h-[90px]`}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={handleEnterToSend}
+                placeholder={
+                  rankedStatus.status === "matched"
+                    ? `Message ${displayPartner?.handle ?? "your opponent"}`
+                    : "Queue up to unlock chat."
+                }
+                ref={inputRef}
+                disabled={
+                  rankedStatus.status !== "matched" ||
+                  isChatLoading ||
+                  isMatchOver ||
+                  isTypingTestActive ||
+                  !isMyTurn ||
+                  isTurnExpired
+                }
+              />
+              {chatError && (
+                <div className="rounded-2xl border border-accent/30 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent">
+                  {chatError}
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted">
+                  Messages send as {user?.handle || "you"}.
+                </p>
+                <Button
+                  type="submit"
                   disabled={
                     rankedStatus.status !== "matched" ||
+                    isSending ||
                     isChatLoading ||
                     isMatchOver ||
                     isTypingTestActive ||
                     !isMyTurn ||
                     isTurnExpired
                   }
-                />
-                {chatError && (
-                  <div className="rounded-2xl border border-accent/30 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent">
-                    {chatError}
-                  </div>
-                )}
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted">
-                    Messages send as {user?.handle || "you"}.
-                  </p>
-                  <Button
-                    type="submit"
-                    disabled={
-                      rankedStatus.status !== "matched" ||
-                      isSending ||
-                      isChatLoading ||
-                      isMatchOver ||
-                      isTypingTestActive ||
-                      !isMyTurn ||
-                      isTurnExpired
-                    }
-                  >
-                    {isSending
-                      ? "Sending..."
-                      : rankedStatus.status === "matched"
-                        ? "Send"
-                        : "Play to chat"}
-                  </Button>
-                </div>
-              </form>
-            )}
+                >
+                  {isSending
+                    ? "Sending..."
+                    : rankedStatus.status === "matched"
+                      ? "Send"
+                      : "Play to chat"}
+                </Button>
+              </div>
+            </form>
           </>
         )}
       {/* Center panel replaces modal for idle/waiting/match-end states */}
