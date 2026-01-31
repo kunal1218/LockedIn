@@ -110,11 +110,18 @@ export default function RankedPlayPage() {
     : "border-card-border/70 bg-white/80 text-muted";
   const showMatchModal =
     isAuthenticated && (rankedStatus.status !== "matched" || isMatchOver);
+  const didWin =
+    rankedStatus.status === "matched" &&
+    isMatchOver &&
+    (lives?.me ?? 0) > 0 &&
+    (lives?.partner ?? 0) <= 0;
   const matchModalTitle = isMatchOver
-    ? "Match finished"
+    ? didWin
+      ? "You Won"
+      : "You Lose"
     : rankedStatus.status === "waiting"
       ? "Searching for a partner..."
-      : "Ready to play?";
+      : "Ready To Play";
   const matchModalBody = isMatchOver
     ? "Start a new match when you're ready."
     : rankedStatus.status === "waiting"
@@ -1128,9 +1135,9 @@ export default function RankedPlayPage() {
             </div>
           </div>
         )}
-        {showMatchModal && (
-          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
-            <div className="w-full max-w-sm rounded-2xl border border-card-border/70 bg-white/95 p-5 shadow-lg">
+      {showMatchModal && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
+          <div className="w-full max-w-sm rounded-2xl border border-card-border/70 bg-white/95 p-5">
               <p className="text-base font-semibold text-ink">{matchModalTitle}</p>
               <p className="mt-2 text-sm text-muted">{matchModalBody}</p>
               <div className="mt-5 flex justify-end">
