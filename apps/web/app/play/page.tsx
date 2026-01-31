@@ -191,22 +191,6 @@ export default function RankedPlayPage() {
     : null;
   const myLivesCount = displayLives?.me ?? 3;
   const partnerLivesCount = displayLives?.partner ?? 3;
-  const isTurnExpired =
-    isMatched &&
-    isMyTurn &&
-    timeLeft <= 0 &&
-    !isMatchOver &&
-    !isTypingTestActive &&
-    !isRoleModalActive;
-  const showSmiteButton =
-    isAdmin && isMatched && !isMatchOver && !isTypingTestActive && !isRoleModalActive;
-  const typingWordsText =
-    typingTest.words.length > 0 ? typingTest.words.join(" ") : "Loading words...";
-  const typingResultTitle = typingTest.winnerId
-    ? typingTest.winnerId === user?.id
-      ? "You won the typing test!"
-      : `${partnerName} won the typing test`
-    : "Typing test finished";
   const renderHearts = (filledCount: number, alignRight = false) => (
     <div className={`flex items-center gap-1 ${alignRight ? "justify-end" : ""}`}>
       {Array.from({ length: 3 }).map((_, index) => {
@@ -295,6 +279,22 @@ export default function RankedPlayPage() {
     !showBlockingModal &&
     !showTypingTestArena;
   const isTurnBlocked = isTypingTestActive || isRoleModalActive;
+  const isTurnExpired =
+    isMatched &&
+    isMyTurn &&
+    timeLeft <= 0 &&
+    !isMatchOver &&
+    !isTypingTestActive &&
+    !isRoleModalActive;
+  const showSmiteButton =
+    isAdmin && isMatched && !isMatchOver && !isTypingTestActive && !isRoleModalActive;
+  const typingWordsText =
+    typingTest.words.length > 0 ? typingTest.words.join(" ") : "Loading words...";
+  const typingResultTitle = typingTest.winnerId
+    ? typingTest.winnerId === user?.id
+      ? "You won the typing test!"
+      : `${partnerName} won the typing test`
+    : "Typing test finished";
   const getRemainingSeconds = useCallback((turnStartedAt: string) => {
     const startedMs = Date.parse(turnStartedAt);
     if (!Number.isFinite(startedMs)) {
