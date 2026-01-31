@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { db } from "../db";
 import { ensureUsersTable } from "./authService";
+import { getWordsByLength } from "./wordDictionary";
 import type { MessageUser } from "./messageService";
 
 export type RankedStatus =
@@ -28,6 +29,12 @@ export type RankedMessage = {
 const DEFAULT_LIVES = 3;
 const TURN_SECONDS = 15;
 const WIN_REWARD_COINS = 100;
+const TYPING_TEST_TRIGGER_MESSAGES = 10;
+const TYPING_TEST_WORD_COUNT = 10;
+const TYPING_TEST_COUNTDOWN_SECONDS = 3;
+const TYPING_TEST_RESULT_SECONDS = 3;
+const TYPING_TEST_MIN_WORD_LENGTH = 3;
+const TYPING_TEST_MAX_WORD_LENGTH = 8;
 
 type RankedMatchRow = {
   id: string;
@@ -43,6 +50,23 @@ type RankedMatchRow = {
   user_b_typing: string | null;
   user_a_typing_at: string | Date | null;
   user_b_typing_at: string | Date | null;
+  typing_test_round?: number;
+  typing_test_state?: string | null;
+  typing_test_started_at?: string | Date | null;
+  typing_test_words?: unknown;
+  typing_test_winner_id?: string | null;
+  typing_test_result_at?: string | Date | null;
+};
+
+type TypingTestState = "countdown" | "active" | "result";
+
+type TypingTestPayload = {
+  state: "idle" | TypingTestState;
+  words: string[];
+  startedAt?: string;
+  resultAt?: string;
+  winnerId?: string | null;
+  round: number;
 };
 
 const mapUser = (row: { id: string; name: string; handle: string }): MessageUser => ({
@@ -97,7 +121,13 @@ const ensureRankedTables = async () => {
         user_a_typing text,
         user_b_typing text,
         user_a_typing_at timestamptz,
-        user_b_typing_at timestamptz
+        user_b_typing_at timestamptz,
+        typing_test_round integer NOT NULL DEFAULT 0,
+        typing_test_state text,
+        typing_test_started_at timestamptz,
+        typing_test_words jsonb,
+        typing_test_winner_id uuid REFERENCES users(id) ON DELETE SET NULL,
+        typing_test_result_at timestamptz
       );
     `);
 
@@ -132,6 +162,16 @@ const ensureRankedTables = async () => {
       ADD COLUMN IF NOT EXISTS user_b_typing text,
       ADD COLUMN IF NOT EXISTS user_a_typing_at timestamptz,
       ADD COLUMN IF NOT EXISTS user_b_typing_at timestamptz;
+    `);
+
+      await db.query(`
+      ALTER TABLE ranked_matches
+      ADD COLUMN IF NOT EXISTS typing_test_round integer NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS typing_test_state text,
+      ADD COLUMN IF NOT EXISTS typing_test_started_at timestamptz,
+      ADD COLUMN IF NOT EXISTS typing_test_words jsonb,
+      ADD COLUMN IF NOT EXISTS typing_test_winner_id uuid REFERENCES users(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS typing_test_result_at timestamptz;
     `);
 
       await db.query(`
@@ -227,7 +267,8 @@ const createMatch = async (userId: string, partnerId: string) => {
 const getMatch = async (matchId: string): Promise<RankedMatchRow | null> => {
   const result = await db.query(
     `SELECT id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
-            user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at
+            user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
+            typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at
      FROM ranked_matches WHERE id = $1 LIMIT 1`,
     [matchId]
   );
@@ -249,6 +290,142 @@ const getMatch = async (matchId: string): Promise<RankedMatchRow | null> => {
 
 const parseTimestamp = (value: string | Date) =>
   value instanceof Date ? value : new Date(value);
+
+const normalizeTypingAttempt = (value: string) =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+
+const typingWordPool: { value: string[] | null } = { value: null };
+
+const getTypingWordPool = () => {
+  if (typingWordPool.value) {
+    return typingWordPool.value;
+  }
+  const pool: string[] = [];
+  for (let length = TYPING_TEST_MIN_WORD_LENGTH; length <= TYPING_TEST_MAX_WORD_LENGTH; length += 1) {
+    pool.push(...getWordsByLength(length));
+  }
+  typingWordPool.value = pool;
+  return pool;
+};
+
+const getTypingTestWords = () => {
+  const pool = getTypingWordPool();
+  if (pool.length === 0) {
+    return [] as string[];
+  }
+  const unique = new Set<string>();
+  const limit = Math.min(TYPING_TEST_WORD_COUNT, pool.length);
+  let attempts = 0;
+  while (unique.size < limit && attempts < pool.length * 2) {
+    const choice = pool[Math.floor(Math.random() * pool.length)];
+    if (choice) {
+      unique.add(choice);
+    }
+    attempts += 1;
+  }
+  return Array.from(unique).slice(0, limit);
+};
+
+const parseTypingWords = (value: unknown): string[] => {
+  if (!value) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value.filter((entry) => typeof entry === "string");
+  }
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed)
+        ? parsed.filter((entry) => typeof entry === "string")
+        : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const getTypingTestPayload = (match: RankedMatchRow): TypingTestPayload => {
+  const round = match.typing_test_round ?? 0;
+  if (!match.typing_test_state) {
+    return { state: "idle", words: [], round };
+  }
+  const startedAt = match.typing_test_started_at
+    ? parseTimestamp(match.typing_test_started_at).toISOString()
+    : undefined;
+  const resultAt = match.typing_test_result_at
+    ? parseTimestamp(match.typing_test_result_at).toISOString()
+    : undefined;
+  return {
+    state: match.typing_test_state as TypingTestState,
+    words: parseTypingWords(match.typing_test_words),
+    startedAt,
+    resultAt,
+    winnerId: match.typing_test_winner_id ?? null,
+    round,
+  };
+};
+
+const isTypingTestBlocking = (match: RankedMatchRow) =>
+  !!match.typing_test_state;
+
+const maybeAdvanceTypingTestState = async (
+  match: RankedMatchRow
+): Promise<RankedMatchRow> => {
+  if (!match.typing_test_state) {
+    return match;
+  }
+  if (
+    match.typing_test_state === "countdown" &&
+    match.typing_test_started_at
+  ) {
+    const startedAt = parseTimestamp(match.typing_test_started_at);
+    if (Date.now() - startedAt.getTime() >= TYPING_TEST_COUNTDOWN_SECONDS * 1000) {
+      const updated = await db.query(
+        `UPDATE ranked_matches
+         SET typing_test_state = 'active'
+         WHERE id = $1 AND typing_test_state = 'countdown'
+         RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
+                   user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
+                   typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at`,
+        [match.id]
+      );
+      if ((updated.rowCount ?? 0) > 0) {
+        return updated.rows[0] as RankedMatchRow;
+      }
+    }
+  }
+  if (
+    match.typing_test_state === "result" &&
+    match.typing_test_result_at
+  ) {
+    const resultAt = parseTimestamp(match.typing_test_result_at);
+    if (Date.now() - resultAt.getTime() >= TYPING_TEST_RESULT_SECONDS * 1000) {
+      const updated = await db.query(
+        `UPDATE ranked_matches
+         SET typing_test_state = NULL,
+             typing_test_started_at = NULL,
+             typing_test_words = NULL,
+             typing_test_winner_id = NULL,
+             typing_test_result_at = NULL,
+             turn_started_at = now()
+         WHERE id = $1 AND typing_test_state = 'result'
+         RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
+                   user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
+                   typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at`,
+        [match.id]
+      );
+      if ((updated.rowCount ?? 0) > 0) {
+        return updated.rows[0] as RankedMatchRow;
+      }
+    }
+  }
+  return match;
+};
 
 const getTurnState = (match: { turn_started_at: string | Date }) => {
   const startedAt = parseTimestamp(match.turn_started_at);
@@ -315,7 +492,8 @@ const applyTurnTimeout = async (
        AND current_turn_user_id = $2
        AND turn_started_at <= now() - interval '${TURN_SECONDS} seconds'
      RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
-               user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at`,
+               user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
+               typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at`,
     [match.id, match.current_turn_user_id]
   );
 
@@ -341,12 +519,20 @@ const applyTurnTimeout = async (
 };
 
 const ensureMatchTimer = async (match: RankedMatchRow) => {
-  const { startedAt, expired } = getTurnState(match);
-  if (!expired || match.timed_out) {
-    return { startedAt, timedOut: match.timed_out, match };
+  const updatedMatch = await maybeAdvanceTypingTestState(match);
+  if (isTypingTestBlocking(updatedMatch)) {
+    return {
+      startedAt: parseTimestamp(updatedMatch.turn_started_at),
+      timedOut: updatedMatch.timed_out,
+      match: updatedMatch,
+    };
+  }
+  const { startedAt, expired } = getTurnState(updatedMatch);
+  if (!expired || updatedMatch.timed_out) {
+    return { startedAt, timedOut: updatedMatch.timed_out, match: updatedMatch };
   }
 
-  const updated = await applyTurnTimeout(match);
+  const updated = await applyTurnTimeout(updatedMatch);
   if (updated) {
     return {
       startedAt: parseTimestamp(updated.turn_started_at),
@@ -365,6 +551,47 @@ const ensureMatchTimer = async (match: RankedMatchRow) => {
     timedOut: refreshed.timed_out,
     match: refreshed,
   };
+};
+
+const maybeStartTypingTest = async (
+  matchId: string,
+  match: RankedMatchRow
+): Promise<RankedMatchRow> => {
+  if (match.timed_out || match.typing_test_state) {
+    return match;
+  }
+  const round = match.typing_test_round ?? 0;
+  const triggerAt = (round + 1) * TYPING_TEST_TRIGGER_MESSAGES;
+  const countResult = await db.query(
+    "SELECT COUNT(*)::int AS count FROM ranked_messages WHERE match_id = $1",
+    [matchId]
+  );
+  const count = Number((countResult.rows[0] as { count: number }).count);
+  if (count < triggerAt) {
+    return match;
+  }
+  const words = getTypingTestWords();
+  if (words.length === 0) {
+    return match;
+  }
+  const updated = await db.query(
+    `UPDATE ranked_matches
+     SET typing_test_state = 'countdown',
+         typing_test_started_at = now(),
+         typing_test_words = $2::jsonb,
+         typing_test_winner_id = NULL,
+         typing_test_result_at = NULL,
+         typing_test_round = typing_test_round + 1
+     WHERE id = $1 AND typing_test_state IS NULL
+     RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
+               user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
+               typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at`,
+    [matchId, JSON.stringify(words)]
+  );
+  if ((updated.rowCount ?? 0) > 0) {
+    return updated.rows[0] as RankedMatchRow;
+  }
+  return match;
 };
 
 const assertParticipant = async (matchId: string, userId: string) => {
@@ -422,7 +649,8 @@ export const getRankedStatusForUser = async (userId: string): Promise<RankedStat
   await ensureRankedTables();
 
   const matchResult = await db.query(
-    `SELECT id, user_a_id, user_b_id, started_at, user_a_lives, user_b_lives, turn_started_at, timed_out, current_turn_user_id
+    `SELECT id, user_a_id, user_b_id, started_at, user_a_lives, user_b_lives, turn_started_at, timed_out, current_turn_user_id,
+            typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at
      FROM ranked_matches
      WHERE (user_a_id = $1 OR user_b_id = $1) AND timed_out = false
      ORDER BY started_at DESC
@@ -501,6 +729,7 @@ export const fetchRankedMessages = async (
   isMyTurn: boolean;
   lives: { me: number; partner: number };
   typing: string;
+  typingTest: TypingTestPayload;
 }> => {
   await ensureRankedTables();
   const { match } = await assertParticipant(matchId, userId);
@@ -575,6 +804,7 @@ export const fetchRankedMessages = async (
     isMyTurn: activeMatch.current_turn_user_id === userId,
     lives: { me: meLives, partner: partnerLives },
     typing,
+    typingTest: getTypingTestPayload(activeMatch),
   };
 };
 
@@ -609,6 +839,85 @@ export const updateRankedTyping = async (params: {
   );
 };
 
+export const submitTypingTestAttempt = async (params: {
+  matchId: string;
+  userId: string;
+  attempt: string;
+}) => {
+  await ensureRankedTables();
+  const { match } = await assertParticipant(params.matchId, params.userId);
+  const activeMatch = await maybeAdvanceTypingTestState(match);
+  if (!activeMatch.typing_test_state) {
+    throw new Error("Typing test is not active");
+  }
+  if (activeMatch.typing_test_state === "countdown") {
+    throw new Error("Typing test has not started yet");
+  }
+  if (activeMatch.typing_test_state === "result") {
+    return { winnerId: activeMatch.typing_test_winner_id ?? null };
+  }
+
+  const words = parseTypingWords(activeMatch.typing_test_words);
+  const expected = normalizeTypingAttempt(words.join(" "));
+  const attempt = normalizeTypingAttempt(params.attempt ?? "");
+  if (!attempt) {
+    throw new Error("Typing attempt is required");
+  }
+  if (!expected || attempt !== expected) {
+    return { winnerId: activeMatch.typing_test_winner_id ?? null };
+  }
+
+  const loserId =
+    activeMatch.user_a_id === params.userId
+      ? activeMatch.user_b_id
+      : activeMatch.user_a_id;
+
+  const updated = await db.query(
+    `UPDATE ranked_matches
+     SET typing_test_state = 'result',
+         typing_test_winner_id = $2,
+         typing_test_result_at = now(),
+         user_a_lives = CASE
+           WHEN user_a_id = $3 THEN GREATEST(user_a_lives - 1, 0)
+           ELSE user_a_lives
+         END,
+         user_b_lives = CASE
+           WHEN user_b_id = $3 THEN GREATEST(user_b_lives - 1, 0)
+           ELSE user_b_lives
+         END,
+         timed_out = CASE
+           WHEN (CASE
+             WHEN user_a_id = $3 THEN GREATEST(user_a_lives - 1, 0)
+             ELSE user_a_lives
+           END) <= 0
+           OR (CASE
+             WHEN user_b_id = $3 THEN GREATEST(user_b_lives - 1, 0)
+             ELSE user_b_lives
+           END) <= 0
+           THEN true
+           ELSE timed_out
+         END
+     WHERE id = $1
+       AND typing_test_state = 'active'
+       AND typing_test_winner_id IS NULL
+     RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
+               user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
+               typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at`,
+    [params.matchId, params.userId, loserId]
+  );
+
+  if ((updated.rowCount ?? 0) > 0) {
+    const row = updated.rows[0] as RankedMatchRow;
+    if (row.timed_out) {
+      await awardDailyWin(params.userId);
+    }
+    return { winnerId: row.typing_test_winner_id ?? params.userId };
+  }
+
+  const refreshed = await getMatch(params.matchId);
+  return { winnerId: refreshed?.typing_test_winner_id ?? null };
+};
+
 export const sendRankedMessage = async (params: {
   matchId: string;
   senderId: string;
@@ -621,6 +930,9 @@ export const sendRankedMessage = async (params: {
     throw new Error("Match has ended");
   }
   const activeMatch = timerState.match;
+  if (activeMatch.typing_test_state) {
+    throw new Error("Typing test in progress");
+  }
   if (
     activeMatch.current_turn_user_id &&
     activeMatch.current_turn_user_id !== params.senderId
@@ -656,6 +968,8 @@ export const sendRankedMessage = async (params: {
      WHERE id = $1`,
     [params.matchId, nextTurnUserId]
   );
+
+  await maybeStartTypingTest(params.matchId, activeMatch);
 
   const row = result.rows[0] as {
     id: string;

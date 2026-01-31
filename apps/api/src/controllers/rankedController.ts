@@ -7,6 +7,7 @@ import {
   getRankedStatusForUser,
   markRankedTimeout,
   updateRankedTyping,
+  submitTypingTestAttempt,
   saveRankedTranscript,
   sendRankedMessage,
   updateRankedMessage,
@@ -70,6 +71,13 @@ const parseMessageBody = (value: unknown) => {
     throw new Error("Message body is required");
   }
   return value.trim();
+};
+
+const parseTypingAttempt = (value: unknown) => {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error("Typing attempt is required");
+  }
+  return value;
 };
 
 export const postRankedPlay = async (req: Request, res: Response) => {
@@ -179,6 +187,22 @@ export const patchRankedTyping = async (req: Request, res: Response) => {
     const body = typeof req.body?.body === "string" ? req.body.body : "";
     await updateRankedTyping({ matchId, userId: user.id, body });
     res.status(204).end();
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const postRankedTypingTest = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const matchId = parseMatchId(req.params?.matchId);
+    const attempt = parseTypingAttempt(req.body?.attempt);
+    const result = await submitTypingTestAttempt({
+      matchId,
+      userId: user.id,
+      attempt,
+    });
+    res.json(result);
   } catch (error) {
     handleError(res, error);
   }

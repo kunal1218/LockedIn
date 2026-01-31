@@ -23,6 +23,15 @@ type RankedMessage = {
   edited?: boolean;
 };
 
+type TypingTestPayload = {
+  state: "idle" | "countdown" | "active" | "result";
+  words: string[];
+  startedAt?: string;
+  resultAt?: string;
+  winnerId?: string | null;
+  round?: number;
+};
+
 type RankedStatus =
   | { status: "idle" }
   | { status: "waiting" }
@@ -41,6 +50,7 @@ const inputClasses =
   "w-full rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-ink outline-none transition focus:border-accent/60 focus:bg-white";
 
 const TURN_SECONDS = 15;
+const TYPING_TEST_MODAL_SECONDS = 3;
 
 export default function RankedPlayPage() {
   const { isAuthenticated, token, user, openAuthModal } = useAuth();
@@ -63,6 +73,14 @@ export default function RankedPlayPage() {
     lives: { me: number; partner: number };
   } | null>(null);
   const [partnerTyping, setPartnerTyping] = useState("");
+  const [typingTest, setTypingTest] = useState<TypingTestPayload>({
+    state: "idle",
+    words: [],
+  });
+  const [typingAttempt, setTypingAttempt] = useState("");
+  const [typingTestError, setTypingTestError] = useState<string | null>(null);
+  const [isTypingSubmitting, setIsTypingSubmitting] = useState(false);
+  const [typingModalTick, setTypingModalTick] = useState(0);
   const endRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
@@ -76,6 +94,7 @@ export default function RankedPlayPage() {
   const turnStartedAtRef = useRef<string | null>(null);
   const typingDebounceRef = useRef<number | null>(null);
   const lastTypingSentRef = useRef<string>("");
+  const typingRoundRef = useRef<number | null>(null);
   const lives =
     rankedStatus.status === "matched"
       ? rankedStatus.lives ?? { me: 3, partner: 3 }
@@ -97,18 +116,27 @@ export default function RankedPlayPage() {
     isTimeout ||
     (rankedStatus.status === "matched" &&
       ((lives?.me ?? 1) <= 0 || (lives?.partner ?? 1) <= 0));
+  const isTypingTestActive = typingTest.state !== "idle";
+  const isTypingTestCountdown = typingTest.state === "countdown";
+  const isTypingTestResult = typingTest.state === "result";
+  const isTypingTestRunning = typingTest.state === "active";
+  const showTypingModal = isTypingTestCountdown || isTypingTestResult;
+  const showTypingTestArena = isTypingTestRunning;
   const matchStateMessage =
     rankedStatus.status === "matched"
       ? isMatchOver
         ? "Match over."
-        : isMyTurn
-          ? "Your Move."
-          : `Waiting for ${rankedStatus.partner.handle}...`
+        : isTypingTestActive
+          ? "Typing test in progress."
+          : isMyTurn
+            ? "Your Move."
+            : `Waiting for ${rankedStatus.partner.handle}...`
       : "";
   const matchStateTone = isMatchOver
     ? "border-red-200 bg-red-50 text-red-700"
     : "border-card-border/70 bg-white/80 text-muted";
-  const showCenterPanel = rankedStatus.status !== "matched" || isMatchOver;
+  const showCenterPanel =
+    (rankedStatus.status !== "matched" || isMatchOver) && !showTypingModal;
   const isMatched = rankedStatus.status === "matched";
   const showMatchSnapshot = !isMatched && hasMatchEnded && lastMatchSnapshot;
   const displayLives = isMatched
@@ -151,7 +179,15 @@ export default function RankedPlayPage() {
     : null;
   const myLivesCount = displayLives?.me ?? 3;
   const partnerLivesCount = displayLives?.partner ?? 3;
-  const isTurnExpired = isMatched && isMyTurn && timeLeft <= 0 && !isMatchOver;
+  const isTurnExpired =
+    isMatched && isMyTurn && timeLeft <= 0 && !isMatchOver && !isTypingTestActive;
+  const typingWordsText =
+    typingTest.words.length > 0 ? typingTest.words.join(" ") : "Loading words...";
+  const typingResultTitle = typingTest.winnerId
+    ? typingTest.winnerId === user?.id
+      ? "You won the typing test!"
+      : `${partnerName} won the typing test`
+    : "Typing test finished";
   const renderHearts = (filledCount: number, alignRight = false) => (
     <div className={`flex items-center gap-1 ${alignRight ? "justify-end" : ""}`}>
       {Array.from({ length: 3 }).map((_, index) => {
@@ -194,6 +230,27 @@ export default function RankedPlayPage() {
       </div>
     );
   };
+  const getModalProgress = (startedAt: string | undefined, durationSeconds: number) => {
+    if (!startedAt) {
+      return 0;
+    }
+    const startedMs = Date.parse(startedAt);
+    if (!Number.isFinite(startedMs)) {
+      return 0;
+    }
+    const nowMs = Date.now() - serverTimeOffsetRef.current;
+    const elapsed = Math.max(0, nowMs - startedMs);
+    return Math.min(1, elapsed / (durationSeconds * 1000));
+  };
+  const typingModalProgress = useMemo(() => {
+    if (isTypingTestCountdown) {
+      return getModalProgress(typingTest.startedAt, TYPING_TEST_MODAL_SECONDS);
+    }
+    if (isTypingTestResult) {
+      return getModalProgress(typingTest.resultAt, TYPING_TEST_MODAL_SECONDS);
+    }
+    return 0;
+  }, [isTypingTestCountdown, isTypingTestResult, typingModalTick, typingTest.resultAt, typingTest.startedAt]);
   const getRemainingSeconds = useCallback((turnStartedAt: string) => {
     const startedMs = Date.parse(turnStartedAt);
     if (!Number.isFinite(startedMs)) {
@@ -204,8 +261,16 @@ export default function RankedPlayPage() {
     return Math.max(0, Math.ceil(remainingMs / 1000));
   }, []);
   const showTimerSnapshot = isMatched || !!showMatchSnapshot;
-  const myTimerSeconds = showTimerSnapshot ? timeLeft : TURN_SECONDS;
-  const partnerTimerSeconds = showTimerSnapshot ? partnerTimeLeft : TURN_SECONDS;
+  const myTimerSeconds = showTimerSnapshot
+    ? isTypingTestActive
+      ? TURN_SECONDS
+      : timeLeft
+    : TURN_SECONDS;
+  const partnerTimerSeconds = showTimerSnapshot
+    ? isTypingTestActive
+      ? TURN_SECONDS
+      : partnerTimeLeft
+    : TURN_SECONDS;
   const syncTimer = useCallback(
     (turnStartedAt: string | null, serverTime?: string, timedOut?: boolean) => {
       if (!turnStartedAt) {
@@ -261,6 +326,29 @@ export default function RankedPlayPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selectedMessageId]);
+
+  useEffect(() => {
+    if (typingTest.state === "idle") {
+      typingRoundRef.current = null;
+      return;
+    }
+    const round = typingTest.round ?? 0;
+    if (typingRoundRef.current !== round) {
+      typingRoundRef.current = round;
+      setTypingAttempt("");
+      setTypingTestError(null);
+    }
+  }, [typingTest.round, typingTest.state]);
+
+  useEffect(() => {
+    if (!isTypingTestCountdown && !isTypingTestResult) {
+      return;
+    }
+    const interval = window.setInterval(() => {
+      setTypingModalTick(Date.now());
+    }, 100);
+    return () => window.clearInterval(interval);
+  }, [isTypingTestCountdown, isTypingTestResult]);
 
   useEffect(() => {
     if (rankedStatus.status === "matched") {
@@ -345,6 +433,7 @@ export default function RankedPlayPage() {
         isMyTurn: boolean;
         lives?: { me: number; partner: number };
         typing?: string;
+        typingTest?: TypingTestPayload;
       }>(`/ranked/match/${encodeURIComponent(activeMatchId)}/messages`, token, {
         signal: controller.signal,
       });
@@ -378,7 +467,13 @@ export default function RankedPlayPage() {
       const remaining = payload.turnStartedAt
         ? getRemainingSeconds(payload.turnStartedAt)
         : TURN_SECONDS;
-      if (payload.isMyTurn === false) {
+      const nextTypingTest = payload.typingTest ?? { state: "idle", words: [] };
+      setTypingTest(nextTypingTest);
+      if (nextTypingTest.state !== "idle") {
+        setTimeLeft(TURN_SECONDS);
+        setPartnerTimeLeft(TURN_SECONDS);
+        setIsTimeout(false);
+      } else if (payload.isMyTurn === false) {
         setTimeLeft(TURN_SECONDS);
         setPartnerTimeLeft(remaining);
         if (matchOver) {
@@ -407,6 +502,7 @@ export default function RankedPlayPage() {
       }
       setMessages([]);
       setPartnerTyping("");
+      setTypingTest({ state: "idle", words: [] });
     } finally {
       window.clearTimeout(timeout);
       setIsChatLoading(false);
@@ -461,7 +557,7 @@ export default function RankedPlayPage() {
     if (!token || rankedStatus.status !== "matched" || !activeMatchId) {
       return;
     }
-    const canType = isMyTurn && !isMatchOver && !isTurnExpired;
+    const canType = isMyTurn && !isMatchOver && !isTurnExpired && !isTypingTestActive;
     const nextText = canType ? draft : "";
 
     if (typingDebounceRef.current) {
@@ -487,6 +583,7 @@ export default function RankedPlayPage() {
     draft,
     isMyTurn,
     isMatchOver,
+    isTypingTestActive,
     isTurnExpired,
     rankedStatus.status,
     sendTypingUpdate,
@@ -505,6 +602,9 @@ export default function RankedPlayPage() {
       }
       turnTimeoutReportedRef.current = null;
       setPartnerTyping("");
+      setTypingTest({ state: "idle", words: [] });
+      setTypingAttempt("");
+      setTypingTestError(null);
       hasLoadedMessagesRef.current = false;
       justSentRef.current = false;
       setChatError(null);
@@ -523,10 +623,19 @@ export default function RankedPlayPage() {
       setHasMatchEnded(false);
       turnTimeoutReportedRef.current = null;
       setPartnerTyping("");
+      setTypingTest({ state: "idle", words: [] });
+      setTypingAttempt("");
+      setTypingTestError(null);
       hasLoadedMessagesRef.current = false;
       justSentRef.current = false;
       setChatError(null);
       lastTypingSentRef.current = "";
+    }
+
+    if (isTypingTestActive) {
+      setTimeLeft(TURN_SECONDS);
+      setPartnerTimeLeft(TURN_SECONDS);
+      return;
     }
 
     turnStartedAtRef.current = rankedStatus.turnStartedAt ?? null;
@@ -563,6 +672,7 @@ export default function RankedPlayPage() {
     loadMessages,
     isMatchOver,
     hasMatchEnded,
+    isTypingTestActive,
     rankedStatus.status === "matched" ? rankedStatus.isMyTurn : undefined,
     rankedStatus.status === "matched" ? rankedStatus.lives : undefined,
     rankedStatus.status === "matched" ? rankedStatus.serverTime : undefined,
@@ -572,12 +682,16 @@ export default function RankedPlayPage() {
   ]);
 
   useEffect(() => {
-    if (!activeMatchId || rankedStatus.status !== "matched" || isMatchOver) {
+    if (
+      !activeMatchId ||
+      rankedStatus.status !== "matched" ||
+      (isMatchOver && typingTest.state === "idle")
+    ) {
       return;
     }
     const interval = window.setInterval(loadMessages, 1000);
     return () => window.clearInterval(interval);
-  }, [activeMatchId, isMatchOver, loadMessages, rankedStatus.status]);
+  }, [activeMatchId, isMatchOver, loadMessages, rankedStatus.status, typingTest.state]);
 
   useEffect(() => {
     if (messages.length <= 1) {
@@ -591,6 +705,7 @@ export default function RankedPlayPage() {
     const canFocus =
       rankedStatus.status === "matched" &&
       !isMatchOver &&
+      !isTypingTestActive &&
       isMyTurn &&
       !isTurnExpired &&
       !isSending &&
@@ -603,6 +718,7 @@ export default function RankedPlayPage() {
   }, [
     rankedStatus.status,
     isMatchOver,
+    isTypingTestActive,
     isMyTurn,
     isTurnExpired,
     isSending,
@@ -619,6 +735,9 @@ export default function RankedPlayPage() {
     setHasMatchEnded(false);
     setLastMatchSnapshot(null);
     setIsTimeout(false);
+    setTypingTest({ state: "idle", words: [] });
+    setTypingAttempt("");
+    setTypingTestError(null);
     setIsQueuing(true);
     setQueueError(null);
     try {
@@ -662,6 +781,9 @@ export default function RankedPlayPage() {
     }
     setHasMatchEnded(false);
     setLastMatchSnapshot(null);
+    setTypingTest({ state: "idle", words: [] });
+    setTypingAttempt("");
+    setTypingTestError(null);
     setIsQueuing(true);
     setQueueError(null);
     try {
@@ -681,6 +803,10 @@ export default function RankedPlayPage() {
     event.preventDefault();
     if (!token) {
       openAuthModal("login");
+      return;
+    }
+    if (isTypingTestActive) {
+      setChatError("Typing test in progress.");
       return;
     }
     if (!isMyTurn || justSentRef.current) {
@@ -768,6 +894,44 @@ export default function RankedPlayPage() {
     }
   };
 
+  const handleTypingTestSubmit = async (
+    event?: FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>
+  ) => {
+    event?.preventDefault();
+    if (!token || rankedStatus.status !== "matched" || !activeMatchId) {
+      return;
+    }
+    if (!typingAttempt.trim()) {
+      setTypingTestError("Type the words to submit.");
+      return;
+    }
+    setIsTypingSubmitting(true);
+    setTypingTestError(null);
+    try {
+      await apiPost(
+        `/ranked/match/${encodeURIComponent(activeMatchId)}/typing-test`,
+        { attempt: typingAttempt },
+        token
+      );
+      loadMessages();
+    } catch (error) {
+      setTypingTestError(
+        error instanceof Error ? error.message : "Unable to submit typing test."
+      );
+    } finally {
+      setIsTypingSubmitting(false);
+    }
+  };
+
+  const handleTypingAttemptKeyDown = (
+    event: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      handleTypingTestSubmit();
+    }
+  };
+
 
   const reportTurnTimeout = useCallback(async () => {
     if (!token || rankedStatus.status !== "matched" || !activeMatchId) {
@@ -797,6 +961,11 @@ export default function RankedPlayPage() {
       return;
     }
     const timer = window.setInterval(() => {
+      if (isTypingTestActive) {
+        setTimeLeft(TURN_SECONDS);
+        setPartnerTimeLeft(TURN_SECONDS);
+        return;
+      }
       if (!turnStartedAtRef.current || isMatchOver) {
         return;
       }
@@ -817,7 +986,14 @@ export default function RankedPlayPage() {
     return () => {
       window.clearInterval(timer);
     };
-  }, [getRemainingSeconds, isMatchOver, isMyTurn, rankedStatus.status, reportTurnTimeout]);
+  }, [
+    getRemainingSeconds,
+    isMatchOver,
+    isMyTurn,
+    isTypingTestActive,
+    rankedStatus.status,
+    reportTurnTimeout,
+  ]);
 
   return (
     <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-6">
@@ -900,89 +1076,146 @@ export default function RankedPlayPage() {
               )}
               <div
                 ref={listRef}
-                className="min-h-0 flex-1 overflow-y-auto pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className={`min-h-0 flex-1 pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                  showTypingModal ? "relative overflow-hidden" : "relative overflow-y-auto"
+                }`}
               >
-              {showCenterPanel ? (
-                <div className="flex h-full flex-col items-center justify-center text-center">
-                  <p className="text-lg font-semibold text-ink">{matchModalTitle}</p>
-                  <p className="mt-2 text-sm text-muted">{matchModalBody}</p>
-                  <div className="mt-5 flex justify-center">
-                    <button
-                      type="button"
-                      className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)] transition hover:translate-y-[-1px] disabled:opacity-60"
-                      onClick={
-                        rankedStatus.status === "waiting" ? handleCancel : handlePlay
-                      }
-                      disabled={isQueuing}
+                {showCenterPanel ? (
+                  <div className="flex h-full flex-col items-center justify-center text-center">
+                    <p className="text-lg font-semibold text-ink">{matchModalTitle}</p>
+                    <p className="mt-2 text-sm text-muted">{matchModalBody}</p>
+                    <div className="mt-5 flex justify-center">
+                      <button
+                        type="button"
+                        className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)] transition hover:translate-y-[-1px] disabled:opacity-60"
+                        onClick={
+                          rankedStatus.status === "waiting" ? handleCancel : handlePlay
+                        }
+                        disabled={isQueuing}
+                      >
+                        {matchModalActionLabel}
+                      </button>
+                    </div>
+                  </div>
+                ) : showTypingTestArena ? (
+                  <div className="flex h-full flex-col items-center justify-center text-center">
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted">
+                      Typing Test
+                    </p>
+                    <p className="mt-3 max-w-2xl text-lg font-semibold text-ink">
+                      {typingWordsText}
+                    </p>
+                    <form
+                      onSubmit={handleTypingTestSubmit}
+                      className="mt-6 flex w-full max-w-2xl flex-col items-center gap-3"
                     >
-                      {matchModalActionLabel}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div
-                    className={`mb-3 rounded-2xl border px-4 py-2 text-sm font-semibold ${matchStateTone}`}
-                  >
-                    {matchStateMessage || (
-                      <span className="text-transparent" aria-hidden="true">
-                        .
-                      </span>
-                    )}
-                  </div>
-                  {isChatLoading ? (
-                    <p className="text-sm text-muted">Loading chat...</p>
-                  ) : messages.length === 0 ? (
-                    <div className="space-y-3">
-                      <p className="text-sm text-muted">
-                        {isMyTurn
-                          ? "You matched! The 15s timer is running — send the first line."
-                          : `You're matched. Waiting for ${rankedStatus.partner.handle} to start.`}
-                      </p>
-                      {partnerTyping && (
-                        <div className="flex justify-start">
-                          <div className="max-w-[90%] rounded-2xl border border-dashed border-card-border/70 bg-white/70 px-4 py-2 text-sm italic text-muted opacity-70">
-                            {partnerTyping}
-                          </div>
+                      <input
+                        type="text"
+                        value={typingAttempt}
+                        onChange={(event) => setTypingAttempt(event.target.value)}
+                        onKeyDown={handleTypingAttemptKeyDown}
+                        className="w-full rounded-full border border-card-border/70 bg-white/90 px-5 py-3 text-sm text-ink outline-none transition focus:border-accent/60"
+                        placeholder="Type the 10 words here"
+                      />
+                      {typingTestError && (
+                        <div className="rounded-full border border-accent/30 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent">
+                          {typingTestError}
                         </div>
                       )}
+                      <Button
+                        type="submit"
+                        disabled={isTypingSubmitting || !typingAttempt.trim()}
+                      >
+                        {isTypingSubmitting ? "Submitting..." : "Submit"}
+                      </Button>
+                    </form>
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      className={`mb-3 rounded-2xl border px-4 py-2 text-sm font-semibold ${matchStateTone}`}
+                    >
+                      {matchStateMessage || (
+                        <span className="text-transparent" aria-hidden="true">
+                          .
+                        </span>
+                      )}
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {messages.map((message) => {
-                        const isMine = message.sender.id === user?.id;
-                        const isSelected = selectedMessageId === message.id;
-                        return (
-                          <div
-                            key={message.id}
-                            className={`flex ${isMine ? "justify-end" : "justify-start"}`}
-                          >
-                            <div
-                              onClick={() => setSelectedMessageId(message.id)}
-                              className={`max-w-[90%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
-                                isMine
-                                  ? "bg-accent text-white"
-                                  : "border border-card-border/70 bg-white/90 text-ink"
-                              } ${isSelected ? "ring-2 ring-accent/40" : ""}`}
-                            >
-                              <p className="whitespace-pre-wrap">{message.body}</p>
+                    {isChatLoading ? (
+                      <p className="text-sm text-muted">Loading chat...</p>
+                    ) : messages.length === 0 ? (
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted">
+                          {isMyTurn
+                            ? "You matched! The 15s timer is running — send the first line."
+                            : `You're matched. Waiting for ${rankedStatus.partner.handle} to start.`}
+                        </p>
+                        {partnerTyping && (
+                          <div className="flex justify-start">
+                            <div className="max-w-[90%] rounded-2xl border border-dashed border-card-border/70 bg-white/70 px-4 py-2 text-sm italic text-muted opacity-70">
+                              {partnerTyping}
                             </div>
                           </div>
-                        );
-                      })}
-                      {partnerTyping && (
-                        <div className="flex justify-start">
-                          <div className="max-w-[90%] rounded-2xl border border-dashed border-card-border/70 bg-white/70 px-4 py-2 text-sm italic text-muted opacity-70">
-                            {partnerTyping}
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {messages.map((message) => {
+                          const isMine = message.sender.id === user?.id;
+                          const isSelected = selectedMessageId === message.id;
+                          return (
+                            <div
+                              key={message.id}
+                              className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+                            >
+                              <div
+                                onClick={() => setSelectedMessageId(message.id)}
+                                className={`max-w-[90%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
+                                  isMine
+                                    ? "bg-accent text-white"
+                                    : "border border-card-border/70 bg-white/90 text-ink"
+                                } ${isSelected ? "ring-2 ring-accent/40" : ""}`}
+                              >
+                                <p className="whitespace-pre-wrap">{message.body}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {partnerTyping && (
+                          <div className="flex justify-start">
+                            <div className="max-w-[90%] rounded-2xl border border-dashed border-card-border/70 bg-white/70 px-4 py-2 text-sm italic text-muted opacity-70">
+                              {partnerTyping}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      <div ref={endRef} />
+                        )}
+                        <div ref={endRef} />
+                      </div>
+                    )}
+                  </>
+                )}
+                {showTypingModal && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 px-6 text-center">
+                    <div className="w-full max-w-md rounded-3xl border border-card-border/70 bg-white px-6 py-5 shadow-sm">
+                      <p className="text-base font-semibold text-ink">
+                        {isTypingTestCountdown
+                          ? "Typing test incoming"
+                          : typingResultTitle}
+                      </p>
+                      <p className="mt-2 text-xs text-muted">
+                        {isTypingTestCountdown
+                          ? "Get ready to type the 10 words."
+                          : "Returning to the match..."}
+                      </p>
+                      <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-card-border/60">
+                        <div
+                          className="h-full bg-accent transition-[width] duration-100"
+                          style={{ width: `${typingModalProgress * 100}%` }}
+                        />
+                      </div>
                     </div>
-                  )}
-                </>
-              )}
-            </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {!isMatchOver && (
@@ -1005,6 +1238,7 @@ export default function RankedPlayPage() {
                     rankedStatus.status !== "matched" ||
                     isChatLoading ||
                     isMatchOver ||
+                    isTypingTestActive ||
                     !isMyTurn ||
                     isTurnExpired
                   }
@@ -1025,6 +1259,7 @@ export default function RankedPlayPage() {
                       isSending ||
                       isChatLoading ||
                       isMatchOver ||
+                      isTypingTestActive ||
                       !isMyTurn ||
                       isTurnExpired
                     }
