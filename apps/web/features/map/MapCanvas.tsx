@@ -412,7 +412,7 @@ export const MapCanvas = () => {
   }
 
   return (
-    <Card className="relative min-h-[520px] h-[520px] overflow-hidden p-0">
+    <Card className="relative min-h-[520px] h-[520px] overflow-hidden p-0 !bg-transparent">
       <div ref={mapContainerRef} className="absolute inset-0" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.05),transparent_55%),radial-gradient(circle_at_bottom,rgba(255,134,88,0.2),transparent_45%)] pointer-events-none" />
       <div className="relative z-10 flex flex-col gap-4 p-6">
