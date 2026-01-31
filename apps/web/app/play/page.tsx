@@ -1126,7 +1126,7 @@ export default function RankedPlayPage() {
               <div
                 ref={listRef}
                 className={`min-h-0 flex-1 pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-                  showTypingModal ? "relative overflow-hidden" : "relative overflow-y-auto"
+                  showTypingModal ? "relative overflow-hidden" : "relative overflow-hidden"
                 }`}
               >
                 {!showTypingModal &&
@@ -1301,7 +1301,7 @@ export default function RankedPlayPage() {
           </>
         )}
         {showTypingModal && isAuthenticated && (
-          <div className="col-start-1 col-end-2 row-start-2 row-end-4 z-20 flex items-center justify-center bg-white px-6 text-center">
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-white px-6 text-center">
             <div className="w-full max-w-md rounded-3xl border border-card-border/70 bg-white px-6 py-5 shadow-sm">
               <p className="text-base font-semibold text-ink">
                 {isTypingTestCountdown ? "Typing test incoming" : typingResultTitle}
