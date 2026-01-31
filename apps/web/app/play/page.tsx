@@ -366,6 +366,7 @@ export default function RankedPlayPage() {
       if (text === lastTypingSentRef.current) {
         return;
       }
+      const previous = lastTypingSentRef.current;
       lastTypingSentRef.current = text;
       try {
         await apiPatch(
@@ -374,6 +375,7 @@ export default function RankedPlayPage() {
           token
         );
       } catch {
+        lastTypingSentRef.current = previous;
         // Ignore typing sync failures.
       }
     },
@@ -488,7 +490,7 @@ export default function RankedPlayPage() {
     if (!activeMatchId || rankedStatus.status !== "matched" || isTimeout) {
       return;
     }
-    const interval = window.setInterval(loadMessages, 2000);
+    const interval = window.setInterval(loadMessages, 1000);
     return () => window.clearInterval(interval);
   }, [activeMatchId, isTimeout, loadMessages, rankedStatus.status]);
 

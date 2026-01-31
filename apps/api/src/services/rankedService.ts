@@ -277,7 +277,9 @@ const awardDailyWin = async (winnerId: string) => {
 const applyTurnTimeout = async (
   match: RankedMatchRow
 ): Promise<RankedMatchRow | null> => {
-  const turnStartedAt = parseTimestamp(match.turn_started_at).toISOString();
+  if (!match.current_turn_user_id) {
+    return null;
+  }
   const result = await db.query(
     `UPDATE ranked_matches
      SET user_a_lives = CASE
@@ -310,10 +312,11 @@ const applyTurnTimeout = async (
          END
      WHERE id = $1
        AND timed_out = false
-       AND turn_started_at = $2
+       AND current_turn_user_id = $2
+       AND turn_started_at <= now() - interval '${TURN_SECONDS} seconds'
      RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
                user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at`,
-    [match.id, turnStartedAt]
+    [match.id, match.current_turn_user_id]
   );
 
   if ((result.rowCount ?? 0) === 0) {
