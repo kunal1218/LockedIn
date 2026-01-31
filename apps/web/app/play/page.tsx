@@ -56,6 +56,7 @@ export default function RankedPlayPage() {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [isTimeout, setIsTimeout] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number>(TURN_SECONDS);
+  const [partnerTimeLeft, setPartnerTimeLeft] = useState<number>(TURN_SECONDS);
   const [partnerTyping, setPartnerTyping] = useState("");
   const endRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -90,30 +91,34 @@ export default function RankedPlayPage() {
       : true;
   const activeMatchId =
     rankedStatus.status === "matched" ? rankedStatus.matchId : null;
+  const isMatchOver =
+    isTimeout ||
+    (rankedStatus.status === "matched" &&
+      ((lives?.me ?? 1) <= 0 || (lives?.partner ?? 1) <= 0));
   const matchStateMessage =
     rankedStatus.status === "matched"
-      ? isTimeout
+      ? isMatchOver
         ? "Match over."
         : !isMyTurn
           ? `Waiting for ${rankedStatus.partner.handle}...`
           : ""
       : "";
-  const matchStateTone = isTimeout
+  const matchStateTone = isMatchOver
     ? "border-red-200 bg-red-50 text-red-700"
     : "border-card-border/70 bg-white/80 text-muted";
   const showMatchModal =
-    isAuthenticated && (rankedStatus.status !== "matched" || isTimeout);
-  const matchModalTitle = isTimeout
+    isAuthenticated && (rankedStatus.status !== "matched" || isMatchOver);
+  const matchModalTitle = isMatchOver
     ? "Match finished"
     : rankedStatus.status === "waiting"
       ? "Searching for a partner..."
       : "Ready to play?";
-  const matchModalBody = isTimeout
+  const matchModalBody = isMatchOver
     ? "Start a new match when you're ready."
     : rankedStatus.status === "waiting"
       ? "Stay here — we will drop them into the chat once matched."
       : "Press play to get paired with someone new.";
-  const matchModalActionLabel = isTimeout
+  const matchModalActionLabel = isMatchOver
     ? "Play again"
     : rankedStatus.status === "waiting"
       ? "Cancel"
@@ -127,7 +132,7 @@ export default function RankedPlayPage() {
     : "Queue up to play.";
   const myLivesCount = lives?.me ?? 3;
   const partnerLivesCount = lives?.partner ?? 3;
-  const isTurnExpired = isMatched && isMyTurn && timeLeft <= 0;
+  const isTurnExpired = isMatched && isMyTurn && timeLeft <= 0 && !isMatchOver;
   const renderHearts = (filledCount: number, alignRight = false) => (
     <div className={`flex items-center gap-1 ${alignRight ? "justify-end" : ""}`}>
       {Array.from({ length: 3 }).map((_, index) => {
@@ -179,14 +184,8 @@ export default function RankedPlayPage() {
     const remainingMs = TURN_SECONDS * 1000 - (nowMs - startedMs);
     return Math.max(0, Math.ceil(remainingMs / 1000));
   }, []);
-  const myTimerSeconds = isMatched ? (isMyTurn ? timeLeft : TURN_SECONDS) : TURN_SECONDS;
-  const partnerTimerSeconds = isMatched
-    ? isMyTurn
-      ? TURN_SECONDS
-      : turnStartedAtRef.current
-        ? getRemainingSeconds(turnStartedAtRef.current)
-        : TURN_SECONDS
-    : TURN_SECONDS;
+  const myTimerSeconds = isMatched ? timeLeft : TURN_SECONDS;
+  const partnerTimerSeconds = isMatched ? partnerTimeLeft : TURN_SECONDS;
   const syncTimer = useCallback(
     (turnStartedAt: string | null, serverTime?: string, timedOut?: boolean) => {
       if (!turnStartedAt) {
@@ -273,18 +272,34 @@ export default function RankedPlayPage() {
         if (status.turnStartedAt) {
           turnStartedAtRef.current = status.turnStartedAt;
         }
+        const matchOver =
+          (status.lives?.me ?? 1) <= 0 || (status.lives?.partner ?? 1) <= 0;
+        const remaining = status.turnStartedAt
+          ? getRemainingSeconds(status.turnStartedAt)
+          : TURN_SECONDS;
         if (status.isMyTurn === false) {
           setTimeLeft(TURN_SECONDS);
-          setIsTimeout(false);
+          setPartnerTimeLeft(remaining);
+          if (!matchOver) {
+            setIsTimeout(false);
+          } else {
+            setIsTimeout(true);
+          }
         } else {
-          syncTimer(status.turnStartedAt ?? null, status.serverTime);
+          setPartnerTimeLeft(TURN_SECONDS);
+          if (matchOver) {
+            setTimeLeft(remaining);
+            setIsTimeout(true);
+          } else {
+            syncTimer(status.turnStartedAt ?? null, status.serverTime);
+          }
         }
       }
     } catch (error) {
       console.error("Ranked status error", error);
       setQueueError(error instanceof Error ? error.message : "Unable to load status.");
     }
-  }, [syncTimer, token]);
+  }, [getRemainingSeconds, syncTimer, token]);
 
   const loadMessages = useCallback(async () => {
     if (!token || !activeMatchId) {
@@ -332,11 +347,29 @@ export default function RankedPlayPage() {
             }
           : prev
       );
-      if (payload.isMyTurn === false && !payload.timedOut) {
+      const matchOver =
+        payload.timedOut ||
+        (payload.lives?.me ?? 1) <= 0 ||
+        (payload.lives?.partner ?? 1) <= 0;
+      const remaining = payload.turnStartedAt
+        ? getRemainingSeconds(payload.turnStartedAt)
+        : TURN_SECONDS;
+      if (payload.isMyTurn === false) {
         setTimeLeft(TURN_SECONDS);
-        setIsTimeout(false);
+        setPartnerTimeLeft(remaining);
+        if (matchOver) {
+          setIsTimeout(true);
+        } else {
+          setIsTimeout(false);
+        }
       } else {
-        syncTimer(payload.turnStartedAt, payload.serverTime, payload.timedOut);
+        setPartnerTimeLeft(TURN_SECONDS);
+        if (matchOver) {
+          setTimeLeft(remaining);
+          setIsTimeout(true);
+        } else {
+          syncTimer(payload.turnStartedAt, payload.serverTime, payload.timedOut);
+        }
       }
       setMessages(payload.messages);
       setPartnerTyping(payload.typing ?? "");
@@ -356,7 +389,7 @@ export default function RankedPlayPage() {
       hasLoadedMessagesRef.current = true;
       isLoadingMessagesRef.current = false;
     }
-  }, [activeMatchId, syncTimer, token]);
+  }, [activeMatchId, getRemainingSeconds, syncTimer, token]);
 
   const sendTypingUpdate = useCallback(
     async (text: string) => {
@@ -404,7 +437,7 @@ export default function RankedPlayPage() {
     if (!token || rankedStatus.status !== "matched" || !activeMatchId) {
       return;
     }
-    const canType = isMyTurn && !isTimeout && !isTurnExpired;
+    const canType = isMyTurn && !isMatchOver && !isTurnExpired;
     const nextText = canType ? draft : "";
 
     if (typingDebounceRef.current) {
@@ -429,7 +462,7 @@ export default function RankedPlayPage() {
     activeMatchId,
     draft,
     isMyTurn,
-    isTimeout,
+    isMatchOver,
     isTurnExpired,
     rankedStatus.status,
     sendTypingUpdate,
@@ -442,6 +475,7 @@ export default function RankedPlayPage() {
       setMessages([]);
       setSavedAt(null);
       setIsTimeout(false);
+      setPartnerTimeLeft(TURN_SECONDS);
       turnTimeoutReportedRef.current = null;
       setPartnerTyping("");
       hasLoadedMessagesRef.current = false;
@@ -458,6 +492,7 @@ export default function RankedPlayPage() {
       setDraft("");
       setSavedAt(null);
       setIsTimeout(false);
+      setPartnerTimeLeft(TURN_SECONDS);
       turnTimeoutReportedRef.current = null;
       setPartnerTyping("");
       hasLoadedMessagesRef.current = false;
@@ -468,18 +503,39 @@ export default function RankedPlayPage() {
 
     turnStartedAtRef.current = rankedStatus.turnStartedAt ?? null;
     if (rankedStatus.turnStartedAt) {
+      const matchOver =
+        (rankedStatus.lives?.me ?? 1) <= 0 ||
+        (rankedStatus.lives?.partner ?? 1) <= 0;
+      const remaining = getRemainingSeconds(rankedStatus.turnStartedAt);
       if (rankedStatus.isMyTurn === false) {
         setTimeLeft(TURN_SECONDS);
-        setIsTimeout(false);
+        setPartnerTimeLeft(remaining);
+        if (matchOver) {
+          setIsTimeout(true);
+        } else {
+          setIsTimeout(false);
+        }
       } else {
-        syncTimer(rankedStatus.turnStartedAt, rankedStatus.serverTime);
+        setPartnerTimeLeft(TURN_SECONDS);
+        if (matchOver) {
+          setTimeLeft(remaining);
+          setIsTimeout(true);
+        } else {
+          syncTimer(rankedStatus.turnStartedAt, rankedStatus.serverTime);
+        }
       }
+    }
+    if (isMatchOver) {
+      return;
     }
     loadMessages();
   }, [
     activeMatchId,
+    getRemainingSeconds,
     loadMessages,
+    isMatchOver,
     rankedStatus.status === "matched" ? rankedStatus.isMyTurn : undefined,
+    rankedStatus.status === "matched" ? rankedStatus.lives : undefined,
     rankedStatus.status === "matched" ? rankedStatus.serverTime : undefined,
     rankedStatus.status,
     rankedStatus.status === "matched" ? rankedStatus.turnStartedAt : undefined,
@@ -487,12 +543,12 @@ export default function RankedPlayPage() {
   ]);
 
   useEffect(() => {
-    if (!activeMatchId || rankedStatus.status !== "matched" || isTimeout) {
+    if (!activeMatchId || rankedStatus.status !== "matched" || isMatchOver) {
       return;
     }
     const interval = window.setInterval(loadMessages, 1000);
     return () => window.clearInterval(interval);
-  }, [activeMatchId, isTimeout, loadMessages, rankedStatus.status]);
+  }, [activeMatchId, isMatchOver, loadMessages, rankedStatus.status]);
 
   useEffect(() => {
     if (messages.length <= 1) {
@@ -505,7 +561,7 @@ export default function RankedPlayPage() {
   useEffect(() => {
     const canFocus =
       rankedStatus.status === "matched" &&
-      !isTimeout &&
+      !isMatchOver &&
       isMyTurn &&
       !isTurnExpired &&
       !isSending &&
@@ -517,7 +573,7 @@ export default function RankedPlayPage() {
     }
   }, [
     rankedStatus.status,
-    isTimeout,
+    isMatchOver,
     isMyTurn,
     isTurnExpired,
     isSending,
@@ -537,11 +593,27 @@ export default function RankedPlayPage() {
       const status = await apiPost<RankedStatus>("/ranked/play", {}, token);
       setRankedStatus(status);
       if (status.status === "matched") {
+        const matchOver =
+          (status.lives?.me ?? 1) <= 0 || (status.lives?.partner ?? 1) <= 0;
+        const remaining = status.turnStartedAt
+          ? getRemainingSeconds(status.turnStartedAt)
+          : TURN_SECONDS;
         if (status.isMyTurn === false) {
           setTimeLeft(TURN_SECONDS);
-          setIsTimeout(false);
+          setPartnerTimeLeft(remaining);
+          if (matchOver) {
+            setIsTimeout(true);
+          } else {
+            setIsTimeout(false);
+          }
         } else {
-          syncTimer(status.turnStartedAt ?? null, status.serverTime);
+          setPartnerTimeLeft(TURN_SECONDS);
+          if (matchOver) {
+            setTimeLeft(remaining);
+            setIsTimeout(true);
+          } else {
+            syncTimer(status.turnStartedAt ?? null, status.serverTime);
+          }
         }
       }
     } catch (error) {
@@ -563,6 +635,7 @@ export default function RankedPlayPage() {
       setRankedStatus({ status: "idle" });
       setMessages([]);
       setSavedAt(null);
+      setPartnerTimeLeft(TURN_SECONDS);
     } catch (error) {
       setQueueError(error instanceof Error ? error.message : "Unable to cancel queue.");
     } finally {
@@ -629,7 +702,7 @@ export default function RankedPlayPage() {
       !event.shiftKey &&
       !isComposing &&
       rankedStatus.status === "matched" &&
-      !isTimeout &&
+      !isMatchOver &&
       isMyTurn &&
       !isTurnExpired &&
       !justSentRef.current &&
@@ -753,15 +826,18 @@ export default function RankedPlayPage() {
       return;
     }
     const timer = window.setInterval(() => {
-      if (!turnStartedAtRef.current) {
+      if (!turnStartedAtRef.current || isMatchOver) {
         return;
       }
       if (!isMyTurn) {
         setTimeLeft(TURN_SECONDS);
+        const remaining = getRemainingSeconds(turnStartedAtRef.current);
+        setPartnerTimeLeft(remaining);
         return;
       }
       const remainingSeconds = getRemainingSeconds(turnStartedAtRef.current);
       setTimeLeft(remainingSeconds);
+      setPartnerTimeLeft(TURN_SECONDS);
       if (remainingSeconds <= 0) {
         reportTurnTimeout();
       }
@@ -770,7 +846,7 @@ export default function RankedPlayPage() {
     return () => {
       window.clearInterval(timer);
     };
-  }, [getRemainingSeconds, isMyTurn, rankedStatus.status, reportTurnTimeout]);
+  }, [getRemainingSeconds, isMatchOver, isMyTurn, rankedStatus.status, reportTurnTimeout]);
 
   return (
     <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-6">
@@ -791,7 +867,7 @@ export default function RankedPlayPage() {
                   </div>
                   <div className="mt-[6px] flex flex-col items-start gap-1">
                     {renderHearts(myLivesCount)}
-                    {renderTimerBar(myTimerSeconds, isMatched && isMyTurn)}
+                    {renderTimerBar(myTimerSeconds, isMatched && isMyTurn && !isMatchOver)}
                   </div>
                 </div>
               </div>
@@ -810,7 +886,11 @@ export default function RankedPlayPage() {
                   </div>
                   <div className="mt-[6px] flex flex-col items-end gap-1">
                     {renderHearts(partnerLivesCount, true)}
-                    {renderTimerBar(partnerTimerSeconds, isMatched && !isMyTurn, true)}
+                    {renderTimerBar(
+                      partnerTimerSeconds,
+                      isMatched && !isMyTurn && !isMatchOver,
+                      true
+                    )}
                   </div>
                 </div>
               </div>
@@ -976,7 +1056,7 @@ export default function RankedPlayPage() {
                 disabled={
                   rankedStatus.status !== "matched" ||
                   isChatLoading ||
-                  isTimeout ||
+                  isMatchOver ||
                   !isMyTurn ||
                   isTurnExpired
                 }
@@ -996,7 +1076,7 @@ export default function RankedPlayPage() {
                     rankedStatus.status !== "matched" ||
                     isSending ||
                     isChatLoading ||
-                    isTimeout ||
+                    isMatchOver ||
                     !isMyTurn ||
                     isTurnExpired
                   }
