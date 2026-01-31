@@ -45,6 +45,8 @@ type RankedStatus =
       serverTime?: string;
       isMyTurn?: boolean;
       icebreakerQuestion?: string | null;
+      characterRole?: string | null;
+      characterRoleAssignedAt?: string | null;
     };
 
 const inputClasses =
@@ -52,6 +54,7 @@ const inputClasses =
 
 const TURN_SECONDS = 15;
 const TYPING_TEST_MODAL_SECONDS = 3;
+const ROLE_MODAL_SECONDS = 3;
 
 export default function RankedPlayPage() {
   const { isAuthenticated, token, user, openAuthModal } = useAuth();
@@ -82,6 +85,7 @@ export default function RankedPlayPage() {
   const [typingTestError, setTypingTestError] = useState<string | null>(null);
   const [isTypingSubmitting, setIsTypingSubmitting] = useState(false);
   const [typingModalTick, setTypingModalTick] = useState(0);
+  const [roleModalTick, setRoleModalTick] = useState(0);
   const [isSmiting, setIsSmiting] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -126,13 +130,18 @@ export default function RankedPlayPage() {
   const showTypingTestArena = isTypingTestRunning;
   const icebreakerQuestion =
     rankedStatus.status === "matched" ? rankedStatus.icebreakerQuestion : null;
+  const cleanedIcebreaker = icebreakerQuestion?.trim();
+  const characterRole =
+    rankedStatus.status === "matched" ? rankedStatus.characterRole : null;
+  const characterRoleAssignedAt =
+    rankedStatus.status === "matched" ? rankedStatus.characterRoleAssignedAt : null;
   const matchStateMessage =
     rankedStatus.status === "matched"
       ? isMatchOver
         ? "Match over."
         : isTypingTestActive
           ? "Typing test in progress."
-          : icebreakerQuestion ?? "Start the conversation."
+          : cleanedIcebreaker || "Start the conversation."
       : "";
   const matchStateTone = isMatchOver
     ? "border-red-200 bg-red-50 text-red-700"
@@ -183,14 +192,14 @@ export default function RankedPlayPage() {
   const myLivesCount = displayLives?.me ?? 3;
   const partnerLivesCount = displayLives?.partner ?? 3;
   const isTurnExpired =
-    isMatched && isMyTurn && timeLeft <= 0 && !isMatchOver && !isTypingTestActive;
+    isMatched &&
+    isMyTurn &&
+    timeLeft <= 0 &&
+    !isMatchOver &&
+    !isTypingTestActive &&
+    !isRoleModalActive;
   const showSmiteButton =
-    isAdmin && isMatched && !isMatchOver && !isTypingTestActive;
-  const showStatusBar =
-    rankedStatus.status === "matched" &&
-    !showCenterPanel &&
-    !showTypingModal &&
-    !showTypingTestArena;
+    isAdmin && isMatched && !isMatchOver && !isTypingTestActive && !isRoleModalActive;
   const typingWordsText =
     typingTest.words.length > 0 ? typingTest.words.join(" ") : "Loading words...";
   const typingResultTitle = typingTest.winnerId
@@ -261,6 +270,31 @@ export default function RankedPlayPage() {
     }
     return 0;
   }, [isTypingTestCountdown, isTypingTestResult, typingModalTick, typingTest.resultAt, typingTest.startedAt]);
+  const roleModalProgress = useMemo(() => {
+    if (!characterRole || !characterRoleAssignedAt) {
+      return 0;
+    }
+    return getModalProgress(characterRoleAssignedAt, ROLE_MODAL_SECONDS);
+  }, [characterRole, characterRoleAssignedAt, roleModalTick]);
+  const isRoleModalActive = useMemo(() => {
+    if (!characterRole || !characterRoleAssignedAt) {
+      return false;
+    }
+    const startedMs = Date.parse(characterRoleAssignedAt);
+    if (!Number.isFinite(startedMs)) {
+      return false;
+    }
+    const nowMs = Date.now() - serverTimeOffsetRef.current;
+    return nowMs - startedMs < ROLE_MODAL_SECONDS * 1000;
+  }, [characterRole, characterRoleAssignedAt, roleModalTick]);
+  const showRoleModal = isRoleModalActive;
+  const showBlockingModal = showTypingModal || showRoleModal;
+  const showStatusBar =
+    rankedStatus.status === "matched" &&
+    !showCenterPanel &&
+    !showBlockingModal &&
+    !showTypingTestArena;
+  const isTurnBlocked = isTypingTestActive || isRoleModalActive;
   const getRemainingSeconds = useCallback((turnStartedAt: string) => {
     const startedMs = Date.parse(turnStartedAt);
     if (!Number.isFinite(startedMs)) {
@@ -272,12 +306,12 @@ export default function RankedPlayPage() {
   }, []);
   const showTimerSnapshot = isMatched || !!showMatchSnapshot;
   const myTimerSeconds = showTimerSnapshot
-    ? isTypingTestActive
+    ? isTurnBlocked
       ? TURN_SECONDS
       : timeLeft
     : TURN_SECONDS;
   const partnerTimerSeconds = showTimerSnapshot
-    ? isTypingTestActive
+    ? isTurnBlocked
       ? TURN_SECONDS
       : partnerTimeLeft
     : TURN_SECONDS;
@@ -377,6 +411,32 @@ export default function RankedPlayPage() {
   }, [isTypingTestCountdown, isTypingTestResult]);
 
   useEffect(() => {
+    if (!characterRole || !characterRoleAssignedAt) {
+      return;
+    }
+    const startedMs = Date.parse(characterRoleAssignedAt);
+    if (!Number.isFinite(startedMs)) {
+      return;
+    }
+    const nowMs = Date.now() - serverTimeOffsetRef.current;
+    const remainingMs = ROLE_MODAL_SECONDS * 1000 - (nowMs - startedMs);
+    if (remainingMs <= 0) {
+      return;
+    }
+    const interval = window.setInterval(() => {
+      setRoleModalTick(Date.now());
+    }, 100);
+    const timeout = window.setTimeout(() => {
+      window.clearInterval(interval);
+      setRoleModalTick(Date.now());
+    }, remainingMs + 50);
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+    };
+  }, [characterRole, characterRoleAssignedAt]);
+
+  useEffect(() => {
     if (rankedStatus.status === "matched") {
       setLastMatchSnapshot({
         partner: rankedStatus.partner,
@@ -461,6 +521,8 @@ export default function RankedPlayPage() {
         typing?: string;
         typingTest?: TypingTestPayload;
         icebreakerQuestion?: string | null;
+        characterRole?: string | null;
+        characterRoleAssignedAt?: string | null;
       }>(`/ranked/match/${encodeURIComponent(activeMatchId)}/messages`, token, {
         signal: controller.signal,
       });
@@ -483,6 +545,9 @@ export default function RankedPlayPage() {
               serverTime: payload.serverTime ?? prev.serverTime,
               icebreakerQuestion:
                 payload.icebreakerQuestion ?? prev.icebreakerQuestion ?? null,
+              characterRole: payload.characterRole ?? prev.characterRole ?? null,
+              characterRoleAssignedAt:
+                payload.characterRoleAssignedAt ?? prev.characterRoleAssignedAt ?? null,
             }
           : prev
       );
@@ -586,7 +651,7 @@ export default function RankedPlayPage() {
     if (!token || rankedStatus.status !== "matched" || !activeMatchId) {
       return;
     }
-    const canType = isMyTurn && !isMatchOver && !isTurnExpired && !isTypingTestActive;
+    const canType = isMyTurn && !isMatchOver && !isTurnExpired && !isTurnBlocked;
     const nextText = canType ? draft : "";
 
     if (typingDebounceRef.current) {
@@ -612,7 +677,7 @@ export default function RankedPlayPage() {
     draft,
     isMyTurn,
     isMatchOver,
-    isTypingTestActive,
+    isTurnBlocked,
     isTurnExpired,
     rankedStatus.status,
     sendTypingUpdate,
@@ -661,7 +726,7 @@ export default function RankedPlayPage() {
       lastTypingSentRef.current = "";
     }
 
-    if (isTypingTestActive) {
+    if (isTurnBlocked) {
       setTimeLeft(TURN_SECONDS);
       setPartnerTimeLeft(TURN_SECONDS);
       return;
@@ -701,7 +766,7 @@ export default function RankedPlayPage() {
     loadMessages,
     isMatchOver,
     hasMatchEnded,
-    isTypingTestActive,
+    isTurnBlocked,
     rankedStatus.status === "matched" ? rankedStatus.isMyTurn : undefined,
     rankedStatus.status === "matched" ? rankedStatus.lives : undefined,
     rankedStatus.status === "matched" ? rankedStatus.serverTime : undefined,
@@ -734,7 +799,7 @@ export default function RankedPlayPage() {
     const canFocus =
       rankedStatus.status === "matched" &&
       !isMatchOver &&
-      !isTypingTestActive &&
+      !isTurnBlocked &&
       isMyTurn &&
       !isTurnExpired &&
       !isSending &&
@@ -747,7 +812,7 @@ export default function RankedPlayPage() {
   }, [
     rankedStatus.status,
     isMatchOver,
-    isTypingTestActive,
+    isTurnBlocked,
     isMyTurn,
     isTurnExpired,
     isSending,
@@ -834,8 +899,10 @@ export default function RankedPlayPage() {
       openAuthModal("login");
       return;
     }
-    if (isTypingTestActive) {
-      setChatError("Typing test in progress.");
+    if (isTurnBlocked) {
+      setChatError(
+        isTypingTestActive ? "Typing test in progress." : "Character role incoming."
+      );
       return;
     }
     if (!isMyTurn || justSentRef.current) {
@@ -892,6 +959,7 @@ export default function RankedPlayPage() {
       !isComposing &&
       rankedStatus.status === "matched" &&
       !isMatchOver &&
+      !isTurnBlocked &&
       isMyTurn &&
       !isTurnExpired &&
       !justSentRef.current &&
@@ -1013,7 +1081,7 @@ export default function RankedPlayPage() {
       return;
     }
     const timer = window.setInterval(() => {
-      if (isTypingTestActive) {
+      if (isTurnBlocked) {
         setTimeLeft(TURN_SECONDS);
         setPartnerTimeLeft(TURN_SECONDS);
         return;
@@ -1042,7 +1110,7 @@ export default function RankedPlayPage() {
     getRemainingSeconds,
     isMatchOver,
     isMyTurn,
-    isTypingTestActive,
+    isTurnBlocked,
     rankedStatus.status,
     reportTurnTimeout,
   ]);
@@ -1066,7 +1134,10 @@ export default function RankedPlayPage() {
                   </div>
                   <div className="mt-[6px] flex flex-col items-start gap-1">
                     {renderHearts(myLivesCount)}
-                    {renderTimerBar(myTimerSeconds, isMatched && isMyTurn && !isMatchOver)}
+                    {renderTimerBar(
+                      myTimerSeconds,
+                      isMatched && isMyTurn && !isMatchOver && !isTurnBlocked
+                    )}
                   </div>
                 </div>
               </div>
@@ -1108,7 +1179,7 @@ export default function RankedPlayPage() {
                     {renderHearts(partnerLivesCount, true)}
                     {renderTimerBar(
                       partnerTimerSeconds,
-                      isMatched && !isMyTurn && !isMatchOver,
+                      isMatched && !isMyTurn && !isMatchOver && !isTurnBlocked,
                       true
                     )}
                   </div>
@@ -1152,10 +1223,12 @@ export default function RankedPlayPage() {
               <div
                 ref={listRef}
                 className={`min-h-0 flex-1 pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-                  showTypingModal ? "relative overflow-hidden" : "relative overflow-hidden"
+                  showBlockingModal
+                    ? "relative overflow-hidden"
+                    : "relative overflow-hidden"
                 }`}
               >
-                {!showTypingModal &&
+                {!showBlockingModal &&
                   (showCenterPanel ? (
                     <div className="flex h-full flex-col items-center justify-center text-center">
                       <p className="text-lg font-semibold text-ink">{matchModalTitle}</p>
@@ -1281,7 +1354,7 @@ export default function RankedPlayPage() {
                   rankedStatus.status !== "matched" ||
                   isChatLoading ||
                   isMatchOver ||
-                  isTypingTestActive ||
+                  isTurnBlocked ||
                   !isMyTurn ||
                   isTurnExpired
                 }
@@ -1302,7 +1375,7 @@ export default function RankedPlayPage() {
                     isSending ||
                     isChatLoading ||
                     isMatchOver ||
-                    isTypingTestActive ||
+                    isTurnBlocked ||
                     !isMyTurn ||
                     isTurnExpired
                   }
@@ -1317,23 +1390,43 @@ export default function RankedPlayPage() {
               </form>
           </>
         )}
-        {showTypingModal && isAuthenticated && (
+        {showBlockingModal && isAuthenticated && (
           <div className="absolute inset-0 z-30 flex items-center justify-center bg-white px-6 text-center">
             <div className="w-full max-w-md rounded-3xl border border-card-border/70 bg-white px-6 py-5 shadow-sm">
-              <p className="text-base font-semibold text-ink">
-                {isTypingTestCountdown ? "Typing test incoming" : typingResultTitle}
-              </p>
-              <p className="mt-2 text-xs text-muted">
-                {isTypingTestCountdown
-                  ? "Get ready to type the 10 words."
-                  : "Returning to the match..."}
-              </p>
-              <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-card-border/60">
-                <div
-                  className="h-full bg-accent transition-[width] duration-100"
-                  style={{ width: `${typingModalProgress * 100}%` }}
-                />
-              </div>
+              {showRoleModal ? (
+                <>
+                  <p className="text-base font-semibold text-ink">Character Role</p>
+                  <p className="mt-2 text-sm font-semibold text-ink">
+                    {characterRole}
+                  </p>
+                  <p className="mt-2 text-xs text-muted">
+                    Play this role for the conversation.
+                  </p>
+                  <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-card-border/60">
+                    <div
+                      className="h-full bg-accent transition-[width] duration-100"
+                      style={{ width: `${roleModalProgress * 100}%` }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-base font-semibold text-ink">
+                    {isTypingTestCountdown ? "Typing test incoming" : typingResultTitle}
+                  </p>
+                  <p className="mt-2 text-xs text-muted">
+                    {isTypingTestCountdown
+                      ? "Get ready to type the 10 words."
+                      : "Returning to the match..."}
+                  </p>
+                  <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-card-border/60">
+                    <div
+                      className="h-full bg-accent transition-[width] duration-100"
+                      style={{ width: `${typingModalProgress * 100}%` }}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
