@@ -108,8 +108,7 @@ export default function RankedPlayPage() {
   const matchStateTone = isMatchOver
     ? "border-red-200 bg-red-50 text-red-700"
     : "border-card-border/70 bg-white/80 text-muted";
-  const showMatchModal =
-    isAuthenticated && (rankedStatus.status !== "matched" || isMatchOver);
+  const showCenterPanel = rankedStatus.status !== "matched" || isMatchOver;
   const didWin =
     rankedStatus.status === "matched" &&
     isMatchOver &&
@@ -128,7 +127,7 @@ export default function RankedPlayPage() {
       ? "Stay here — we will drop them into the chat once matched."
       : "Press play to get paired with someone new.";
   const matchModalActionLabel = isMatchOver
-    ? "Play again"
+    ? "Play Again"
     : rankedStatus.status === "waiting"
       ? "Cancel"
       : "Play";
@@ -940,12 +939,22 @@ export default function RankedPlayPage() {
                 ref={listRef}
                 className="min-h-0 flex-1 overflow-y-auto pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
-              {rankedStatus.status !== "matched" ? (
-                <div className="flex h-full flex-col items-center justify-center space-y-3 text-center">
-                  <p className="text-base font-semibold text-ink">Blank chat.</p>
-                  <p className="text-sm text-muted">
-                    Press play to start looking for a partner. We will drop them here once matched.
-                  </p>
+              {showCenterPanel ? (
+                <div className="flex h-full flex-col items-center justify-center text-center">
+                  <p className="text-lg font-semibold text-ink">{matchModalTitle}</p>
+                  <p className="mt-2 text-sm text-muted">{matchModalBody}</p>
+                  <div className="mt-5 flex justify-center">
+                    <button
+                      type="button"
+                      className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)] transition hover:translate-y-[-1px] disabled:opacity-60"
+                      onClick={
+                        rankedStatus.status === "waiting" ? handleCancel : handlePlay
+                      }
+                      disabled={isQueuing}
+                    >
+                      {matchModalActionLabel}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <>
@@ -1056,57 +1065,59 @@ export default function RankedPlayPage() {
             </div>
             </div>
 
-            <form
-              className="mt-auto space-y-3 border-t border-card-border/60 pt-4"
-              onSubmit={handleSubmit}
-            >
-              <textarea
-                className={`${inputClasses} min-h-[90px]`}
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={handleEnterToSend}
-                placeholder={
-                  rankedStatus.status === "matched"
-                    ? `Message ${rankedStatus.partner.handle}`
-                    : "Queue up to unlock chat."
-                }
-                ref={inputRef}
-                disabled={
-                  rankedStatus.status !== "matched" ||
-                  isChatLoading ||
-                  isMatchOver ||
-                  !isMyTurn ||
-                  isTurnExpired
-                }
-              />
-              {chatError && (
-                <div className="rounded-2xl border border-accent/30 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent">
-                  {chatError}
-                </div>
-              )}
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted">
-                  Messages send as {user?.handle || "you"}.
-                </p>
-                <Button
-                  type="submit"
+            {!showCenterPanel && (
+              <form
+                className="mt-auto space-y-3 border-t border-card-border/60 pt-4"
+                onSubmit={handleSubmit}
+              >
+                <textarea
+                  className={`${inputClasses} min-h-[90px]`}
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={handleEnterToSend}
+                  placeholder={
+                    rankedStatus.status === "matched"
+                      ? `Message ${rankedStatus.partner.handle}`
+                      : "Queue up to unlock chat."
+                  }
+                  ref={inputRef}
                   disabled={
                     rankedStatus.status !== "matched" ||
-                    isSending ||
                     isChatLoading ||
                     isMatchOver ||
                     !isMyTurn ||
                     isTurnExpired
                   }
-                >
-                  {isSending
-                    ? "Sending..."
-                    : rankedStatus.status === "matched"
-                      ? "Send"
-                      : "Play to chat"}
-                </Button>
-              </div>
-            </form>
+                />
+                {chatError && (
+                  <div className="rounded-2xl border border-accent/30 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent">
+                    {chatError}
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted">
+                    Messages send as {user?.handle || "you"}.
+                  </p>
+                  <Button
+                    type="submit"
+                    disabled={
+                      rankedStatus.status !== "matched" ||
+                      isSending ||
+                      isChatLoading ||
+                      isMatchOver ||
+                      !isMyTurn ||
+                      isTurnExpired
+                    }
+                  >
+                    {isSending
+                      ? "Sending..."
+                      : rankedStatus.status === "matched"
+                        ? "Send"
+                        : "Play to chat"}
+                  </Button>
+                </div>
+              </form>
+            )}
           </>
         )}
         {messageToDelete && (
@@ -1135,26 +1146,7 @@ export default function RankedPlayPage() {
             </div>
           </div>
         )}
-      {showMatchModal && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
-          <div className="w-full max-w-sm rounded-2xl border border-card-border/70 bg-white/95 p-5">
-              <p className="text-base font-semibold text-ink">{matchModalTitle}</p>
-              <p className="mt-2 text-sm text-muted">{matchModalBody}</p>
-              <div className="mt-5 flex justify-end">
-                <button
-                  type="button"
-                  className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)] transition hover:translate-y-[-1px] disabled:opacity-60"
-                  onClick={
-                    rankedStatus.status === "waiting" ? handleCancel : handlePlay
-                  }
-                  disabled={isQueuing}
-                >
-                  {matchModalActionLabel}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+      {/* Center panel replaces modal for idle/waiting/match-end states */}
       </Card>
     </div>
   );
