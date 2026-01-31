@@ -994,6 +994,61 @@ export const sendRankedMessage = async (params: {
   };
 };
 
+export const smiteRankedOpponent = async (params: {
+  matchId: string;
+  userId: string;
+}) => {
+  await ensureRankedTables();
+  const { match, partnerId } = await assertParticipant(params.matchId, params.userId);
+  if (match.timed_out) {
+    throw new Error("Match has ended");
+  }
+
+  const updated = await db.query(
+    `UPDATE ranked_matches
+     SET user_a_lives = CASE
+           WHEN user_a_id = $2 THEN GREATEST(user_a_lives - 3, 0)
+           ELSE user_a_lives
+         END,
+         user_b_lives = CASE
+           WHEN user_b_id = $2 THEN GREATEST(user_b_lives - 3, 0)
+           ELSE user_b_lives
+         END,
+         timed_out = CASE
+           WHEN (CASE
+             WHEN user_a_id = $2 THEN GREATEST(user_a_lives - 3, 0)
+             ELSE user_a_lives
+           END) <= 0
+           OR (CASE
+             WHEN user_b_id = $2 THEN GREATEST(user_b_lives - 3, 0)
+             ELSE user_b_lives
+           END) <= 0
+           THEN true
+           ELSE timed_out
+         END,
+         typing_test_state = NULL,
+         typing_test_started_at = NULL,
+         typing_test_words = NULL,
+         typing_test_winner_id = NULL,
+         typing_test_result_at = NULL
+     WHERE id = $1
+     RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
+               user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
+               typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at`,
+    [params.matchId, partnerId]
+  );
+
+  if ((updated.rowCount ?? 0) === 0) {
+    throw new Error("Match not found");
+  }
+
+  const row = updated.rows[0] as RankedMatchRow;
+  if (row.timed_out) {
+    await awardDailyWin(params.userId);
+  }
+  return row;
+};
+
 export const updateRankedMessage = async (params: {
   matchId: string;
   messageId: string;

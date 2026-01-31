@@ -12,6 +12,7 @@ import {
   sendRankedMessage,
   updateRankedMessage,
   deleteRankedMessageById,
+  smiteRankedOpponent,
 } from "../services/rankedService";
 
 const getToken = (req: Request) => {
@@ -203,6 +204,20 @@ export const postRankedTypingTest = async (req: Request, res: Response) => {
       attempt,
     });
     res.json(result);
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const postRankedSmite = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    if (!user.isAdmin) {
+      throw new AuthError("Unauthorized", 403);
+    }
+    const matchId = parseMatchId(req.params?.matchId);
+    await smiteRankedOpponent({ matchId, userId: user.id });
+    res.status(204).end();
   } catch (error) {
     handleError(res, error);
   }

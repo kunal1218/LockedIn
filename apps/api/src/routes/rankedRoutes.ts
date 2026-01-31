@@ -10,6 +10,7 @@ import {
   patchRankedMessage,
   patchRankedTyping,
   postRankedTypingTest,
+  postRankedSmite,
   deleteRankedMessage,
 } from "../controllers/rankedController";
 
@@ -26,5 +27,6 @@ router.post("/match/:matchId/save", postRankedSave);
 router.post("/match/:matchId/timeout", postRankedTimeout);
 router.patch("/match/:matchId/typing", patchRankedTyping);
 router.post("/match/:matchId/typing-test", postRankedTypingTest);
+router.post("/match/:matchId/smite", postRankedSmite);
 
 export default router;

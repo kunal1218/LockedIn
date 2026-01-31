@@ -81,6 +81,7 @@ export default function RankedPlayPage() {
   const [typingTestError, setTypingTestError] = useState<string | null>(null);
   const [isTypingSubmitting, setIsTypingSubmitting] = useState(false);
   const [typingModalTick, setTypingModalTick] = useState(0);
+  const [isSmiting, setIsSmiting] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
@@ -177,6 +178,7 @@ export default function RankedPlayPage() {
       : "Play";
   const myName = user?.name ?? "You";
   const myHandle = user?.handle ?? "you";
+  const isAdmin = Boolean(user?.isAdmin);
   const displayPartner = isMatched
     ? rankedStatus.partner
     : showMatchSnapshot
@@ -191,6 +193,8 @@ export default function RankedPlayPage() {
   const partnerLivesCount = displayLives?.partner ?? 3;
   const isTurnExpired =
     isMatched && isMyTurn && timeLeft <= 0 && !isMatchOver && !isTypingTestActive;
+  const showSmiteButton =
+    isAdmin && isMatched && !isMatchOver && !isTypingTestActive;
   const typingWordsText =
     typingTest.words.length > 0 ? typingTest.words.join(" ") : "Loading words...";
   const typingResultTitle = typingTest.winnerId
@@ -904,6 +908,29 @@ export default function RankedPlayPage() {
     }
   };
 
+  const handleSmite = async () => {
+    if (!token || !activeMatchId) {
+      return;
+    }
+    setIsSmiting(true);
+    setChatError(null);
+    try {
+      await apiPost(
+        `/ranked/match/${encodeURIComponent(activeMatchId)}/smite`,
+        {},
+        token
+      );
+      await loadMessages();
+      await loadStatus();
+    } catch (error) {
+      setChatError(
+        error instanceof Error ? error.message : "Unable to smite opponent."
+      );
+    } finally {
+      setIsSmiting(false);
+    }
+  };
+
   const handleTypingTestSubmit = async (
     event?: FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>
   ) => {
@@ -1009,7 +1036,7 @@ export default function RankedPlayPage() {
     <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-6">
       <Card className="relative grid h-full min-h-[520px] grid-rows-[auto_1fr_auto] gap-3 overflow-hidden border border-card-border/70 bg-white/85 shadow-sm">
         <div className="flex flex-col gap-4">
-          <div className="grid gap-6 md:grid-cols-[1fr_auto]">
+          <div className="grid gap-6 md:grid-cols-[1fr_auto_1fr]">
             <div className="flex min-w-[240px] items-center gap-3 md:justify-self-start">
               {user?.name ? (
                 <Avatar name={myName} size={44} />
@@ -1028,6 +1055,18 @@ export default function RankedPlayPage() {
                   </div>
                 </div>
               </div>
+            </div>
+            <div className="flex items-center justify-center">
+              {showSmiteButton && (
+                <Button
+                  variant="outline"
+                  className="px-3 py-1 text-xs"
+                  onClick={handleSmite}
+                  disabled={isSmiting}
+                >
+                  {isSmiting ? "Smiting..." : "Smite Opp"}
+                </Button>
+              )}
             </div>
             <div className="flex min-w-[240px] flex-row-reverse items-center justify-end gap-3 text-right md:justify-self-end">
               {displayPartner ? (
