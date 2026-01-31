@@ -107,19 +107,16 @@ export default function RankedPlayPage() {
     rankedStatus.status === "matched"
       ? rankedStatus.lives ?? { me: 3, partner: 3 }
       : null;
-  const maybeStartRoleModal = useCallback(
-    (matchId: string | null, role?: string | null) => {
-      if (!matchId || !role) {
-        return;
-      }
-      if (roleModalSeenRef.current[matchId]) {
-        return;
-      }
-      roleModalSeenRef.current[matchId] = true;
-      setRoleModalStartMs(Date.now());
-    },
-    []
-  );
+  const maybeStartRoleModal = useCallback((matchId: string | null) => {
+    if (!matchId) {
+      return;
+    }
+    if (roleModalSeenRef.current[matchId]) {
+      return;
+    }
+    roleModalSeenRef.current[matchId] = true;
+    setRoleModalStartMs(Date.now());
+  }, []);
   const derivedIsMyTurn = useMemo(() => {
     if (!user?.id) return true;
     const last = messages[messages.length - 1];
@@ -417,7 +414,7 @@ export default function RankedPlayPage() {
       setRoleModalStartMs(null);
       return;
     }
-    maybeStartRoleModal(activeMatchId, characterRole);
+    maybeStartRoleModal(activeMatchId);
   }, [activeMatchId, characterRole, maybeStartRoleModal, rankedStatus.status]);
 
   useEffect(() => {
@@ -470,7 +467,7 @@ export default function RankedPlayPage() {
       const status = await apiGet<RankedStatus>("/ranked/status", token);
       setRankedStatus(status);
       if (status.status === "matched") {
-        maybeStartRoleModal(status.matchId, status.characterRole);
+        maybeStartRoleModal(status.matchId);
         if (status.serverTime) {
           const serverMs = Date.parse(status.serverTime);
           if (Number.isFinite(serverMs)) {
@@ -567,7 +564,7 @@ export default function RankedPlayPage() {
             }
           : prev
       );
-      maybeStartRoleModal(activeMatchId, payload.characterRole ?? rankedCharacterRole);
+      maybeStartRoleModal(activeMatchId);
       const matchOver =
         payload.timedOut ||
         (payload.lives?.me ?? 1) <= 0 ||
@@ -625,7 +622,6 @@ export default function RankedPlayPage() {
     getRemainingSeconds,
     hasMatchEnded,
     maybeStartRoleModal,
-    rankedCharacterRole,
     rankedStatus.status,
     syncTimer,
     token,
@@ -864,7 +860,7 @@ export default function RankedPlayPage() {
       const status = await apiPost<RankedStatus>("/ranked/play", {}, token);
       setRankedStatus(status);
       if (status.status === "matched") {
-        maybeStartRoleModal(status.matchId, status.characterRole);
+        maybeStartRoleModal(status.matchId);
         const matchOver =
           (status.lives?.me ?? 1) <= 0 || (status.lives?.partner ?? 1) <= 0;
         const remaining = status.turnStartedAt
@@ -1424,7 +1420,7 @@ export default function RankedPlayPage() {
                 <>
                   <p className="text-base font-semibold text-ink">Character Role</p>
                   <p className="mt-2 text-sm font-semibold text-ink">
-                    {characterRole}
+                    {characterRole ?? "Loading role..."}
                   </p>
                   <p className="mt-2 text-xs text-muted">
                     Play this role for the conversation.
