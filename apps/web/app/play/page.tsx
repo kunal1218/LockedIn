@@ -195,6 +195,11 @@ export default function RankedPlayPage() {
     isMatched && isMyTurn && timeLeft <= 0 && !isMatchOver && !isTypingTestActive;
   const showSmiteButton =
     isAdmin && isMatched && !isMatchOver && !isTypingTestActive;
+  const showStatusBar =
+    rankedStatus.status === "matched" &&
+    !showCenterPanel &&
+    !showTypingModal &&
+    !showTypingTestArena;
   const typingWordsText =
     typingTest.words.length > 0 ? typingTest.words.join(" ") : "Loading words...";
   const typingResultTitle = typingTest.winnerId
@@ -1139,6 +1144,17 @@ export default function RankedPlayPage() {
                   {queueError}
                 </div>
               )}
+              {showStatusBar && (
+                <div
+                  className={`mb-3 rounded-2xl border px-4 py-2 text-sm font-semibold ${matchStateTone}`}
+                >
+                  {matchStateMessage || (
+                    <span className="text-transparent" aria-hidden="true">
+                      .
+                    </span>
+                  )}
+                </div>
+              )}
               <div
                 ref={listRef}
                 className={`min-h-0 flex-1 pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
@@ -1200,15 +1216,6 @@ export default function RankedPlayPage() {
                     </div>
                   ) : (
                     <>
-                      <div
-                        className={`mb-3 rounded-2xl border px-4 py-2 text-sm font-semibold ${matchStateTone}`}
-                      >
-                        {matchStateMessage || (
-                          <span className="text-transparent" aria-hidden="true">
-                            .
-                          </span>
-                        )}
-                      </div>
                       {isChatLoading ? (
                         <p className="text-sm text-muted">Loading chat...</p>
                       ) : messages.length === 0 ? (
