@@ -96,6 +96,9 @@ export const MapCanvas = () => {
       return;
     }
 
+    console.log("Mapbox token exists:", Boolean(mapboxToken));
+    console.log("Map container ref:", mapContainerRef.current);
+
     mapboxgl.accessToken = mapboxToken;
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
@@ -104,6 +107,8 @@ export const MapCanvas = () => {
       zoom: DEFAULT_ZOOM,
       attributionControl: false,
     });
+
+    console.log("Map instance created:", map);
 
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");
     mapRef.current = map;
