@@ -56,6 +56,7 @@ export default function RankedPlayPage() {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [isTimeout, setIsTimeout] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number>(TURN_SECONDS);
+  const [partnerTyping, setPartnerTyping] = useState("");
   const endRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const editInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -71,6 +72,8 @@ export default function RankedPlayPage() {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const serverTimeOffsetRef = useRef<number>(0);
   const turnStartedAtRef = useRef<string | null>(null);
+  const typingDebounceRef = useRef<number | null>(null);
+  const lastTypingSentRef = useRef<string>("");
   const lives =
     rankedStatus.status === "matched"
       ? rankedStatus.lives ?? { me: 3, partner: 3 }
@@ -335,6 +338,7 @@ export default function RankedPlayPage() {
         syncTimer(payload.turnStartedAt, payload.serverTime, payload.timedOut);
       }
       setMessages(payload.messages);
+      setPartnerTyping(payload.typing ?? "");
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         setChatError("Chat sync timed out. Retrying...");
@@ -344,6 +348,7 @@ export default function RankedPlayPage() {
         );
       }
       setMessages([]);
+      setPartnerTyping("");
     } finally {
       window.clearTimeout(timeout);
       setIsChatLoading(false);
@@ -351,6 +356,28 @@ export default function RankedPlayPage() {
       isLoadingMessagesRef.current = false;
     }
   }, [activeMatchId, syncTimer, token]);
+
+  const sendTypingUpdate = useCallback(
+    async (text: string) => {
+      if (!token || rankedStatus.status !== "matched" || !activeMatchId) {
+        return;
+      }
+      if (text === lastTypingSentRef.current) {
+        return;
+      }
+      lastTypingSentRef.current = text;
+      try {
+        await apiPatch(
+          `/ranked/match/${encodeURIComponent(activeMatchId)}/typing`,
+          { body: text },
+          token
+        );
+      } catch {
+        // Ignore typing sync failures.
+      }
+    },
+    [activeMatchId, rankedStatus.status, token]
+  );
 
   useEffect(() => {
     if (!token) {
@@ -371,16 +398,54 @@ export default function RankedPlayPage() {
   }, [loadStatus, rankedStatus.status]);
 
   useEffect(() => {
+    if (!token || rankedStatus.status !== "matched" || !activeMatchId) {
+      return;
+    }
+    const canType = isMyTurn && !isTimeout && !isTurnExpired;
+    const nextText = canType ? draft : "";
+
+    if (typingDebounceRef.current) {
+      window.clearTimeout(typingDebounceRef.current);
+    }
+
+    if (!nextText.trim()) {
+      sendTypingUpdate("");
+      return;
+    }
+
+    typingDebounceRef.current = window.setTimeout(() => {
+      sendTypingUpdate(nextText);
+    }, 250);
+
+    return () => {
+      if (typingDebounceRef.current) {
+        window.clearTimeout(typingDebounceRef.current);
+      }
+    };
+  }, [
+    activeMatchId,
+    draft,
+    isMyTurn,
+    isTimeout,
+    isTurnExpired,
+    rankedStatus.status,
+    sendTypingUpdate,
+    token,
+  ]);
+
+  useEffect(() => {
     if (rankedStatus.status !== "matched" || !activeMatchId) {
       activeMatchIdRef.current = null;
       setMessages([]);
       setSavedAt(null);
       setIsTimeout(false);
       turnTimeoutReportedRef.current = null;
+      setPartnerTyping("");
       hasLoadedMessagesRef.current = false;
       justSentRef.current = false;
       setChatError(null);
       turnStartedAtRef.current = null;
+      lastTypingSentRef.current = "";
       return;
     }
 
@@ -391,9 +456,11 @@ export default function RankedPlayPage() {
       setSavedAt(null);
       setIsTimeout(false);
       turnTimeoutReportedRef.current = null;
+      setPartnerTyping("");
       hasLoadedMessagesRef.current = false;
       justSentRef.current = false;
       setChatError(null);
+      lastTypingSentRef.current = "";
     }
 
     turnStartedAtRef.current = rankedStatus.turnStartedAt ?? null;
@@ -513,6 +580,7 @@ export default function RankedPlayPage() {
     if (isTurnExpired) {
       setChatError("Your turn expired. Waiting for your partner.");
       reportTurnTimeout();
+      sendTypingUpdate("");
       return;
     }
     if (rankedStatus.status !== "matched") {
@@ -534,6 +602,7 @@ export default function RankedPlayPage() {
       );
       setMessages((prev) => [...prev, response.message]);
       setDraft("");
+      sendTypingUpdate("");
       setRankedStatus((prev) =>
         prev.status === "matched" ? { ...prev, isMyTurn: false } : prev
       );
@@ -791,11 +860,20 @@ export default function RankedPlayPage() {
                   {isChatLoading ? (
                     <p className="text-sm text-muted">Loading chat...</p>
                   ) : messages.length === 0 ? (
-                    <p className="text-sm text-muted">
-                      {isMyTurn
-                        ? "You matched! The 15s timer is running — send the first line."
-                        : `You're matched. Waiting for ${rankedStatus.partner.handle} to start.`}
-                    </p>
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted">
+                        {isMyTurn
+                          ? "You matched! The 15s timer is running — send the first line."
+                          : `You're matched. Waiting for ${rankedStatus.partner.handle} to start.`}
+                      </p>
+                      {partnerTyping && (
+                        <div className="flex justify-start">
+                          <div className="max-w-[90%] rounded-2xl border border-dashed border-card-border/70 bg-white/70 px-4 py-2 text-sm italic text-muted opacity-70">
+                            {partnerTyping}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="space-y-3">
                       {messages.map((message) => {
@@ -862,6 +940,13 @@ export default function RankedPlayPage() {
                           </div>
                         );
                       })}
+                      {partnerTyping && (
+                        <div className="flex justify-start">
+                          <div className="max-w-[90%] rounded-2xl border border-dashed border-card-border/70 bg-white/70 px-4 py-2 text-sm italic text-muted opacity-70">
+                            {partnerTyping}
+                          </div>
+                        </div>
+                      )}
                       <div ref={endRef} />
                     </div>
                   )}

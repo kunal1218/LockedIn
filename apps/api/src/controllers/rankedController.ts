@@ -6,6 +6,7 @@ import {
   fetchRankedMessages,
   getRankedStatusForUser,
   markRankedTimeout,
+  updateRankedTyping,
   saveRankedTranscript,
   sendRankedMessage,
   updateRankedMessage,
@@ -166,6 +167,18 @@ export const postRankedTimeout = async (req: Request, res: Response) => {
     const matchId = parseMatchId(req.params?.matchId);
     await markRankedTimeout(matchId, user.id);
     res.json({ timedOut: true });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const patchRankedTyping = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const matchId = parseMatchId(req.params?.matchId);
+    const body = typeof req.body?.body === "string" ? req.body.body : "";
+    await updateRankedTyping({ matchId, userId: user.id, body });
+    res.status(204).end();
   } catch (error) {
     handleError(res, error);
   }

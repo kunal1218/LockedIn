@@ -8,6 +8,7 @@ import {
   postRankedSave,
   postRankedTimeout,
   patchRankedMessage,
+  patchRankedTyping,
   deleteRankedMessage,
 } from "../controllers/rankedController";
 
@@ -22,5 +23,6 @@ router.patch("/match/:matchId/messages/:messageId", patchRankedMessage);
 router.delete("/match/:matchId/messages/:messageId", deleteRankedMessage);
 router.post("/match/:matchId/save", postRankedSave);
 router.post("/match/:matchId/timeout", postRankedTimeout);
+router.patch("/match/:matchId/typing", patchRankedTyping);
 
 export default router;
