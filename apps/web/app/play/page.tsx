@@ -1090,136 +1090,119 @@ export default function RankedPlayPage() {
                   showTypingModal ? "relative overflow-hidden" : "relative overflow-y-auto"
                 }`}
               >
-                {showCenterPanel ? (
-                  <div className="flex h-full flex-col items-center justify-center text-center">
-                    <p className="text-lg font-semibold text-ink">{matchModalTitle}</p>
-                    <p className="mt-2 text-sm text-muted">{matchModalBody}</p>
-                    <div className="mt-5 flex justify-center">
-                      <button
-                        type="button"
-                        className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)] transition hover:translate-y-[-1px] disabled:opacity-60"
-                        onClick={
-                          rankedStatus.status === "waiting" ? handleCancel : handlePlay
-                        }
-                        disabled={isQueuing}
-                      >
-                        {matchModalActionLabel}
-                      </button>
+                {!showTypingModal &&
+                  (showCenterPanel ? (
+                    <div className="flex h-full flex-col items-center justify-center text-center">
+                      <p className="text-lg font-semibold text-ink">{matchModalTitle}</p>
+                      <p className="mt-2 text-sm text-muted">{matchModalBody}</p>
+                      <div className="mt-5 flex justify-center">
+                        <button
+                          type="button"
+                          className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)] transition hover:translate-y-[-1px] disabled:opacity-60"
+                          onClick={
+                            rankedStatus.status === "waiting"
+                              ? handleCancel
+                              : handlePlay
+                          }
+                          disabled={isQueuing}
+                        >
+                          {matchModalActionLabel}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ) : showTypingTestArena ? (
-                  <div className="flex h-full flex-col items-center justify-center text-center">
-                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted">
-                      Typing Test
-                    </p>
-                    <p className="mt-3 max-w-2xl text-lg font-semibold text-ink">
-                      {typingWordsText}
-                    </p>
-                    <form
-                      onSubmit={handleTypingTestSubmit}
-                      className="mt-6 flex w-full max-w-2xl flex-col items-center gap-3"
-                    >
-                      <input
-                        type="text"
-                        value={typingAttempt}
-                        onChange={(event) => setTypingAttempt(event.target.value)}
-                        onKeyDown={handleTypingAttemptKeyDown}
-                        className="w-full rounded-full border border-card-border/70 bg-white/90 px-5 py-3 text-sm text-ink outline-none transition focus:border-accent/60"
-                        placeholder="Type the 10 words here"
-                      />
-                      {typingTestError && (
-                        <div className="rounded-full border border-accent/30 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent">
-                          {typingTestError}
-                        </div>
-                      )}
-                      <Button
-                        type="submit"
-                        disabled={isTypingSubmitting || !typingAttempt.trim()}
+                  ) : showTypingTestArena ? (
+                    <div className="flex h-full flex-col items-center justify-center text-center">
+                      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted">
+                        Typing Test
+                      </p>
+                      <p className="mt-3 max-w-2xl text-lg font-semibold text-ink">
+                        {typingWordsText}
+                      </p>
+                      <form
+                        onSubmit={handleTypingTestSubmit}
+                        className="mt-6 flex w-full max-w-2xl flex-col items-center gap-3"
                       >
-                        {isTypingSubmitting ? "Submitting..." : "Submit"}
-                      </Button>
-                    </form>
-                  </div>
-                ) : (
-                  <>
-                    <div
-                      className={`mb-3 rounded-2xl border px-4 py-2 text-sm font-semibold ${matchStateTone}`}
-                    >
-                      {matchStateMessage || (
-                        <span className="text-transparent" aria-hidden="true">
-                          .
-                        </span>
-                      )}
-                    </div>
-                    {isChatLoading ? (
-                      <p className="text-sm text-muted">Loading chat...</p>
-                    ) : messages.length === 0 ? (
-                      <div className="space-y-3">
-                        {partnerTyping && (
-                          <div className="flex justify-start">
-                            <div className="max-w-[90%] rounded-2xl border border-dashed border-card-border/70 bg-white/70 px-4 py-2 text-sm italic text-muted opacity-70">
-                              {partnerTyping}
-                            </div>
+                        <input
+                          type="text"
+                          value={typingAttempt}
+                          onChange={(event) => setTypingAttempt(event.target.value)}
+                          onKeyDown={handleTypingAttemptKeyDown}
+                          className="w-full rounded-full border border-card-border/70 bg-white/90 px-5 py-3 text-sm text-ink outline-none transition focus:border-accent/60"
+                          placeholder="Type the 10 words here"
+                        />
+                        {typingTestError && (
+                          <div className="rounded-full border border-accent/30 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent">
+                            {typingTestError}
                           </div>
                         )}
+                        <Button
+                          type="submit"
+                          disabled={isTypingSubmitting || !typingAttempt.trim()}
+                        >
+                          {isTypingSubmitting ? "Submitting..." : "Submit"}
+                        </Button>
+                      </form>
+                    </div>
+                  ) : (
+                    <>
+                      <div
+                        className={`mb-3 rounded-2xl border px-4 py-2 text-sm font-semibold ${matchStateTone}`}
+                      >
+                        {matchStateMessage || (
+                          <span className="text-transparent" aria-hidden="true">
+                            .
+                          </span>
+                        )}
                       </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {messages.map((message) => {
-                          const isMine = message.sender.id === user?.id;
-                          const isSelected = selectedMessageId === message.id;
-                          return (
-                            <div
-                              key={message.id}
-                              className={`flex ${isMine ? "justify-end" : "justify-start"}`}
-                            >
-                              <div
-                                onClick={() => setSelectedMessageId(message.id)}
-                                className={`max-w-[90%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
-                                  isMine
-                                    ? "bg-accent text-white"
-                                    : "border border-card-border/70 bg-white/90 text-ink"
-                                } ${isSelected ? "ring-2 ring-accent/40" : ""}`}
-                              >
-                                <p className="whitespace-pre-wrap">{message.body}</p>
+                      {isChatLoading ? (
+                        <p className="text-sm text-muted">Loading chat...</p>
+                      ) : messages.length === 0 ? (
+                        <div className="space-y-3">
+                          {partnerTyping && (
+                            <div className="flex justify-start">
+                              <div className="max-w-[90%] rounded-2xl border border-dashed border-card-border/70 bg-white/70 px-4 py-2 text-sm italic text-muted opacity-70">
+                                {partnerTyping}
                               </div>
                             </div>
-                          );
-                        })}
-                        {partnerTyping && (
-                          <div className="flex justify-start">
-                            <div className="max-w-[90%] rounded-2xl border border-dashed border-card-border/70 bg-white/70 px-4 py-2 text-sm italic text-muted opacity-70">
-                              {partnerTyping}
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {messages.map((message) => {
+                            const isMine = message.sender.id === user?.id;
+                            const isSelected = selectedMessageId === message.id;
+                            return (
+                              <div
+                                key={message.id}
+                                className={`flex ${
+                                  isMine ? "justify-end" : "justify-start"
+                                }`}
+                              >
+                                <div
+                                  onClick={() => setSelectedMessageId(message.id)}
+                                  className={`max-w-[90%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
+                                    isMine
+                                      ? "bg-accent text-white"
+                                      : "border border-card-border/70 bg-white/90 text-ink"
+                                  } ${isSelected ? "ring-2 ring-accent/40" : ""}`}
+                                >
+                                  <p className="whitespace-pre-wrap">{message.body}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {partnerTyping && (
+                            <div className="flex justify-start">
+                              <div className="max-w-[90%] rounded-2xl border border-dashed border-card-border/70 bg-white/70 px-4 py-2 text-sm italic text-muted opacity-70">
+                                {partnerTyping}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                        <div ref={endRef} />
-                      </div>
-                    )}
-                  </>
-                )}
-                {showTypingModal && (
-                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-white px-6 text-center">
-                    <div className="w-full max-w-md rounded-3xl border border-card-border/70 bg-white px-6 py-5 shadow-sm">
-                      <p className="text-base font-semibold text-ink">
-                        {isTypingTestCountdown
-                          ? "Typing test incoming"
-                          : typingResultTitle}
-                      </p>
-                      <p className="mt-2 text-xs text-muted">
-                        {isTypingTestCountdown
-                          ? "Get ready to type the 10 words."
-                          : "Returning to the match..."}
-                      </p>
-                      <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-card-border/60">
-                        <div
-                          className="h-full bg-accent transition-[width] duration-100"
-                          style={{ width: `${typingModalProgress * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
+                          )}
+                          <div ref={endRef} />
+                        </div>
+                      )}
+                    </>
+                  ))}
               </div>
             </div>
 
@@ -1273,10 +1256,30 @@ export default function RankedPlayPage() {
                     : rankedStatus.status === "matched"
                       ? "Send"
                       : "Play to chat"}
-                </Button>
-              </div>
-            </form>
+                  </Button>
+                </div>
+              </form>
           </>
+        )}
+        {showTypingModal && isAuthenticated && (
+          <div className="col-start-1 col-end-2 row-start-2 row-end-4 z-20 flex items-center justify-center bg-white px-6 text-center">
+            <div className="w-full max-w-md rounded-3xl border border-card-border/70 bg-white px-6 py-5 shadow-sm">
+              <p className="text-base font-semibold text-ink">
+                {isTypingTestCountdown ? "Typing test incoming" : typingResultTitle}
+              </p>
+              <p className="mt-2 text-xs text-muted">
+                {isTypingTestCountdown
+                  ? "Get ready to type the 10 words."
+                  : "Returning to the match..."}
+              </p>
+              <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-card-border/60">
+                <div
+                  className="h-full bg-accent transition-[width] duration-100"
+                  style={{ width: `${typingModalProgress * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
         )}
       {/* Center panel replaces modal for idle/waiting/match-end states */}
       </Card>
