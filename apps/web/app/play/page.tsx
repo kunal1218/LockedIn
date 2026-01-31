@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
@@ -57,6 +58,10 @@ export default function RankedPlayPage() {
   const [timeLeft, setTimeLeft] = useState<number>(TURN_SECONDS);
   const [partnerTimeLeft, setPartnerTimeLeft] = useState<number>(TURN_SECONDS);
   const [hasMatchEnded, setHasMatchEnded] = useState(false);
+  const [lastMatchSnapshot, setLastMatchSnapshot] = useState<{
+    partner: MessageUser;
+    lives: { me: number; partner: number };
+  } | null>(null);
   const [partnerTyping, setPartnerTyping] = useState("");
   const endRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -96,19 +101,25 @@ export default function RankedPlayPage() {
     rankedStatus.status === "matched"
       ? isMatchOver
         ? "Match over."
-        : !isMyTurn
-          ? `Waiting for ${rankedStatus.partner.handle}...`
-          : ""
+        : isMyTurn
+          ? "Your Move."
+          : `Waiting for ${rankedStatus.partner.handle}...`
       : "";
   const matchStateTone = isMatchOver
     ? "border-red-200 bg-red-50 text-red-700"
     : "border-card-border/70 bg-white/80 text-muted";
   const showCenterPanel = rankedStatus.status !== "matched" || isMatchOver;
+  const isMatched = rankedStatus.status === "matched";
+  const showMatchSnapshot = !isMatched && hasMatchEnded && lastMatchSnapshot;
+  const displayLives = isMatched
+    ? lives ?? { me: 3, partner: 3 }
+    : showMatchSnapshot
+      ? showMatchSnapshot.lives
+      : null;
   const didWin =
-    rankedStatus.status === "matched" &&
     isMatchOver &&
-    (lives?.me ?? 0) > 0 &&
-    (lives?.partner ?? 0) <= 0;
+    (displayLives?.me ?? 0) > 0 &&
+    (displayLives?.partner ?? 0) <= 0;
   const matchModalTitle = isMatchOver
     ? didWin
       ? "You Won"
@@ -128,13 +139,18 @@ export default function RankedPlayPage() {
       : "Play";
   const myName = user?.name ?? "You";
   const myHandle = user?.handle ?? "you";
-  const isMatched = rankedStatus.status === "matched";
-  const partnerName = isMatched ? rankedStatus.partner.name : "Waiting for a match";
-  const partnerHandle = isMatched
-    ? rankedStatus.partner.handle
-    : "Queue up to play.";
-  const myLivesCount = lives?.me ?? 3;
-  const partnerLivesCount = lives?.partner ?? 3;
+  const displayPartner = isMatched
+    ? rankedStatus.partner
+    : showMatchSnapshot
+      ? showMatchSnapshot.partner
+      : null;
+  const partnerName = displayPartner?.name ?? "Waiting for a match";
+  const partnerHandle = displayPartner?.handle ?? "Queue up to play.";
+  const partnerProfileHref = displayPartner?.handle
+    ? `/profile/${encodeURIComponent(displayPartner.handle.replace(/^@/, ""))}`
+    : null;
+  const myLivesCount = displayLives?.me ?? 3;
+  const partnerLivesCount = displayLives?.partner ?? 3;
   const isTurnExpired = isMatched && isMyTurn && timeLeft <= 0 && !isMatchOver;
   const renderHearts = (filledCount: number, alignRight = false) => (
     <div className={`flex items-center gap-1 ${alignRight ? "justify-end" : ""}`}>
@@ -187,8 +203,9 @@ export default function RankedPlayPage() {
     const remainingMs = TURN_SECONDS * 1000 - (nowMs - startedMs);
     return Math.max(0, Math.ceil(remainingMs / 1000));
   }, []);
-  const myTimerSeconds = isMatched ? timeLeft : TURN_SECONDS;
-  const partnerTimerSeconds = isMatched ? partnerTimeLeft : TURN_SECONDS;
+  const showTimerSnapshot = isMatched || !!showMatchSnapshot;
+  const myTimerSeconds = showTimerSnapshot ? timeLeft : TURN_SECONDS;
+  const partnerTimerSeconds = showTimerSnapshot ? partnerTimeLeft : TURN_SECONDS;
   const syncTimer = useCallback(
     (turnStartedAt: string | null, serverTime?: string, timedOut?: boolean) => {
       if (!turnStartedAt) {
@@ -244,6 +261,15 @@ export default function RankedPlayPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selectedMessageId]);
+
+  useEffect(() => {
+    if (rankedStatus.status === "matched") {
+      setLastMatchSnapshot({
+        partner: rankedStatus.partner,
+        lives: rankedStatus.lives ?? { me: 3, partner: 3 },
+      });
+    }
+  }, [rankedStatus]);
 
   const loadStatus = useCallback(async () => {
     if (!token) {
@@ -473,8 +499,10 @@ export default function RankedPlayPage() {
       setMessages([]);
       setSavedAt(null);
       setIsTimeout(false);
-      setPartnerTimeLeft(TURN_SECONDS);
-      setHasMatchEnded(false);
+      if (!hasMatchEnded) {
+        setTimeLeft(TURN_SECONDS);
+        setPartnerTimeLeft(TURN_SECONDS);
+      }
       turnTimeoutReportedRef.current = null;
       setPartnerTyping("");
       hasLoadedMessagesRef.current = false;
@@ -588,6 +616,9 @@ export default function RankedPlayPage() {
       openAuthModal("signup");
       return;
     }
+    setHasMatchEnded(false);
+    setLastMatchSnapshot(null);
+    setIsTimeout(false);
     setIsQueuing(true);
     setQueueError(null);
     try {
@@ -629,6 +660,8 @@ export default function RankedPlayPage() {
       openAuthModal("signup");
       return;
     }
+    setHasMatchEnded(false);
+    setLastMatchSnapshot(null);
     setIsQueuing(true);
     setQueueError(null);
     try {
@@ -811,8 +844,17 @@ export default function RankedPlayPage() {
               </div>
             </div>
             <div className="flex min-w-[240px] flex-row-reverse items-center justify-end gap-3 text-right md:justify-self-end">
-              {isMatched ? (
-                <Avatar name={partnerName} size={44} />
+              {displayPartner ? (
+                partnerProfileHref ? (
+                  <Link
+                    href={partnerProfileHref}
+                    className="rounded-full transition hover:-translate-y-0.5 hover:shadow-sm"
+                  >
+                    <Avatar name={partnerName} size={44} />
+                  </Link>
+                ) : (
+                  <Avatar name={partnerName} size={44} />
+                )
               ) : (
                 <div className="h-11 w-11 rounded-full bg-card-border/60" />
               )}
