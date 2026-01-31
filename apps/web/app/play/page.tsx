@@ -107,12 +107,27 @@ export default function RankedPlayPage() {
     rankedStatus.status === "matched"
       ? rankedStatus.lives ?? { me: 3, partner: 3 }
       : null;
+  const maybeStartRoleModal = useCallback(
+    (matchId: string | null, role?: string | null) => {
+      if (!matchId || !role) {
+        return;
+      }
+      if (roleModalSeenRef.current[matchId]) {
+        return;
+      }
+      roleModalSeenRef.current[matchId] = true;
+      setRoleModalStartMs(Date.now());
+    },
+    []
+  );
   const derivedIsMyTurn = useMemo(() => {
     if (!user?.id) return true;
     const last = messages[messages.length - 1];
     if (!last) return true;
     return last.sender.id !== user.id;
   }, [messages, user?.id]);
+  const rankedCharacterRole =
+    rankedStatus.status === "matched" ? rankedStatus.characterRole ?? null : null;
   const isMyTurn =
     rankedStatus.status === "matched"
       ? rankedStatus.isMyTurn ?? derivedIsMyTurn
@@ -133,8 +148,7 @@ export default function RankedPlayPage() {
   const icebreakerQuestion =
     rankedStatus.status === "matched" ? rankedStatus.icebreakerQuestion : null;
   const cleanedIcebreaker = icebreakerQuestion?.trim();
-  const characterRole =
-    rankedStatus.status === "matched" ? rankedStatus.characterRole : null;
+  const characterRole = rankedCharacterRole;
   const characterRoleAssignedAt =
     rankedStatus.status === "matched" ? rankedStatus.characterRoleAssignedAt : null;
   const matchStateMessage =
@@ -403,18 +417,8 @@ export default function RankedPlayPage() {
       setRoleModalStartMs(null);
       return;
     }
-    if (!characterRole) {
-      return;
-    }
-    if (!isAuthenticated) {
-      return;
-    }
-    if (roleModalSeenRef.current[activeMatchId]) {
-      return;
-    }
-    roleModalSeenRef.current[activeMatchId] = true;
-    setRoleModalStartMs(Date.now());
-  }, [activeMatchId, characterRole, isAuthenticated, rankedStatus.status]);
+    maybeStartRoleModal(activeMatchId, characterRole);
+  }, [activeMatchId, characterRole, maybeStartRoleModal, rankedStatus.status]);
 
   useEffect(() => {
     if (!isTypingTestCountdown && !isTypingTestResult) {
@@ -466,6 +470,7 @@ export default function RankedPlayPage() {
       const status = await apiGet<RankedStatus>("/ranked/status", token);
       setRankedStatus(status);
       if (status.status === "matched") {
+        maybeStartRoleModal(status.matchId, status.characterRole);
         if (status.serverTime) {
           const serverMs = Date.parse(status.serverTime);
           if (Number.isFinite(serverMs)) {
@@ -505,7 +510,7 @@ export default function RankedPlayPage() {
       console.error("Ranked status error", error);
       setQueueError(error instanceof Error ? error.message : "Unable to load status.");
     }
-  }, [getRemainingSeconds, hasMatchEnded, syncTimer, token]);
+  }, [getRemainingSeconds, hasMatchEnded, maybeStartRoleModal, syncTimer, token]);
 
   const loadMessages = useCallback(async () => {
     if (!token || !activeMatchId) {
@@ -562,6 +567,7 @@ export default function RankedPlayPage() {
             }
           : prev
       );
+      maybeStartRoleModal(activeMatchId, payload.characterRole ?? rankedCharacterRole);
       const matchOver =
         payload.timedOut ||
         (payload.lives?.me ?? 1) <= 0 ||
@@ -614,7 +620,16 @@ export default function RankedPlayPage() {
       hasLoadedMessagesRef.current = true;
       isLoadingMessagesRef.current = false;
     }
-  }, [activeMatchId, getRemainingSeconds, hasMatchEnded, syncTimer, token]);
+  }, [
+    activeMatchId,
+    getRemainingSeconds,
+    hasMatchEnded,
+    maybeStartRoleModal,
+    rankedCharacterRole,
+    rankedStatus.status,
+    syncTimer,
+    token,
+  ]);
 
   const sendTypingUpdate = useCallback(
     async (text: string) => {
@@ -849,6 +864,7 @@ export default function RankedPlayPage() {
       const status = await apiPost<RankedStatus>("/ranked/play", {}, token);
       setRankedStatus(status);
       if (status.status === "matched") {
+        maybeStartRoleModal(status.matchId, status.characterRole);
         const matchOver =
           (status.lives?.me ?? 1) <= 0 || (status.lives?.partner ?? 1) <= 0;
         const remaining = status.turnStartedAt
@@ -1401,7 +1417,7 @@ export default function RankedPlayPage() {
               </form>
           </>
         )}
-        {showBlockingModal && isAuthenticated && (
+        {showBlockingModal && (
           <div className="absolute inset-0 z-30 flex items-center justify-center bg-white px-6 text-center">
             <div className="w-full max-w-md rounded-3xl border border-card-border/70 bg-white px-6 py-5 shadow-sm">
               {showRoleModal ? (
