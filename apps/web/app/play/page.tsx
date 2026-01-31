@@ -308,6 +308,7 @@ export default function RankedPlayPage() {
         serverTime: string;
         isMyTurn: boolean;
         lives?: { me: number; partner: number };
+        typing?: string;
       }>(`/ranked/match/${encodeURIComponent(activeMatchId)}/messages`, token, {
         signal: controller.signal,
       });
