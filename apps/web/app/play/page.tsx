@@ -1199,7 +1199,7 @@ export default function RankedPlayPage() {
                   </>
                 )}
                 {showTypingModal && (
-                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 px-6 text-center">
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-white px-6 text-center">
                     <div className="w-full max-w-md rounded-3xl border border-card-border/70 bg-white px-6 py-5 shadow-sm">
                       <p className="text-base font-semibold text-ink">
                         {isTypingTestCountdown
