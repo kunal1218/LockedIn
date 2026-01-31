@@ -6,7 +6,7 @@ import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { useAuth } from "@/features/auth";
-import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
+import { apiGet, apiPatch, apiPost } from "@/lib/api";
 
 type MessageUser = {
   id: string;
@@ -61,7 +61,6 @@ export default function RankedPlayPage() {
   const endRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
-  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const turnTimeoutReportedRef = useRef<string | null>(null);
   const hasLoadedMessagesRef = useRef<boolean>(false);
   const isLoadingMessagesRef = useRef<boolean>(false);
@@ -238,16 +237,13 @@ export default function RankedPlayPage() {
       ) {
         return;
       }
-      if ((event.key === "Delete" || event.key === "Backspace") && selectedMessageId) {
-        const message = messages.find((m) => m.id === selectedMessageId);
-        if (message && message.sender.id === user?.id) {
-          setMessageToDelete(selectedMessageId);
-        }
+      if (event.key === "Escape" && selectedMessageId) {
+        setSelectedMessageId(null);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [messages, selectedMessageId, user?.id]);
+  }, [selectedMessageId]);
 
   const loadStatus = useCallback(async () => {
     if (!token) {
@@ -739,21 +735,6 @@ export default function RankedPlayPage() {
     }
   };
 
-  const handleDeleteMessage = async () => {
-    if (!messageToDelete || !token || rankedStatus.status !== "matched") return;
-    try {
-      await apiDelete(
-        `/ranked/match/${encodeURIComponent(rankedStatus.matchId)}/messages/${encodeURIComponent(messageToDelete)}`,
-        token
-      );
-      setMessages((prev) => prev.filter((msg) => msg.id !== messageToDelete));
-      setSelectedMessageId(null);
-    } catch (error) {
-      setChatError(error instanceof Error ? error.message : "Unable to delete message.");
-    } finally {
-      setMessageToDelete(null);
-    }
-  };
 
   const reportTurnTimeout = useCallback(async () => {
     if (!token || rankedStatus.status !== "matched" || !activeMatchId) {
@@ -1016,32 +997,6 @@ export default function RankedPlayPage() {
               </form>
             )}
           </>
-        )}
-        {messageToDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-            <div className="w-full max-w-sm rounded-2xl border border-card-border/70 bg-white/90 p-5 shadow-lg">
-              <p className="text-base font-semibold text-ink">Delete message?</p>
-              <p className="mt-2 text-sm text-muted">
-                This message will be removed for both players.
-              </p>
-              <div className="mt-5 flex justify-end gap-2">
-                <button
-                  type="button"
-                  className="rounded-full border border-card-border/70 px-4 py-2 text-xs font-semibold text-muted transition hover:border-accent/50 hover:text-ink"
-                  onClick={() => setMessageToDelete(null)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)] transition hover:translate-y-[-1px]"
-                  onClick={handleDeleteMessage}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
         )}
       {/* Center panel replaces modal for idle/waiting/match-end states */}
       </Card>
