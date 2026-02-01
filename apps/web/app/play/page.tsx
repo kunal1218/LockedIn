@@ -38,12 +38,15 @@ type RankedStatus =
   | {
       status: "matched";
       matchId: string;
-      partner: MessageUser;
+      opponents: MessageUser[];
       startedAt: string;
-      lives?: { me: number; partner: number };
+      lives?: { me: number; opponents: number[] };
       turnStartedAt?: string;
       serverTime?: string;
       isMyTurn?: boolean;
+      currentTurnUserId?: string | null;
+      isJudge?: boolean;
+      judgeUserId?: string | null;
       icebreakerQuestion?: string | null;
       characterRole?: string | null;
       characterRoleAssignedAt?: string | null;
@@ -70,13 +73,14 @@ export default function RankedPlayPage() {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [isTimeout, setIsTimeout] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number>(TURN_SECONDS);
-  const [partnerTimeLeft, setPartnerTimeLeft] = useState<number>(TURN_SECONDS);
   const [hasMatchEnded, setHasMatchEnded] = useState(false);
   const [lastMatchSnapshot, setLastMatchSnapshot] = useState<{
-    partner: MessageUser;
-    lives: { me: number; partner: number };
+    opponents: MessageUser[];
+    lives: { me: number; opponents: number[] };
+    judgeUserId: string | null;
+    isJudge: boolean;
   } | null>(null);
-  const [partnerTyping, setPartnerTyping] = useState("");
+  const [opponentTyping, setOpponentTyping] = useState("");
   const [typingTest, setTypingTest] = useState<TypingTestPayload>({
     state: "idle",
     words: [],
@@ -105,7 +109,7 @@ export default function RankedPlayPage() {
   const typingRoundRef = useRef<number | null>(null);
   const lives =
     rankedStatus.status === "matched"
-      ? rankedStatus.lives ?? { me: 3, partner: 3 }
+      ? rankedStatus.lives ?? { me: 3, opponents: [3, 3] }
       : null;
   const maybeStartRoleModal = useCallback((matchId: string | null) => {
     if (!matchId) {
@@ -125,17 +129,20 @@ export default function RankedPlayPage() {
   }, [messages, user?.id]);
   const rankedCharacterRole =
     rankedStatus.status === "matched" ? rankedStatus.characterRole ?? null : null;
-  const isMyTurn =
-    rankedStatus.status === "matched"
-      ? rankedStatus.isMyTurn ?? derivedIsMyTurn
-      : true;
-  const activeMatchId =
-    rankedStatus.status === "matched" ? rankedStatus.matchId : null;
+  const isMatched = rankedStatus.status === "matched";
+  const currentTurnUserId = isMatched ? rankedStatus.currentTurnUserId ?? null : null;
+  const isJudge = isMatched ? rankedStatus.isJudge ?? false : false;
+  const isMyTurn = isMatched
+    ? !isJudge &&
+      (currentTurnUserId
+        ? currentTurnUserId === user?.id
+        : rankedStatus.isMyTurn ?? derivedIsMyTurn)
+    : false;
+  const activeMatchId = isMatched ? rankedStatus.matchId : null;
+  const opponentLives = lives?.opponents ?? [];
+  const hasOpponentLost = opponentLives.some((life) => life <= 0);
   const isMatchOver =
-    hasMatchEnded ||
-    isTimeout ||
-    (rankedStatus.status === "matched" &&
-      ((lives?.me ?? 1) <= 0 || (lives?.partner ?? 1) <= 0));
+    hasMatchEnded || isTimeout || (isMatched && ((lives?.me ?? 1) <= 0 || hasOpponentLost));
   const isTypingTestActive = typingTest.state !== "idle";
   const isTypingTestCountdown = typingTest.state === "countdown";
   const isTypingTestResult = typingTest.state === "result";
@@ -154,35 +161,74 @@ export default function RankedPlayPage() {
         ? "Match over."
         : isTypingTestActive
           ? "Typing test in progress."
-          : cleanedIcebreaker || "Start the conversation."
+          : isMyTurn
+            ? "Your Move."
+            : cleanedIcebreaker || "Start the conversation."
       : "";
   const matchStateTone = isMatchOver
     ? "border-red-200 bg-red-50 text-red-700"
     : "border-card-border/70 bg-white/80 text-muted";
   const showCenterPanel =
     (rankedStatus.status !== "matched" || isMatchOver) && !showTypingModal;
-  const isMatched = rankedStatus.status === "matched";
-  const showMatchSnapshot = !isMatched && hasMatchEnded && lastMatchSnapshot;
+  const matchSnapshot = !isMatched && hasMatchEnded ? lastMatchSnapshot : null;
+  const showMatchSnapshot = Boolean(matchSnapshot);
   const displayLives = isMatched
-    ? lives ?? { me: 3, partner: 3 }
-    : showMatchSnapshot
-      ? showMatchSnapshot.lives
+    ? lives ?? { me: 3, opponents: [3, 3] }
+    : matchSnapshot
+      ? matchSnapshot.lives
       : null;
+  const displayOpponents = isMatched
+    ? rankedStatus.opponents
+    : matchSnapshot
+      ? matchSnapshot.opponents
+      : [];
+  const displayJudgeUserId = isMatched
+    ? rankedStatus.judgeUserId ?? null
+    : matchSnapshot
+      ? matchSnapshot.judgeUserId
+      : null;
+  const displayIsJudge = isMatched ? isJudge : matchSnapshot?.isJudge ?? false;
+  const opponentLivesById = useMemo(() => {
+    const mapping = new Map<string, number>();
+    displayOpponents.forEach((opponent, index) => {
+      mapping.set(opponent.id, displayLives?.opponents?.[index] ?? 3);
+    });
+    return mapping;
+  }, [displayOpponents, displayLives?.opponents]);
+  const [leftOpponent, rightOpponent] = useMemo(() => {
+    if (displayOpponents.length === 0) {
+      return [null, null] as const;
+    }
+    if (displayJudgeUserId && !displayIsJudge) {
+      const judgeOpponent =
+        displayOpponents.find((opponent) => opponent.id === displayJudgeUserId) ??
+        displayOpponents[0];
+      const otherOpponent =
+        displayOpponents.find((opponent) => opponent.id !== judgeOpponent.id) ??
+        displayOpponents[1] ??
+        null;
+      return [judgeOpponent, otherOpponent] as const;
+    }
+    return [displayOpponents[0] ?? null, displayOpponents[1] ?? null] as const;
+  }, [displayOpponents, displayIsJudge, displayJudgeUserId]);
   const didWin =
     isMatchOver &&
+    !displayIsJudge &&
     (displayLives?.me ?? 0) > 0 &&
-    (displayLives?.partner ?? 0) <= 0;
+    (displayLives?.opponents?.some((life) => life <= 0) ?? false);
   const matchModalTitle = isMatchOver
-    ? didWin
-      ? "You Won"
-      : "You Lose"
+    ? displayIsJudge
+      ? "Match Complete"
+      : didWin
+        ? "You Won"
+        : "You Lose"
     : rankedStatus.status === "waiting"
-      ? "Searching for a partner..."
+      ? "Searching for players..."
       : "Ready To Play";
   const matchModalBody = isMatchOver
     ? "Start a new match when you're ready."
     : rankedStatus.status === "waiting"
-      ? "Stay here - we will drop them into the chat once matched."
+      ? "Stay here - we will drop you into the chat once matched."
       : "Press play to get paired with someone new.";
   const matchModalActionLabel = isMatchOver
     ? "Play Again"
@@ -192,18 +238,29 @@ export default function RankedPlayPage() {
   const myName = user?.name ?? "You";
   const myHandle = user?.handle ?? "you";
   const isAdmin = Boolean(user?.isAdmin);
-  const displayPartner = isMatched
-    ? rankedStatus.partner
-    : showMatchSnapshot
-      ? showMatchSnapshot.partner
-      : null;
-  const partnerName = displayPartner?.name ?? "Waiting for a match";
-  const partnerHandle = displayPartner?.handle ?? "Queue up to play.";
-  const partnerProfileHref = displayPartner?.handle
-    ? `/profile/${encodeURIComponent(displayPartner.handle.replace(/^@/, ""))}`
-    : null;
   const myLivesCount = displayLives?.me ?? 3;
-  const partnerLivesCount = displayLives?.partner ?? 3;
+  const leftOpponentName = leftOpponent?.name ?? "Waiting for a match";
+  const leftOpponentHandle = leftOpponent?.handle ?? "Queue up to play.";
+  const leftOpponentProfileHref = leftOpponent?.handle
+    ? `/profile/${encodeURIComponent(leftOpponent.handle.replace(/^@/, ""))}`
+    : null;
+  const rightOpponentName = rightOpponent?.name ?? "Waiting for a match";
+  const rightOpponentHandle = rightOpponent?.handle ?? "Queue up to play.";
+  const rightOpponentProfileHref = rightOpponent?.handle
+    ? `/profile/${encodeURIComponent(rightOpponent.handle.replace(/^@/, ""))}`
+    : null;
+  const leftOpponentLivesCount = leftOpponent
+    ? opponentLivesById.get(leftOpponent.id) ?? 3
+    : 3;
+  const rightOpponentLivesCount = rightOpponent
+    ? opponentLivesById.get(rightOpponent.id) ?? 3
+    : 3;
+  const chatOpponent =
+    !displayIsJudge
+      ? displayOpponents.find((opponent) => opponent.id !== displayJudgeUserId) ??
+        displayOpponents[0] ??
+        null
+      : displayOpponents[0] ?? null;
   const renderHearts = (filledCount: number, alignRight = false) => (
     <div className={`flex items-center gap-1 ${alignRight ? "justify-end" : ""}`}>
       {Array.from({ length: 3 }).map((_, index) => {
@@ -299,10 +356,16 @@ export default function RankedPlayPage() {
     isAdmin && isMatched && !isMatchOver && !isTypingTestActive && !isRoleModalActive;
   const typingWordsText =
     typingTest.words.length > 0 ? typingTest.words.join(" ") : "Loading words...";
+  const typingTestDisabled = displayIsJudge;
+  const typingWinnerName =
+    typingTest.winnerId && typingTest.winnerId !== user?.id
+      ? displayOpponents.find((opponent) => opponent.id === typingTest.winnerId)
+          ?.name ?? "Opponent"
+      : "You";
   const typingResultTitle = typingTest.winnerId
     ? typingTest.winnerId === user?.id
       ? "You won the typing test!"
-      : `${partnerName} won the typing test`
+      : `${typingWinnerName} won the typing test`
     : "Typing test finished";
   const getRemainingSeconds = useCallback((turnStartedAt: string) => {
     const startedMs = Date.parse(turnStartedAt);
@@ -314,16 +377,22 @@ export default function RankedPlayPage() {
     return Math.max(0, Math.ceil(remainingMs / 1000));
   }, []);
   const showTimerSnapshot = isMatched || !!showMatchSnapshot;
-  const myTimerSeconds = showTimerSnapshot
+  const activeTurnSeconds = showTimerSnapshot
     ? isTurnBlocked
       ? TURN_SECONDS
       : timeLeft
     : TURN_SECONDS;
-  const partnerTimerSeconds = showTimerSnapshot
-    ? isTurnBlocked
-      ? TURN_SECONDS
-      : partnerTimeLeft
-    : TURN_SECONDS;
+  const getTimerSecondsForUser = (id?: string | null) => {
+    if (!id || !showTimerSnapshot) {
+      return TURN_SECONDS;
+    }
+    if (!currentTurnUserId || isTurnBlocked || isMatchOver) {
+      return TURN_SECONDS;
+    }
+    return currentTurnUserId === id ? activeTurnSeconds : TURN_SECONDS;
+  };
+  const isTimerActiveForUser = (id?: string | null) =>
+    isMatched && !isMatchOver && !isTurnBlocked && !!id && currentTurnUserId === id;
   const syncTimer = useCallback(
     (turnStartedAt: string | null, serverTime?: string, timedOut?: boolean) => {
       if (!turnStartedAt) {
@@ -451,8 +520,10 @@ export default function RankedPlayPage() {
   useEffect(() => {
     if (rankedStatus.status === "matched") {
       setLastMatchSnapshot({
-        partner: rankedStatus.partner,
-        lives: rankedStatus.lives ?? { me: 3, partner: 3 },
+        opponents: rankedStatus.opponents,
+        lives: rankedStatus.lives ?? { me: 3, opponents: [3, 3] },
+        judgeUserId: rankedStatus.judgeUserId ?? null,
+        isJudge: rankedStatus.isJudge ?? false,
       });
     }
   }, [rankedStatus]);
@@ -478,36 +549,27 @@ export default function RankedPlayPage() {
           turnStartedAtRef.current = status.turnStartedAt;
         }
         const matchOver =
-          (status.lives?.me ?? 1) <= 0 || (status.lives?.partner ?? 1) <= 0;
+          (status.lives?.me ?? 1) <= 0 ||
+          (status.lives?.opponents?.some((life) => life <= 0) ?? false);
         if (matchOver) {
           setHasMatchEnded(true);
         }
-        const remaining = status.turnStartedAt
-          ? getRemainingSeconds(status.turnStartedAt)
-          : TURN_SECONDS;
-        if (status.isMyTurn === false) {
-          setTimeLeft(TURN_SECONDS);
-          setPartnerTimeLeft(remaining);
-          if (matchOver) {
-            setIsTimeout(true);
-          } else if (!hasMatchEnded) {
-            setIsTimeout(false);
-          }
+        if (matchOver) {
+          setIsTimeout(true);
+        } else if (!hasMatchEnded) {
+          setIsTimeout(false);
+        }
+        if (status.turnStartedAt) {
+          syncTimer(status.turnStartedAt, status.serverTime, matchOver);
         } else {
-          setPartnerTimeLeft(TURN_SECONDS);
-          if (matchOver) {
-            setTimeLeft(remaining);
-            setIsTimeout(true);
-          } else if (!hasMatchEnded) {
-            syncTimer(status.turnStartedAt ?? null, status.serverTime);
-          }
+          setTimeLeft(TURN_SECONDS);
         }
       }
     } catch (error) {
       console.error("Ranked status error", error);
       setQueueError(error instanceof Error ? error.message : "Unable to load status.");
     }
-  }, [getRemainingSeconds, hasMatchEnded, maybeStartRoleModal, syncTimer, token]);
+  }, [hasMatchEnded, maybeStartRoleModal, syncTimer, token]);
 
   const loadMessages = useCallback(async () => {
     if (!token || !activeMatchId) {
@@ -530,7 +592,10 @@ export default function RankedPlayPage() {
         turnStartedAt: string;
         serverTime: string;
         isMyTurn: boolean;
-        lives?: { me: number; partner: number };
+        currentTurnUserId?: string | null;
+        isJudge?: boolean;
+        judgeUserId?: string | null;
+        lives?: { me: number; opponents: number[] };
         typing?: string;
         typingTest?: TypingTestPayload;
         icebreakerQuestion?: string | null;
@@ -553,6 +618,9 @@ export default function RankedPlayPage() {
           ? {
               ...prev,
               isMyTurn: payload.isMyTurn ?? prev.isMyTurn,
+              currentTurnUserId: payload.currentTurnUserId ?? prev.currentTurnUserId,
+              isJudge: payload.isJudge ?? prev.isJudge,
+              judgeUserId: payload.judgeUserId ?? prev.judgeUserId,
               lives: payload.lives ?? prev.lives,
               turnStartedAt: payload.turnStartedAt ?? prev.turnStartedAt,
               serverTime: payload.serverTime ?? prev.serverTime,
@@ -568,38 +636,28 @@ export default function RankedPlayPage() {
       const matchOver =
         payload.timedOut ||
         (payload.lives?.me ?? 1) <= 0 ||
-        (payload.lives?.partner ?? 1) <= 0;
+        (payload.lives?.opponents?.some((life) => life <= 0) ?? false);
       if (matchOver) {
         setHasMatchEnded(true);
       }
-      const remaining = payload.turnStartedAt
-        ? getRemainingSeconds(payload.turnStartedAt)
-        : TURN_SECONDS;
       const nextTypingTest = payload.typingTest ?? { state: "idle", words: [] };
       setTypingTest(nextTypingTest);
       if (nextTypingTest.state !== "idle") {
         setTimeLeft(TURN_SECONDS);
-        setPartnerTimeLeft(TURN_SECONDS);
         setIsTimeout(false);
-      } else if (payload.isMyTurn === false) {
+      } else if (matchOver) {
+        setIsTimeout(true);
         setTimeLeft(TURN_SECONDS);
-        setPartnerTimeLeft(remaining);
-        if (matchOver) {
-          setIsTimeout(true);
-        } else if (!hasMatchEnded) {
-          setIsTimeout(false);
-        }
-      } else {
-        setPartnerTimeLeft(TURN_SECONDS);
-        if (matchOver) {
-          setTimeLeft(remaining);
-          setIsTimeout(true);
-        } else if (!hasMatchEnded) {
+      } else if (!hasMatchEnded) {
+        setIsTimeout(false);
+        if (payload.turnStartedAt) {
           syncTimer(payload.turnStartedAt, payload.serverTime, payload.timedOut);
+        } else {
+          setTimeLeft(TURN_SECONDS);
         }
       }
       setMessages(payload.messages);
-      setPartnerTyping(payload.typing ?? "");
+      setOpponentTyping(payload.typing ?? "");
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         setChatError("Chat sync timed out. Retrying...");
@@ -609,7 +667,7 @@ export default function RankedPlayPage() {
         );
       }
       setMessages([]);
-      setPartnerTyping("");
+      setOpponentTyping("");
       setTypingTest({ state: "idle", words: [] });
     } finally {
       window.clearTimeout(timeout);
@@ -617,15 +675,7 @@ export default function RankedPlayPage() {
       hasLoadedMessagesRef.current = true;
       isLoadingMessagesRef.current = false;
     }
-  }, [
-    activeMatchId,
-    getRemainingSeconds,
-    hasMatchEnded,
-    maybeStartRoleModal,
-    rankedStatus.status,
-    syncTimer,
-    token,
-  ]);
+  }, [activeMatchId, hasMatchEnded, maybeStartRoleModal, rankedStatus.status, syncTimer, token]);
 
   const sendTypingUpdate = useCallback(
     async (text: string) => {
@@ -673,6 +723,10 @@ export default function RankedPlayPage() {
     if (!token || rankedStatus.status !== "matched" || !activeMatchId) {
       return;
     }
+    if (displayIsJudge) {
+      setTypingTestError("Judges observe only.");
+      return;
+    }
     const canType = isMyTurn && !isMatchOver && !isTurnExpired && !isTurnBlocked;
     const nextText = canType ? draft : "";
 
@@ -714,10 +768,9 @@ export default function RankedPlayPage() {
       setIsTimeout(false);
       if (!hasMatchEnded) {
         setTimeLeft(TURN_SECONDS);
-        setPartnerTimeLeft(TURN_SECONDS);
       }
       turnTimeoutReportedRef.current = null;
-      setPartnerTyping("");
+      setOpponentTyping("");
       setTypingTest({ state: "idle", words: [] });
       setTypingAttempt("");
       setTypingTestError(null);
@@ -735,10 +788,10 @@ export default function RankedPlayPage() {
       setDraft("");
       setSavedAt(null);
       setIsTimeout(false);
-      setPartnerTimeLeft(TURN_SECONDS);
+      setTimeLeft(TURN_SECONDS);
       setHasMatchEnded(false);
       turnTimeoutReportedRef.current = null;
-      setPartnerTyping("");
+      setOpponentTyping("");
       setTypingTest({ state: "idle", words: [] });
       setTypingAttempt("");
       setTypingTestError(null);
@@ -750,7 +803,6 @@ export default function RankedPlayPage() {
 
     if (isTurnBlocked) {
       setTimeLeft(TURN_SECONDS);
-      setPartnerTimeLeft(TURN_SECONDS);
       return;
     }
 
@@ -758,25 +810,14 @@ export default function RankedPlayPage() {
     if (rankedStatus.turnStartedAt) {
       const matchOver =
         (rankedStatus.lives?.me ?? 1) <= 0 ||
-        (rankedStatus.lives?.partner ?? 1) <= 0 ||
+        (rankedStatus.lives?.opponents?.some((life) => life <= 0) ?? false) ||
         hasMatchEnded;
-      const remaining = getRemainingSeconds(rankedStatus.turnStartedAt);
-      if (rankedStatus.isMyTurn === false) {
+      if (matchOver) {
+        setIsTimeout(true);
         setTimeLeft(TURN_SECONDS);
-        setPartnerTimeLeft(remaining);
-        if (matchOver) {
-          setIsTimeout(true);
-        } else {
-          setIsTimeout(false);
-        }
       } else {
-        setPartnerTimeLeft(TURN_SECONDS);
-        if (matchOver) {
-          setTimeLeft(remaining);
-          setIsTimeout(true);
-        } else {
-          syncTimer(rankedStatus.turnStartedAt, rankedStatus.serverTime);
-        }
+        setIsTimeout(false);
+        syncTimer(rankedStatus.turnStartedAt, rankedStatus.serverTime);
       }
     }
     if (!isMatchOver) {
@@ -784,12 +825,10 @@ export default function RankedPlayPage() {
     }
   }, [
     activeMatchId,
-    getRemainingSeconds,
     loadMessages,
     isMatchOver,
     hasMatchEnded,
     isTurnBlocked,
-    rankedStatus.status === "matched" ? rankedStatus.isMyTurn : undefined,
     rankedStatus.status === "matched" ? rankedStatus.lives : undefined,
     rankedStatus.status === "matched" ? rankedStatus.serverTime : undefined,
     rankedStatus.status,
@@ -862,25 +901,17 @@ export default function RankedPlayPage() {
       if (status.status === "matched") {
         maybeStartRoleModal(status.matchId);
         const matchOver =
-          (status.lives?.me ?? 1) <= 0 || (status.lives?.partner ?? 1) <= 0;
-        const remaining = status.turnStartedAt
-          ? getRemainingSeconds(status.turnStartedAt)
-          : TURN_SECONDS;
-        if (status.isMyTurn === false) {
+          (status.lives?.me ?? 1) <= 0 ||
+          (status.lives?.opponents?.some((life) => life <= 0) ?? false);
+        if (matchOver) {
+          setIsTimeout(true);
           setTimeLeft(TURN_SECONDS);
-          setPartnerTimeLeft(remaining);
-          if (matchOver) {
-            setIsTimeout(true);
-          } else {
-            setIsTimeout(false);
-          }
         } else {
-          setPartnerTimeLeft(TURN_SECONDS);
-          if (matchOver) {
-            setTimeLeft(remaining);
-            setIsTimeout(true);
+          setIsTimeout(false);
+          if (status.turnStartedAt) {
+            syncTimer(status.turnStartedAt, status.serverTime);
           } else {
-            syncTimer(status.turnStartedAt ?? null, status.serverTime);
+            setTimeLeft(TURN_SECONDS);
           }
         }
       }
@@ -908,7 +939,6 @@ export default function RankedPlayPage() {
       setRankedStatus({ status: "idle" });
       setMessages([]);
       setSavedAt(null);
-      setPartnerTimeLeft(TURN_SECONDS);
     } catch (error) {
       setQueueError(error instanceof Error ? error.message : "Unable to cancel queue.");
     } finally {
@@ -928,12 +958,16 @@ export default function RankedPlayPage() {
       );
       return;
     }
+    if (isJudge) {
+      setChatError("Judges cannot send messages.");
+      return;
+    }
     if (!isMyTurn || justSentRef.current) {
-      setChatError("Wait for your partner to reply before sending again.");
+      setChatError("Wait for your opponent to reply before sending again.");
       return;
     }
     if (isTurnExpired) {
-      setChatError("Your turn expired. Waiting for your partner.");
+      setChatError("Your turn expired. Waiting for your opponent.");
       reportTurnTimeout();
       sendTypingUpdate("");
       return;
@@ -959,7 +993,15 @@ export default function RankedPlayPage() {
       setDraft("");
       sendTypingUpdate("");
       setRankedStatus((prev) =>
-        prev.status === "matched" ? { ...prev, isMyTurn: false } : prev
+        prev.status === "matched"
+          ? {
+              ...prev,
+              isMyTurn: false,
+              currentTurnUserId:
+                prev.opponents.find((opponent) => opponent.id !== prev.judgeUserId)
+                  ?.id ?? prev.currentTurnUserId,
+            }
+          : prev
       );
       setTimeLeft(TURN_SECONDS);
       setIsTimeout(false);
@@ -1106,21 +1148,13 @@ export default function RankedPlayPage() {
     const timer = window.setInterval(() => {
       if (isTurnBlocked) {
         setTimeLeft(TURN_SECONDS);
-        setPartnerTimeLeft(TURN_SECONDS);
         return;
       }
       if (!turnStartedAtRef.current || isMatchOver) {
         return;
       }
-      if (!isMyTurn) {
-        setTimeLeft(TURN_SECONDS);
-        const remaining = getRemainingSeconds(turnStartedAtRef.current);
-        setPartnerTimeLeft(remaining);
-        return;
-      }
       const remainingSeconds = getRemainingSeconds(turnStartedAtRef.current);
       setTimeLeft(remainingSeconds);
-      setPartnerTimeLeft(TURN_SECONDS);
       if (remainingSeconds <= 0) {
         reportTurnTimeout();
       }
@@ -1132,7 +1166,6 @@ export default function RankedPlayPage() {
   }, [
     getRemainingSeconds,
     isMatchOver,
-    isMyTurn,
     isTurnBlocked,
     rankedStatus.status,
     reportTurnTimeout,
@@ -1144,28 +1177,37 @@ export default function RankedPlayPage() {
         <div className="flex flex-col gap-4">
           <div className="grid gap-6 md:grid-cols-[1fr_auto_1fr]">
             <div className="flex min-w-[240px] items-center gap-3 md:justify-self-start">
-              {user?.name ? (
-                <Avatar name={myName} size={44} />
+              {leftOpponent ? (
+                leftOpponentProfileHref ? (
+                  <Link
+                    href={leftOpponentProfileHref}
+                    className="rounded-full transition hover:-translate-y-0.5 hover:shadow-sm"
+                  >
+                    <Avatar name={leftOpponentName} size={44} />
+                  </Link>
+                ) : (
+                  <Avatar name={leftOpponentName} size={44} />
+                )
               ) : (
                 <div className="h-11 w-11 rounded-full bg-card-border/60" />
               )}
               <div className="flex min-w-0 flex-col">
                 <div className="flex items-start gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-ink">{myName}</p>
-                    <p className="text-xs text-muted">{myHandle}</p>
+                    <p className="text-sm font-semibold text-ink">{leftOpponentName}</p>
+                    <p className="text-xs text-muted">{leftOpponentHandle}</p>
                   </div>
                   <div className="mt-[6px] flex flex-col items-start gap-1">
-                    {renderHearts(myLivesCount)}
+                    {renderHearts(leftOpponentLivesCount)}
                     {renderTimerBar(
-                      myTimerSeconds,
-                      isMatched && isMyTurn && !isMatchOver && !isTurnBlocked
+                      getTimerSecondsForUser(leftOpponent?.id),
+                      isTimerActiveForUser(leftOpponent?.id)
                     )}
                   </div>
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-center">
+            <div className="flex flex-col items-center justify-center gap-2">
               {showSmiteButton && (
                 <Button
                   variant="outline"
@@ -1176,18 +1218,40 @@ export default function RankedPlayPage() {
                   {isSmiting ? "Smiting..." : "Smite Opp"}
                 </Button>
               )}
+              <div className="flex min-w-[240px] items-center justify-center gap-3">
+                {user?.name ? (
+                  <Avatar name={myName} size={44} />
+                ) : (
+                  <div className="h-11 w-11 rounded-full bg-card-border/60" />
+                )}
+                <div className="flex min-w-0 flex-col">
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-ink">{myName}</p>
+                      <p className="text-xs text-muted">{myHandle}</p>
+                    </div>
+                    <div className="mt-[6px] flex flex-col items-start gap-1">
+                      {renderHearts(myLivesCount)}
+                      {renderTimerBar(
+                        getTimerSecondsForUser(user?.id),
+                        isTimerActiveForUser(user?.id)
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="flex min-w-[240px] flex-row-reverse items-center justify-end gap-3 text-right md:justify-self-end">
-              {displayPartner ? (
-                partnerProfileHref ? (
+              {rightOpponent ? (
+                rightOpponentProfileHref ? (
                   <Link
-                    href={partnerProfileHref}
+                    href={rightOpponentProfileHref}
                     className="rounded-full transition hover:-translate-y-0.5 hover:shadow-sm"
                   >
-                    <Avatar name={partnerName} size={44} />
+                    <Avatar name={rightOpponentName} size={44} />
                   </Link>
                 ) : (
-                  <Avatar name={partnerName} size={44} />
+                  <Avatar name={rightOpponentName} size={44} />
                 )
               ) : (
                 <div className="h-11 w-11 rounded-full bg-card-border/60" />
@@ -1195,14 +1259,14 @@ export default function RankedPlayPage() {
               <div className="flex min-w-0 flex-col items-end">
                 <div className="flex flex-row-reverse items-start gap-3">
                   <div className="min-w-0 text-right">
-                    <p className="text-sm font-semibold text-ink">{partnerName}</p>
-                    <p className="text-xs text-muted">{partnerHandle}</p>
+                    <p className="text-sm font-semibold text-ink">{rightOpponentName}</p>
+                    <p className="text-xs text-muted">{rightOpponentHandle}</p>
                   </div>
                   <div className="mt-[6px] flex flex-col items-end gap-1">
-                    {renderHearts(partnerLivesCount, true)}
+                    {renderHearts(rightOpponentLivesCount, true)}
                     {renderTimerBar(
-                      partnerTimerSeconds,
-                      isMatched && !isMyTurn && !isMatchOver && !isTurnBlocked,
+                      getTimerSecondsForUser(rightOpponent?.id),
+                      isTimerActiveForUser(rightOpponent?.id),
                       true
                     )}
                   </div>
@@ -1289,7 +1353,12 @@ export default function RankedPlayPage() {
                           onChange={(event) => setTypingAttempt(event.target.value)}
                           onKeyDown={handleTypingAttemptKeyDown}
                           className="w-full rounded-full border border-card-border/70 bg-white/90 px-5 py-3 text-sm text-ink outline-none transition focus:border-accent/60"
-                          placeholder="Type the 10 words here"
+                          placeholder={
+                            typingTestDisabled
+                              ? "Judges observe the typing test."
+                              : "Type the 10 words here"
+                          }
+                          disabled={typingTestDisabled}
                         />
                         {typingTestError && (
                           <div className="rounded-full border border-accent/30 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent">
@@ -1298,7 +1367,9 @@ export default function RankedPlayPage() {
                         )}
                         <Button
                           type="submit"
-                          disabled={isTypingSubmitting || !typingAttempt.trim()}
+                          disabled={
+                            typingTestDisabled || isTypingSubmitting || !typingAttempt.trim()
+                          }
                         >
                           {isTypingSubmitting ? "Submitting..." : "Submit"}
                         </Button>
@@ -1310,10 +1381,10 @@ export default function RankedPlayPage() {
                         <p className="text-sm text-muted">Loading chat...</p>
                       ) : messages.length === 0 ? (
                         <div className="space-y-3">
-                          {partnerTyping && (
+                          {opponentTyping && (
                             <div className="flex justify-start">
                               <div className="max-w-[90%] rounded-2xl border border-dashed border-card-border/70 bg-white/70 px-4 py-2 text-sm italic text-muted opacity-70">
-                                {partnerTyping}
+                                {opponentTyping}
                               </div>
                             </div>
                           )}
@@ -1350,10 +1421,10 @@ export default function RankedPlayPage() {
                               </div>
                             );
                           })}
-                          {partnerTyping && (
+                          {opponentTyping && (
                             <div className="flex justify-start">
                               <div className="max-w-[90%] rounded-2xl border border-dashed border-card-border/70 bg-white/70 px-4 py-2 text-sm italic text-muted opacity-70">
-                                {partnerTyping}
+                                {opponentTyping}
                               </div>
                             </div>
                           )}
@@ -1383,7 +1454,9 @@ export default function RankedPlayPage() {
                 onKeyDown={handleEnterToSend}
                 placeholder={
                   rankedStatus.status === "matched"
-                    ? `Message ${displayPartner?.handle ?? "your opponent"}`
+                    ? displayIsJudge
+                      ? "Judging mode."
+                      : `Message ${chatOpponent?.handle ?? "your opponent"}`
                     : "Queue up to unlock chat."
                 }
                 ref={inputRef}
@@ -1432,12 +1505,18 @@ export default function RankedPlayPage() {
             <div className="w-full max-w-md rounded-3xl border border-card-border/70 bg-white px-6 py-5 shadow-sm">
               {showRoleModal ? (
                 <>
-                  <p className="text-base font-semibold text-ink">Character Role</p>
-                  <p className="mt-2 text-sm font-semibold text-ink">
-                    {characterRole ?? "Loading role..."}
+                  <p className="text-base font-semibold text-ink">
+                    {isJudge ? "You are the judge." : "Character Role"}
                   </p>
+                  {!isJudge && (
+                    <p className="mt-2 text-sm font-semibold text-ink">
+                      {characterRole ? `You play: ${characterRole}` : "Loading role..."}
+                    </p>
+                  )}
                   <p className="mt-2 text-xs text-muted">
-                    Play this role for the conversation.
+                    {isJudge
+                      ? "Observe the conversation and decide the winner."
+                      : "Play this role for the conversation."}
                   </p>
                   <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-card-border/60">
                     <div
