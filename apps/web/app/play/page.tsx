@@ -1425,16 +1425,32 @@ export default function RankedPlayPage() {
                           {messages.map((message) => {
                             const isMine = message.sender.id === user?.id;
                             const isSelected = selectedMessageId === message.id;
+                            const judgeOpponentIndex = displayOpponents.findIndex(
+                              (opponent) => opponent.id === message.sender.id
+                            );
+                            const judgeIsLeft = judgeOpponentIndex === 0;
+                            const judgeIsRight = judgeOpponentIndex === 1;
                             const messageTone = displayIsJudge
-                              ? "border border-card-border/70 bg-white text-ink"
+                              ? isMine
+                                ? "bg-accent text-white"
+                                : judgeIsLeft
+                                  ? "bg-rose-500 text-white"
+                                  : "bg-sky-500 text-white"
                               : messageColorById.get(message.sender.id) ??
                                 "border border-card-border/70 bg-white/90 text-ink";
+                            const messageAlignment = displayIsJudge
+                              ? isMine
+                                ? "justify-end"
+                                : judgeIsLeft
+                                  ? "justify-start"
+                                  : "justify-end"
+                              : isMine
+                                ? "justify-end"
+                                : "justify-start";
                             return (
                               <div
                                 key={message.id}
-                                className={`flex ${
-                                  isMine ? "justify-end" : "justify-start"
-                                }`}
+                                className={`flex ${messageAlignment}`}
                               >
                                 <div
                                   onClick={() => setSelectedMessageId(message.id)}
