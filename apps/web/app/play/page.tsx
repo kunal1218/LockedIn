@@ -268,18 +268,18 @@ export default function RankedPlayPage() {
     return 0;
   }, [isTypingTestCountdown, isTypingTestResult, typingModalTick, typingTest.resultAt, typingTest.startedAt]);
   const roleModalProgress = useMemo(() => {
-    if (!characterRole || roleModalStartMs === null) {
+    if (roleModalStartMs === null) {
       return 0;
     }
     const elapsed = Date.now() - roleModalStartMs;
     return Math.min(1, elapsed / (ROLE_MODAL_SECONDS * 1000));
-  }, [characterRole, roleModalStartMs, roleModalTick]);
+  }, [roleModalStartMs, roleModalTick]);
   const isRoleModalActive = useMemo(() => {
-    if (!characterRole || roleModalStartMs === null) {
+    if (roleModalStartMs === null) {
       return false;
     }
     return Date.now() - roleModalStartMs < ROLE_MODAL_SECONDS * 1000;
-  }, [characterRole, roleModalStartMs, roleModalTick]);
+  }, [roleModalStartMs, roleModalTick]);
   const showRoleModal = isRoleModalActive;
   const showBlockingModal = showTypingModal || showRoleModal;
   const showStatusBar =
