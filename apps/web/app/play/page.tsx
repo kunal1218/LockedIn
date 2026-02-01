@@ -140,9 +140,12 @@ export default function RankedPlayPage() {
     : false;
   const activeMatchId = isMatched ? rankedStatus.matchId : null;
   const opponentLives = lives?.opponents ?? [];
-  const hasOpponentLost = opponentLives.some((life) => life <= 0);
+  const haveAllOpponentsLost =
+    opponentLives.length > 0 && opponentLives.every((life) => life <= 0);
   const isMatchOver =
-    hasMatchEnded || isTimeout || (isMatched && ((lives?.me ?? 1) <= 0 || hasOpponentLost));
+    hasMatchEnded ||
+    isTimeout ||
+    (isMatched && ((lives?.me ?? 1) <= 0 || haveAllOpponentsLost));
   const isTypingTestActive = typingTest.state !== "idle";
   const isTypingTestCountdown = typingTest.state === "countdown";
   const isTypingTestResult = typingTest.state === "result";
@@ -219,7 +222,9 @@ export default function RankedPlayPage() {
     isMatchOver &&
     !displayIsJudge &&
     (displayLives?.me ?? 0) > 0 &&
-    (displayLives?.opponents?.some((life) => life <= 0) ?? false);
+    ((displayLives?.opponents?.length ?? 0) > 0
+      ? displayLives?.opponents?.every((life) => life <= 0)
+      : false);
   const matchModalTitle = isMatchOver
     ? displayIsJudge
       ? "Match Complete"
@@ -399,6 +404,9 @@ export default function RankedPlayPage() {
       ? "You won the typing test!"
       : `${typingWinnerName} won the typing test`
     : "Typing test finished";
+  const didOpponentsLose = (value?: { opponents?: number[] }) =>
+    (value?.opponents?.length ?? 0) > 0 &&
+    value?.opponents?.every((life) => life <= 0);
   const getRemainingSeconds = useCallback((turnStartedAt: string) => {
     const startedMs = Date.parse(turnStartedAt);
     if (!Number.isFinite(startedMs)) {
@@ -581,8 +589,7 @@ export default function RankedPlayPage() {
           turnStartedAtRef.current = status.turnStartedAt;
         }
         const matchOver =
-          (status.lives?.me ?? 1) <= 0 ||
-          (status.lives?.opponents?.some((life) => life <= 0) ?? false);
+          (status.lives?.me ?? 1) <= 0 || didOpponentsLose(status.lives);
         if (matchOver) {
           setHasMatchEnded(true);
         }
@@ -668,7 +675,7 @@ export default function RankedPlayPage() {
       const matchOver =
         payload.timedOut ||
         (payload.lives?.me ?? 1) <= 0 ||
-        (payload.lives?.opponents?.some((life) => life <= 0) ?? false);
+        didOpponentsLose(payload.lives);
       if (matchOver) {
         setHasMatchEnded(true);
       }
@@ -844,7 +851,7 @@ export default function RankedPlayPage() {
     if (rankedStatus.turnStartedAt) {
       const matchOver =
         (rankedStatus.lives?.me ?? 1) <= 0 ||
-        (rankedStatus.lives?.opponents?.some((life) => life <= 0) ?? false) ||
+        didOpponentsLose(rankedStatus.lives) ||
         hasMatchEnded;
       if (matchOver) {
         setIsTimeout(true);
@@ -923,8 +930,7 @@ export default function RankedPlayPage() {
       if (status.status === "matched") {
         maybeStartRoleModal(status.matchId);
         const matchOver =
-          (status.lives?.me ?? 1) <= 0 ||
-          (status.lives?.opponents?.some((life) => life <= 0) ?? false);
+          (status.lives?.me ?? 1) <= 0 || didOpponentsLose(status.lives);
         if (matchOver) {
           setIsTimeout(true);
           setTimeLeft(TURN_SECONDS);

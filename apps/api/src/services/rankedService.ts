@@ -340,6 +340,27 @@ const getLivesForUser = (match: RankedMatchRow, userId: string) => {
   return DEFAULT_LIVES;
 };
 
+const getAliveUserIds = (match: RankedMatchRow) => {
+  const alive: string[] = [];
+  if (match.user_a_id && match.user_a_lives > 0) {
+    alive.push(match.user_a_id);
+  }
+  if (match.user_b_id && match.user_b_lives > 0) {
+    alive.push(match.user_b_id);
+  }
+  if (match.user_c_id && (match.user_c_lives ?? DEFAULT_LIVES) > 0) {
+    alive.push(match.user_c_id);
+  }
+  return alive;
+};
+
+const getWinnerId = (match: RankedMatchRow) => {
+  const alive = getAliveUserIds(match);
+  return alive.length === 1 ? alive[0] : null;
+};
+
+const shouldEndMatch = (match: RankedMatchRow) => getAliveUserIds(match).length <= 1;
+
 const getActiveOpponentId = (match: RankedMatchRow, userId: string) => {
   if (match.judge_user_id && match.judge_user_id === userId) {
     return match.current_turn_user_id ?? match.user_a_id;
@@ -890,18 +911,6 @@ const applyTurnTimeout = async (
            WHEN current_turn_user_id = user_a_id THEN user_b_id
            WHEN current_turn_user_id = user_b_id THEN user_a_id
            ELSE current_turn_user_id
-         END,
-         timed_out = CASE
-           WHEN (CASE
-             WHEN current_turn_user_id = user_a_id THEN GREATEST(user_a_lives - 1, 0)
-             ELSE user_a_lives
-           END) <= 0
-           OR (CASE
-             WHEN current_turn_user_id = user_b_id THEN GREATEST(user_b_lives - 1, 0)
-             ELSE user_b_lives
-           END) <= 0
-           THEN true
-           ELSE false
          END
      WHERE id = $1
        AND timed_out = false
@@ -917,16 +926,23 @@ const applyTurnTimeout = async (
 
   const updated = result.rows[0] as RankedMatchRow;
 
-  if (updated.timed_out) {
-    const winnerId =
-      updated.user_a_lives <= 0
-        ? updated.user_b_id
-        : updated.user_b_lives <= 0
-          ? updated.user_a_id
-          : null;
+  if (shouldEndMatch(updated)) {
+    const finalResult = await db.query(
+      `UPDATE ranked_matches
+       SET timed_out = true
+       WHERE id = $1 AND timed_out = false
+       RETURNING ${rankedMatchColumns}`,
+      [updated.id]
+    );
+    const finalMatch =
+      (finalResult.rowCount ?? 0) > 0
+        ? (finalResult.rows[0] as RankedMatchRow)
+        : { ...updated, timed_out: true };
+    const winnerId = getWinnerId(finalMatch);
     if (winnerId) {
       await awardDailyWin(winnerId);
     }
+    return finalMatch;
   }
 
   return updated;
@@ -934,6 +950,28 @@ const applyTurnTimeout = async (
 
 const ensureMatchTimer = async (match: RankedMatchRow) => {
   const updatedMatch = await maybeAdvanceTypingTestState(match);
+  if (!updatedMatch.timed_out && shouldEndMatch(updatedMatch)) {
+    const finalResult = await db.query(
+      `UPDATE ranked_matches
+       SET timed_out = true
+       WHERE id = $1 AND timed_out = false
+       RETURNING ${rankedMatchColumns}`,
+      [updatedMatch.id]
+    );
+    const finalMatch =
+      (finalResult.rowCount ?? 0) > 0
+        ? (finalResult.rows[0] as RankedMatchRow)
+        : { ...updatedMatch, timed_out: true };
+    const winnerId = getWinnerId(finalMatch);
+    if (winnerId) {
+      await awardDailyWin(winnerId);
+    }
+    return {
+      startedAt: parseTimestamp(finalMatch.turn_started_at),
+      timedOut: true,
+      match: finalMatch,
+    };
+  }
   if (isTypingTestBlocking(updatedMatch)) {
     return {
       startedAt: parseTimestamp(updatedMatch.turn_started_at),
@@ -1335,18 +1373,7 @@ export const submitTypingTestAttempt = async (params: {
            WHEN user_b_id = $3 THEN GREATEST(user_b_lives - 1, 0)
            ELSE user_b_lives
          END,
-         timed_out = CASE
-           WHEN (CASE
-             WHEN user_a_id = $3 THEN GREATEST(user_a_lives - 1, 0)
-             ELSE user_a_lives
-           END) <= 0
-           OR (CASE
-             WHEN user_b_id = $3 THEN GREATEST(user_b_lives - 1, 0)
-             ELSE user_b_lives
-           END) <= 0
-           THEN true
-           ELSE timed_out
-         END
+         timed_out = timed_out
      WHERE id = $1
        AND typing_test_state = 'active'
        AND typing_test_winner_id IS NULL
@@ -1356,8 +1383,22 @@ export const submitTypingTestAttempt = async (params: {
 
   if ((updated.rowCount ?? 0) > 0) {
     const row = updated.rows[0] as RankedMatchRow;
-    if (row.timed_out) {
-      await awardDailyWin(params.userId);
+    if (shouldEndMatch(row)) {
+      const finalResult = await db.query(
+        `UPDATE ranked_matches
+         SET timed_out = true
+         WHERE id = $1 AND timed_out = false
+         RETURNING ${rankedMatchColumns}`,
+        [row.id]
+      );
+      const finalMatch =
+        (finalResult.rowCount ?? 0) > 0
+          ? (finalResult.rows[0] as RankedMatchRow)
+          : { ...row, timed_out: true };
+      const winnerId = getWinnerId(finalMatch);
+      if (winnerId) {
+        await awardDailyWin(winnerId);
+      }
     }
     return { winnerId: row.typing_test_winner_id ?? params.userId };
   }
@@ -1470,18 +1511,7 @@ export const smiteRankedOpponent = async (params: {
            WHEN user_b_id = $2 THEN GREATEST(user_b_lives - 3, 0)
            ELSE user_b_lives
          END,
-         timed_out = CASE
-           WHEN (CASE
-             WHEN user_a_id = $2 THEN GREATEST(user_a_lives - 3, 0)
-             ELSE user_a_lives
-           END) <= 0
-           OR (CASE
-             WHEN user_b_id = $2 THEN GREATEST(user_b_lives - 3, 0)
-             ELSE user_b_lives
-           END) <= 0
-           THEN true
-           ELSE timed_out
-         END,
+         timed_out = timed_out,
          typing_test_state = NULL,
          typing_test_started_at = NULL,
          typing_test_words = NULL,
@@ -1497,8 +1527,23 @@ export const smiteRankedOpponent = async (params: {
   }
 
   const row = updated.rows[0] as RankedMatchRow;
-  if (row.timed_out) {
-    await awardDailyWin(params.userId);
+  if (shouldEndMatch(row)) {
+    const finalResult = await db.query(
+      `UPDATE ranked_matches
+       SET timed_out = true
+       WHERE id = $1 AND timed_out = false
+       RETURNING ${rankedMatchColumns}`,
+      [row.id]
+    );
+    const finalMatch =
+      (finalResult.rowCount ?? 0) > 0
+        ? (finalResult.rows[0] as RankedMatchRow)
+        : { ...row, timed_out: true };
+    const winnerId = getWinnerId(finalMatch);
+    if (winnerId) {
+      await awardDailyWin(winnerId);
+    }
+    return finalMatch;
   }
   return row;
 };
