@@ -41,28 +41,12 @@ const TYPING_TEST_RESULT_SECONDS = 3;
 const TYPING_TEST_MIN_WORD_LENGTH = 3;
 const TYPING_TEST_MAX_WORD_LENGTH = 8;
 
-const CHARACTER_ROLES = [
-  "Act overly interested",
-  "Try to woo your opponent",
-  "Compliment everything they say",
-  "Constantly gas them up your opponent, like a hype person",
-  "Treat them like a long-lost best friend",
-  "Talk like their life coach",
-  "Act jealous about everything",
-  "Flirt badly and awkwardly",
-  "Be incredibly unserious",
-  "Speak like a cartoon character",
-  "Overreact to everything",
-  "Laugh at your own jokes",
-  "Talk like you're sleep-deprived",
-  "Pretend everything is extremely dramatic",
-  "Speak only in memes/slang",
-  "Treat the convo like it's life or death",
-  "Be aggressively optimistic",
-  "Act like nothing makes sense",
-];
-
 const icebreakerCache: { value: string[] | null } = { value: null };
+const characterRoleCache: {
+  value: string[] | null;
+  mtimeMs: number | null;
+  path: string | null;
+} = { value: null, mtimeMs: null, path: null };
 
 const getIcebreakerPath = () => {
   const candidates = [
@@ -74,6 +58,26 @@ const getIcebreakerPath = () => {
     path.resolve(process.cwd(), "..", "..", "..", "GameQuestions.csv"),
     path.resolve(__dirname, "..", "..", "..", "GameQuestions.csv"),
     path.resolve(__dirname, "..", "..", "..", "..", "GameQuestions.csv"),
+  ].filter(Boolean) as string[];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+};
+
+const getCharacterRolesPath = () => {
+  const candidates = [
+    process.env.CHARACTER_ROLES_PATH,
+    path.resolve(process.cwd(), "characters.csv"),
+    path.resolve(process.cwd(), "apps", "api", "characters.csv"),
+    path.resolve(process.cwd(), "..", "characters.csv"),
+    path.resolve(process.cwd(), "..", "..", "characters.csv"),
+    path.resolve(process.cwd(), "..", "..", "..", "characters.csv"),
+    path.resolve(__dirname, "..", "..", "..", "characters.csv"),
+    path.resolve(__dirname, "..", "..", "..", "..", "characters.csv"),
   ].filter(Boolean) as string[];
 
   for (const candidate of candidates) {
@@ -110,6 +114,56 @@ const loadIcebreakerQuestions = () => {
   return questions;
 };
 
+const loadCharacterRoles = () => {
+  const filePath = getCharacterRolesPath();
+  if (!filePath) {
+    characterRoleCache.value = [];
+    characterRoleCache.mtimeMs = null;
+    characterRoleCache.path = null;
+    return characterRoleCache.value;
+  }
+  let stat: fs.Stats | null = null;
+  try {
+    stat = fs.statSync(filePath);
+  } catch {
+    stat = null;
+  }
+  if (
+    stat &&
+    characterRoleCache.value &&
+    characterRoleCache.path === filePath &&
+    characterRoleCache.mtimeMs === stat.mtimeMs
+  ) {
+    return characterRoleCache.value;
+  }
+  let raw = "";
+  try {
+    raw = fs.readFileSync(filePath, "utf8");
+  } catch {
+    raw = "";
+  }
+  const roles: string[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let role = trimmed;
+    if (role.startsWith("\"") && role.endsWith("\"")) {
+      role = role.slice(1, -1).replace(/""/g, "\"");
+    }
+    if (role) {
+      roles.push(role);
+    }
+  }
+  // Drop a simple header if present.
+  if (roles.length > 1 && roles[0]?.toLowerCase().includes("role")) {
+    roles.shift();
+  }
+  characterRoleCache.value = roles;
+  characterRoleCache.mtimeMs = stat ? stat.mtimeMs : null;
+  characterRoleCache.path = filePath;
+  return roles;
+};
+
 const pickIcebreakerQuestion = () => {
   const questions = loadIcebreakerQuestions();
   if (questions.length === 0) {
@@ -120,11 +174,12 @@ const pickIcebreakerQuestion = () => {
 };
 
 const pickCharacterRole = () => {
-  if (CHARACTER_ROLES.length === 0) {
+  const roles = loadCharacterRoles();
+  if (roles.length === 0) {
     return null;
   }
-  const index = Math.floor(Math.random() * CHARACTER_ROLES.length);
-  return CHARACTER_ROLES[index] ?? null;
+  const index = Math.floor(Math.random() * roles.length);
+  return roles[index] ?? null;
 };
 
 const ensureIcebreakerQuestion = async (

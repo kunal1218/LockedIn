@@ -182,7 +182,7 @@ export default function RankedPlayPage() {
   const matchModalBody = isMatchOver
     ? "Start a new match when you're ready."
     : rankedStatus.status === "waiting"
-      ? "Stay here — we will drop them into the chat once matched."
+      ? "Stay here - we will drop them into the chat once matched."
       : "Press play to get paired with someone new.";
   const matchModalActionLabel = isMatchOver
     ? "Play Again"
