@@ -196,9 +196,9 @@ const ensureIcebreakerQuestion = async (
     `UPDATE ranked_matches
      SET icebreaker_question = $2
      WHERE id = $1 AND icebreaker_question IS NULL
-      RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
+     RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
                user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
-               icebreaker_question, character_role, character_role_assigned_at,
+               icebreaker_question, character_role_a, character_role_b, character_role_assigned_at_a, character_role_assigned_at_b,
                typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at`,
     [match.id, question]
   );
@@ -212,53 +212,41 @@ const ensureCharacterRole = async (
   match: RankedMatchRow
 ): Promise<RankedMatchRow> => {
   let currentMatch = match;
-  if (typeof currentMatch.character_role === "undefined") {
+  if (typeof currentMatch.character_role_a === "undefined") {
     const refreshed = await getMatch(currentMatch.id);
     if (refreshed) {
       currentMatch = refreshed;
     }
   }
-  if (currentMatch.character_role) {
-    if (currentMatch.character_role_assigned_at) {
-      return currentMatch;
-    }
-    const updated = await db.query(
-      `UPDATE ranked_matches
-       SET character_role_assigned_at = now()
-       WHERE id = $1 AND character_role_assigned_at IS NULL
-       RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
-                 user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
-                 icebreaker_question, character_role, character_role_assigned_at,
-                 typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at`,
-      [currentMatch.id]
-    );
-    if ((updated.rowCount ?? 0) > 0) {
-      return updated.rows[0] as RankedMatchRow;
-    }
-    return { ...currentMatch, character_role_assigned_at: new Date().toISOString() };
-  }
-  const role = pickCharacterRole();
-  if (!role) {
+  const roleA = currentMatch.character_role_a ?? pickCharacterRole();
+  const roleB = currentMatch.character_role_b ?? pickCharacterRole();
+  if (!roleA || !roleB) {
     return currentMatch;
   }
   const updated = await db.query(
     `UPDATE ranked_matches
-     SET character_role = $2,
-         character_role_assigned_at = now()
-     WHERE id = $1 AND character_role IS NULL
+     SET character_role_a = COALESCE(character_role_a, $2),
+         character_role_b = COALESCE(character_role_b, $3),
+         character_role_assigned_at_a = COALESCE(character_role_assigned_at_a, now()),
+         character_role_assigned_at_b = COALESCE(character_role_assigned_at_b, now())
+     WHERE id = $1
      RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
                user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
-               icebreaker_question, character_role, character_role_assigned_at,
+               icebreaker_question, character_role_a, character_role_b, character_role_assigned_at_a, character_role_assigned_at_b,
                typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at`,
-    [currentMatch.id, role]
+    [currentMatch.id, roleA, roleB]
   );
   if ((updated.rowCount ?? 0) > 0) {
     return updated.rows[0] as RankedMatchRow;
   }
   return {
     ...currentMatch,
-    character_role: role,
-    character_role_assigned_at: new Date().toISOString(),
+    character_role_a: roleA,
+    character_role_b: roleB,
+    character_role_assigned_at_a:
+      currentMatch.character_role_assigned_at_a ?? new Date().toISOString(),
+    character_role_assigned_at_b:
+      currentMatch.character_role_assigned_at_b ?? new Date().toISOString(),
   };
 };
 
@@ -277,8 +265,10 @@ type RankedMatchRow = {
   user_a_typing_at: string | Date | null;
   user_b_typing_at: string | Date | null;
   icebreaker_question?: string | null;
-  character_role?: string | null;
-  character_role_assigned_at?: string | Date | null;
+  character_role_a?: string | null;
+  character_role_b?: string | null;
+  character_role_assigned_at_a?: string | Date | null;
+  character_role_assigned_at_b?: string | Date | null;
   typing_test_round?: number;
   typing_test_state?: string | null;
   typing_test_started_at?: string | Date | null;
@@ -303,6 +293,19 @@ const mapUser = (row: { id: string; name: string; handle: string }): MessageUser
   name: row.name,
   handle: row.handle,
 });
+
+const getCharacterRoleForUser = (
+  match: RankedMatchRow,
+  userId: string
+): { role: string | null; assignedAt: string | null } => {
+  const isUserA = match.user_a_id === userId;
+  const role = isUserA ? match.character_role_a ?? null : match.character_role_b ?? null;
+  const assignedAtRaw = isUserA
+    ? match.character_role_assigned_at_a
+    : match.character_role_assigned_at_b;
+  const assignedAt = assignedAtRaw ? parseTimestamp(assignedAtRaw).toISOString() : null;
+  return { role, assignedAt };
+};
 
 const fetchUserById = async (userId: string): Promise<MessageUser> => {
   await ensureUsersTable();
@@ -352,8 +355,10 @@ const ensureRankedTables = async () => {
         user_a_typing_at timestamptz,
         user_b_typing_at timestamptz,
         icebreaker_question text,
-        character_role text,
-        character_role_assigned_at timestamptz,
+        character_role_a text,
+        character_role_b text,
+        character_role_assigned_at_a timestamptz,
+        character_role_assigned_at_b timestamptz,
         typing_test_round integer NOT NULL DEFAULT 0,
         typing_test_state text,
         typing_test_started_at timestamptz,
@@ -403,8 +408,10 @@ const ensureRankedTables = async () => {
 
       await db.query(`
       ALTER TABLE ranked_matches
-      ADD COLUMN IF NOT EXISTS character_role text,
-      ADD COLUMN IF NOT EXISTS character_role_assigned_at timestamptz;
+      ADD COLUMN IF NOT EXISTS character_role_a text,
+      ADD COLUMN IF NOT EXISTS character_role_b text,
+      ADD COLUMN IF NOT EXISTS character_role_assigned_at_a timestamptz,
+      ADD COLUMN IF NOT EXISTS character_role_assigned_at_b timestamptz;
     `);
 
       await db.query(`
@@ -492,8 +499,8 @@ const createMatch = async (userId: string, partnerId: string) => {
   const matchId = randomUUID();
   const startingTurnUserId = Math.random() < 0.5 ? userId : partnerId;
   const icebreakerQuestion = pickIcebreakerQuestion();
-  const characterRole = pickCharacterRole();
-  const characterRoleAssignedAt = characterRole ? new Date().toISOString() : null;
+  const characterRoleA = pickCharacterRole();
+  const characterRoleB = pickCharacterRole();
   await db.query(
     `INSERT INTO ranked_matches (
       id,
@@ -504,10 +511,12 @@ const createMatch = async (userId: string, partnerId: string) => {
       turn_started_at,
       current_turn_user_id,
       icebreaker_question,
-      character_role,
-      character_role_assigned_at
+      character_role_a,
+      character_role_b,
+      character_role_assigned_at_a,
+      character_role_assigned_at_b
      )
-     VALUES ($1, $2, $3, $4, $5, now(), $6, $7, $8, $9)`,
+     VALUES ($1, $2, $3, $4, $5, now(), $6, $7, $8, $9, now(), now())`,
     [
       matchId,
       userId,
@@ -516,18 +525,18 @@ const createMatch = async (userId: string, partnerId: string) => {
       DEFAULT_LIVES,
       startingTurnUserId,
       icebreakerQuestion,
-      characterRole,
-      characterRoleAssignedAt,
+      characterRoleA,
+      characterRoleB,
     ]
   );
-  return { matchId, startingTurnUserId, icebreakerQuestion, characterRole, characterRoleAssignedAt };
+  return { matchId, startingTurnUserId, icebreakerQuestion, characterRoleA, characterRoleB };
 };
 
 const getMatch = async (matchId: string): Promise<RankedMatchRow | null> => {
   const result = await db.query(
     `SELECT id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
             user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
-            icebreaker_question, character_role, character_role_assigned_at,
+            icebreaker_question, character_role_a, character_role_b, character_role_assigned_at_a, character_role_assigned_at_b,
             typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at
      FROM ranked_matches WHERE id = $1 LIMIT 1`,
     [matchId]
@@ -651,7 +660,7 @@ const maybeAdvanceTypingTestState = async (
          WHERE id = $1 AND typing_test_state = 'countdown'
          RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
                    user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
-                   icebreaker_question, character_role, character_role_assigned_at,
+                   icebreaker_question, character_role_a, character_role_b, character_role_assigned_at_a, character_role_assigned_at_b,
                    typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at`,
         [match.id]
       );
@@ -677,7 +686,7 @@ const maybeAdvanceTypingTestState = async (
          WHERE id = $1 AND typing_test_state = 'result'
          RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
                    user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
-                   icebreaker_question, character_role, character_role_assigned_at,
+                   icebreaker_question, character_role_a, character_role_b, character_role_assigned_at_a, character_role_assigned_at_b,
                    typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at`,
         [match.id]
       );
@@ -755,7 +764,7 @@ const applyTurnTimeout = async (
        AND turn_started_at <= now() - interval '${TURN_SECONDS} seconds'
      RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
                user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
-               icebreaker_question, character_role, character_role_assigned_at,
+               icebreaker_question, character_role_a, character_role_b, character_role_assigned_at_a, character_role_assigned_at_b,
                typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at`,
     [match.id, match.current_turn_user_id]
   );
@@ -848,7 +857,7 @@ const maybeStartTypingTest = async (
      WHERE id = $1 AND typing_test_state IS NULL
      RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
                user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
-               icebreaker_question, character_role, character_role_assigned_at,
+               icebreaker_question, character_role_a, character_role_b, character_role_assigned_at_a, character_role_assigned_at_b,
                typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at`,
     [matchId, JSON.stringify(words)]
   );
@@ -890,13 +899,8 @@ export const enqueueAndMatch = async (userId: string): Promise<RankedStatus> => 
   if (partnerId) {
     // Pair with the oldest waiting partner.
     await removeFromQueue(partnerId);
-    const {
-      matchId,
-      startingTurnUserId,
-      icebreakerQuestion,
-      characterRole,
-      characterRoleAssignedAt,
-    } = await createMatch(
+    const { matchId, startingTurnUserId, icebreakerQuestion, characterRoleA } =
+      await createMatch(
       userId,
       partnerId
     );
@@ -912,8 +916,8 @@ export const enqueueAndMatch = async (userId: string): Promise<RankedStatus> => 
       serverTime: nowIso,
       isMyTurn: startingTurnUserId === userId,
       icebreakerQuestion,
-      characterRole,
-      characterRoleAssignedAt,
+      characterRole: characterRoleA ?? null,
+      characterRoleAssignedAt: nowIso,
     };
   }
 
@@ -926,7 +930,7 @@ export const getRankedStatusForUser = async (userId: string): Promise<RankedStat
 
   const matchResult = await db.query(
     `SELECT id, user_a_id, user_b_id, started_at, user_a_lives, user_b_lives, turn_started_at, timed_out, current_turn_user_id,
-            icebreaker_question, character_role, character_role_assigned_at,
+            icebreaker_question, character_role_a, character_role_b, character_role_assigned_at_a, character_role_assigned_at_b,
             typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at
      FROM ranked_matches
      WHERE (user_a_id = $1 OR user_b_id = $1) AND timed_out = false
@@ -963,6 +967,8 @@ export const getRankedStatusForUser = async (userId: string): Promise<RankedStat
       activeMatch.user_a_id === userId
         ? activeMatch.user_b_lives
         : activeMatch.user_a_lives;
+    const { role: characterRole, assignedAt: characterRoleAssignedAt } =
+      getCharacterRoleForUser(activeMatch, userId);
     const nowIso = new Date().toISOString();
     return {
       status: "matched",
@@ -977,10 +983,8 @@ export const getRankedStatusForUser = async (userId: string): Promise<RankedStat
       serverTime: nowIso,
       isMyTurn: activeMatch.current_turn_user_id === userId,
       icebreakerQuestion: activeMatch.icebreaker_question ?? null,
-      characterRole: activeMatch.character_role ?? null,
-      characterRoleAssignedAt: activeMatch.character_role_assigned_at
-        ? parseTimestamp(activeMatch.character_role_assigned_at).toISOString()
-        : null,
+      characterRole,
+      characterRoleAssignedAt,
     };
   }
 
@@ -1083,6 +1087,8 @@ export const fetchRankedMessages = async (
     ? Date.now() - typingAt.getTime() <= 6000
     : false;
   const typing = isTypingFresh && typingText ? typingText : "";
+  const { role: characterRole, assignedAt: characterRoleAssignedAt } =
+    getCharacterRoleForUser(activeMatch, userId);
 
   return {
     messages,
@@ -1094,10 +1100,8 @@ export const fetchRankedMessages = async (
     typing,
     typingTest: getTypingTestPayload(activeMatch),
     icebreakerQuestion: activeMatch.icebreaker_question ?? null,
-    characterRole: activeMatch.character_role ?? null,
-    characterRoleAssignedAt: activeMatch.character_role_assigned_at
-      ? parseTimestamp(activeMatch.character_role_assigned_at).toISOString()
-      : null,
+    characterRole,
+    characterRoleAssignedAt,
   };
 };
 
@@ -1195,7 +1199,7 @@ export const submitTypingTestAttempt = async (params: {
        AND typing_test_winner_id IS NULL
      RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
                user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
-               icebreaker_question, character_role, character_role_assigned_at,
+               icebreaker_question, character_role_a, character_role_b, character_role_assigned_at_a, character_role_assigned_at_b,
                typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at`,
     [params.matchId, params.userId, loserId]
   );
@@ -1328,7 +1332,7 @@ export const smiteRankedOpponent = async (params: {
      WHERE id = $1
      RETURNING id, user_a_id, user_b_id, started_at, timed_out, user_a_lives, user_b_lives, turn_started_at, current_turn_user_id,
                user_a_typing, user_b_typing, user_a_typing_at, user_b_typing_at,
-               icebreaker_question, character_role, character_role_assigned_at,
+               icebreaker_question, character_role_a, character_role_b, character_role_assigned_at_a, character_role_assigned_at_b,
                typing_test_round, typing_test_state, typing_test_started_at, typing_test_words, typing_test_winner_id, typing_test_result_at`,
     [params.matchId, partnerId]
   );

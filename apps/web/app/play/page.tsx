@@ -54,7 +54,7 @@ const inputClasses =
 
 const TURN_SECONDS = 15;
 const TYPING_TEST_MODAL_SECONDS = 3;
-const ROLE_MODAL_SECONDS = 3;
+const ROLE_MODAL_SECONDS = 5;
 
 export default function RankedPlayPage() {
   const { isAuthenticated, token, user, openAuthModal } = useAuth();
@@ -1317,6 +1317,13 @@ export default function RankedPlayPage() {
                               </div>
                             </div>
                           )}
+                          {draft.trim() && (
+                            <div className="flex justify-end">
+                              <div className="max-w-[90%] rounded-2xl border border-dashed border-card-border/70 bg-white/70 px-4 py-2 text-sm italic text-muted opacity-70">
+                                {draft}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="space-y-3">
@@ -1347,6 +1354,13 @@ export default function RankedPlayPage() {
                             <div className="flex justify-start">
                               <div className="max-w-[90%] rounded-2xl border border-dashed border-card-border/70 bg-white/70 px-4 py-2 text-sm italic text-muted opacity-70">
                                 {partnerTyping}
+                              </div>
+                            </div>
+                          )}
+                          {draft.trim() && (
+                            <div className="flex justify-end">
+                              <div className="max-w-[90%] rounded-2xl border border-dashed border-card-border/70 bg-white/70 px-4 py-2 text-sm italic text-muted opacity-70">
+                                {draft}
                               </div>
                             </div>
                           )}
