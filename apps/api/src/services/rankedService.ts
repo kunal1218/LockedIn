@@ -784,6 +784,10 @@ const getTypingTestPayload = (match: RankedMatchRow): TypingTestPayload => {
   };
 };
 
+const getRoundNumber = (match: RankedMatchRow) => (match.typing_test_round ?? 0) + 1;
+
+const isJudgeParticipationRound = (match: RankedMatchRow) => getRoundNumber(match) % 2 === 0;
+
 const isTypingTestBlocking = (match: RankedMatchRow) =>
   !!match.typing_test_state;
 
@@ -1244,7 +1248,10 @@ export const updateRankedTyping = async (params: {
 }) => {
   await ensureRankedTables();
   const match = await assertParticipant(params.matchId, params.userId);
-  if (match.judge_user_id === params.userId) {
+  if (
+    match.judge_user_id === params.userId &&
+    !isJudgeParticipationRound(match)
+  ) {
     return;
   }
   const raw = typeof params.body === "string" ? params.body : "";
@@ -1372,10 +1379,12 @@ export const sendRankedMessage = async (params: {
   if (activeMatch.typing_test_state) {
     throw new Error("Typing test in progress");
   }
-  if (activeMatch.judge_user_id === params.senderId) {
-    throw new Error("Judges cannot send messages");
+  const isJudgeSender = activeMatch.judge_user_id === params.senderId;
+  if (isJudgeSender && !isJudgeParticipationRound(activeMatch)) {
+    throw new Error("Judges sit out odd rounds");
   }
   if (
+    !isJudgeSender &&
     activeMatch.current_turn_user_id &&
     activeMatch.current_turn_user_id !== params.senderId
   ) {
@@ -1399,14 +1408,16 @@ export const sendRankedMessage = async (params: {
     [id, params.matchId, params.senderId, trimmed]
   );
 
-  const nextTurnUserId = getNextTurnUserId(activeMatch, params.senderId);
-  await db.query(
-    `UPDATE ranked_matches
-     SET turn_started_at = now(),
-         current_turn_user_id = $2
-     WHERE id = $1`,
-    [params.matchId, nextTurnUserId]
-  );
+  if (!isJudgeSender) {
+    const nextTurnUserId = getNextTurnUserId(activeMatch, params.senderId);
+    await db.query(
+      `UPDATE ranked_matches
+       SET turn_started_at = now(),
+           current_turn_user_id = $2
+       WHERE id = $1`,
+      [params.matchId, nextTurnUserId]
+    );
+  }
 
   await maybeStartTypingTest(params.matchId, activeMatch);
 

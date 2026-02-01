@@ -188,6 +188,8 @@ export default function RankedPlayPage() {
       ? matchSnapshot.judgeUserId
       : null;
   const displayIsJudge = isMatched ? isJudge : matchSnapshot?.isJudge ?? false;
+  const roundNumber = (typingTest.round ?? 0) + 1;
+  const isJudgeOddRound = displayIsJudge && roundNumber % 2 === 1;
   const opponentLivesById = useMemo(() => {
     const mapping = new Map<string, number>();
     displayOpponents.forEach((opponent, index) => {
@@ -261,6 +263,22 @@ export default function RankedPlayPage() {
         displayOpponents[0] ??
         null
       : displayOpponents[0] ?? null;
+  const messageColorById = useMemo(() => {
+    const palette = [
+      "bg-accent text-white",
+      "bg-emerald-500 text-white",
+      "bg-sky-500 text-white",
+      "bg-violet-500 text-white",
+    ];
+    const ids = [user?.id, ...displayOpponents.map((opponent) => opponent.id)].filter(
+      Boolean
+    ) as string[];
+    const mapping = new Map<string, string>();
+    ids.forEach((id, index) => {
+      mapping.set(id, palette[index % palette.length]);
+    });
+    return mapping;
+  }, [displayOpponents, user?.id]);
   const renderHearts = (filledCount: number, alignRight = false) => (
     <div className={`flex items-center gap-1 ${alignRight ? "justify-end" : ""}`}>
       {Array.from({ length: 3 }).map((_, index) => {
@@ -352,6 +370,18 @@ export default function RankedPlayPage() {
     !isMatchOver &&
     !isTypingTestActive &&
     !isRoleModalActive;
+  const canTypeMessage =
+    rankedStatus.status === "matched" &&
+    !isMatchOver &&
+    !isTurnBlocked &&
+    !isTurnExpired &&
+    (displayIsJudge ? !isJudgeOddRound : isMyTurn);
+  const canSendMessage =
+    rankedStatus.status === "matched" &&
+    !isMatchOver &&
+    !isTurnBlocked &&
+    !isTurnExpired &&
+    (displayIsJudge ? !isJudgeOddRound : isMyTurn && !justSentRef.current);
   const showSmiteButton =
     isAdmin && isMatched && !isMatchOver && !isTypingTestActive && !isRoleModalActive;
   const typingWordsText =
@@ -723,11 +753,11 @@ export default function RankedPlayPage() {
     if (!token || rankedStatus.status !== "matched" || !activeMatchId) {
       return;
     }
-    if (displayIsJudge) {
-      setTypingTestError("Judges observe only.");
-      return;
-    }
-    const canType = isMyTurn && !isMatchOver && !isTurnExpired && !isTurnBlocked;
+    const canType =
+      !isMatchOver &&
+      !isTurnExpired &&
+      !isTurnBlocked &&
+      (displayIsJudge ? !isJudgeOddRound : isMyTurn);
     const nextText = canType ? draft : "";
 
     if (typingDebounceRef.current) {
@@ -751,6 +781,8 @@ export default function RankedPlayPage() {
   }, [
     activeMatchId,
     draft,
+    displayIsJudge,
+    isJudgeOddRound,
     isMyTurn,
     isMatchOver,
     isTurnBlocked,
@@ -857,28 +889,16 @@ export default function RankedPlayPage() {
   }, [messages]);
 
   useEffect(() => {
-    const canFocus =
-      rankedStatus.status === "matched" &&
-      !isMatchOver &&
-      !isTurnBlocked &&
-      isMyTurn &&
-      !isTurnExpired &&
-      !isSending &&
-      !isChatLoading;
+    const canFocus = canTypeMessage && !isSending && !isChatLoading;
     if (canFocus) {
       window.setTimeout(() => {
         inputRef.current?.focus();
       }, 0);
     }
   }, [
-    rankedStatus.status,
-    isMatchOver,
-    isTurnBlocked,
-    isMyTurn,
-    isTurnExpired,
+    canTypeMessage,
     isSending,
     isChatLoading,
-    draft,
     timeLeft,
   ]);
 
@@ -954,23 +974,30 @@ export default function RankedPlayPage() {
     }
     if (isTurnBlocked) {
       setChatError(
-        isTypingTestActive ? "Typing test in progress." : "Character role incoming."
+        isTypingTestActive ? "Typing test in progress." : "Round starting."
       );
       return;
     }
-    if (isJudge) {
-      setChatError("Judges cannot send messages.");
+    if (isMatchOver) {
+      setChatError("Match is over.");
       return;
     }
-    if (!isMyTurn || justSentRef.current) {
-      setChatError("Wait for your opponent to reply before sending again.");
-      return;
-    }
-    if (isTurnExpired) {
-      setChatError("Your turn expired. Waiting for your opponent.");
-      reportTurnTimeout();
-      sendTypingUpdate("");
-      return;
+    if (displayIsJudge) {
+      if (isJudgeOddRound) {
+        setChatError("Judges sit out odd rounds.");
+        return;
+      }
+    } else {
+      if (!isMyTurn || justSentRef.current) {
+        setChatError("Wait for your opponent to reply before sending again.");
+        return;
+      }
+      if (isTurnExpired) {
+        setChatError("Your turn expired. Waiting for your opponent.");
+        reportTurnTimeout();
+        sendTypingUpdate("");
+        return;
+      }
     }
     if (rankedStatus.status !== "matched") {
       setChatError("You need a match before chatting.");
@@ -992,17 +1019,19 @@ export default function RankedPlayPage() {
       setMessages((prev) => [...prev, response.message]);
       setDraft("");
       sendTypingUpdate("");
-      setRankedStatus((prev) =>
-        prev.status === "matched"
-          ? {
-              ...prev,
-              isMyTurn: false,
-              currentTurnUserId:
-                prev.opponents.find((opponent) => opponent.id !== prev.judgeUserId)
-                  ?.id ?? prev.currentTurnUserId,
-            }
-          : prev
-      );
+      if (!displayIsJudge) {
+        setRankedStatus((prev) =>
+          prev.status === "matched"
+            ? {
+                ...prev,
+                isMyTurn: false,
+                currentTurnUserId:
+                  prev.opponents.find((opponent) => opponent.id !== prev.judgeUserId)
+                    ?.id ?? prev.currentTurnUserId,
+              }
+            : prev
+        );
+      }
       setTimeLeft(TURN_SECONDS);
       setIsTimeout(false);
       justSentRef.current = true;
@@ -1022,12 +1051,7 @@ export default function RankedPlayPage() {
       event.key === "Enter" &&
       !event.shiftKey &&
       !isComposing &&
-      rankedStatus.status === "matched" &&
-      !isMatchOver &&
-      !isTurnBlocked &&
-      isMyTurn &&
-      !isTurnExpired &&
-      !justSentRef.current &&
+      canSendMessage &&
       !isSending &&
       !isChatLoading
     ) {
@@ -1401,6 +1425,10 @@ export default function RankedPlayPage() {
                           {messages.map((message) => {
                             const isMine = message.sender.id === user?.id;
                             const isSelected = selectedMessageId === message.id;
+                            const messageTone = displayIsJudge
+                              ? "border border-card-border/70 bg-white text-ink"
+                              : messageColorById.get(message.sender.id) ??
+                                "border border-card-border/70 bg-white/90 text-ink";
                             return (
                               <div
                                 key={message.id}
@@ -1410,11 +1438,9 @@ export default function RankedPlayPage() {
                               >
                                 <div
                                   onClick={() => setSelectedMessageId(message.id)}
-                                  className={`max-w-[90%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
-                                    isMine
-                                      ? "bg-accent text-white"
-                                      : "border border-card-border/70 bg-white/90 text-ink"
-                                  } ${isSelected ? "ring-2 ring-accent/40" : ""}`}
+                                  className={`max-w-[90%] rounded-2xl px-4 py-2 text-sm shadow-sm ${messageTone} ${
+                                    isSelected ? "ring-2 ring-accent/40" : ""
+                                  }`}
                                 >
                                   <p className="whitespace-pre-wrap">{message.body}</p>
                                 </div>
@@ -1461,12 +1487,7 @@ export default function RankedPlayPage() {
                 }
                 ref={inputRef}
                 disabled={
-                  rankedStatus.status !== "matched" ||
-                  isChatLoading ||
-                  isMatchOver ||
-                  isTurnBlocked ||
-                  !isMyTurn ||
-                  isTurnExpired
+                  rankedStatus.status !== "matched" || isChatLoading || !canTypeMessage
                 }
               />
               {chatError && (
@@ -1481,13 +1502,7 @@ export default function RankedPlayPage() {
                 <Button
                   type="submit"
                   disabled={
-                    rankedStatus.status !== "matched" ||
-                    isSending ||
-                    isChatLoading ||
-                    isMatchOver ||
-                    isTurnBlocked ||
-                    !isMyTurn ||
-                    isTurnExpired
+                    !canSendMessage || isSending || isChatLoading
                   }
                 >
                   {isSending
@@ -1506,17 +1521,12 @@ export default function RankedPlayPage() {
               {showRoleModal ? (
                 <>
                   <p className="text-base font-semibold text-ink">
-                    {isJudge ? "You are the judge." : "Character Role"}
+                    {`Round ${roundNumber}: Icebreaker`}
                   </p>
-                  {!isJudge && (
-                    <p className="mt-2 text-sm font-semibold text-ink">
-                      {characterRole ? `You play: ${characterRole}` : "Loading role..."}
-                    </p>
-                  )}
                   <p className="mt-2 text-xs text-muted">
-                    {isJudge
-                      ? "Observe the conversation and decide the winner."
-                      : "Play this role for the conversation."}
+                    {displayIsJudge
+                      ? "You are the judge for this round."
+                      : "Get ready to start the conversation."}
                   </p>
                   <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-card-border/60">
                     <div
