@@ -155,6 +155,7 @@ export default function RankedPlayPage() {
   const characterRole = rankedCharacterRole;
   const characterRoleAssignedAt =
     rankedStatus.status === "matched" ? rankedStatus.characterRoleAssignedAt : null;
+  const roundNumber = (typingTest.round ?? 0) + 1;
   const matchStateMessage =
     rankedStatus.status === "matched"
       ? isMatchOver
@@ -190,7 +191,6 @@ export default function RankedPlayPage() {
       ? matchSnapshot.judgeUserId
       : null;
   const displayIsJudge = isMatched ? isJudge : matchSnapshot?.isJudge ?? false;
-  const roundNumber = (typingTest.round ?? 0) + 1;
   const isJudgeOddRound = displayIsJudge && roundNumber % 2 === 1;
   const opponentLivesById = useMemo(() => {
     const mapping = new Map<string, number>();
