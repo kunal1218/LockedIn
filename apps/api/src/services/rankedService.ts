@@ -634,6 +634,7 @@ const createMatch = async (userIds: string[]) => {
   const icebreakerQuestion = pickIcebreakerQuestion();
   const characterRoleA = pickCharacterRole();
   const characterRoleB = pickCharacterRole();
+  const judgeUserId = userC;
   await db.query(
     `INSERT INTO ranked_matches (
       id,
@@ -662,6 +663,7 @@ const createMatch = async (userIds: string[]) => {
       DEFAULT_LIVES,
       DEFAULT_LIVES,
       startingTurnUserId,
+      judgeUserId,
       icebreakerQuestion,
       characterRoleA,
       characterRoleB,
@@ -676,7 +678,7 @@ const createMatch = async (userIds: string[]) => {
     icebreakerQuestion,
     characterRoleA,
     characterRoleB,
-    judgeUserId: userC,
+    judgeUserId,
   };
 };
 
