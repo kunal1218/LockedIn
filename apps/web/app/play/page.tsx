@@ -161,9 +161,11 @@ export default function RankedPlayPage() {
         ? "Match over."
         : isTypingTestActive
           ? "Typing test in progress."
-          : isMyTurn
-            ? "Your Move."
-            : cleanedIcebreaker || "Start the conversation."
+          : roundNumber % 2 === 1
+            ? cleanedIcebreaker || "Start the conversation."
+            : isMyTurn
+              ? "Your Move."
+              : cleanedIcebreaker || "Start the conversation."
       : "";
   const matchStateTone = isMatchOver
     ? "border-red-200 bg-red-50 text-red-700"
