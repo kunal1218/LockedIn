@@ -88,6 +88,7 @@ const WIN_REWARD_COINS = 100;
 const TYPING_TEST_WORD_COUNT = 10;
 const TYPING_TEST_COUNTDOWN_SECONDS = 3;
 const TYPING_TEST_RESULT_SECONDS = 3;
+const TYPING_TEST_MAX_SECONDS = 90;
 const TYPING_TEST_MIN_WORD_LENGTH = 3;
 const TYPING_TEST_MAX_WORD_LENGTH = 8;
 
@@ -1180,6 +1181,66 @@ const maybeAdvanceTypingTestState = async (
          WHERE id = $1 AND typing_test_state = 'countdown'
          RETURNING ${rankedMatchColumns}`,
         [match.id]
+      );
+      if ((updated.rowCount ?? 0) > 0) {
+        return updated.rows[0] as RankedMatchRow;
+      }
+    }
+  }
+  if (
+    match.typing_test_state === "active" &&
+    match.typing_test_started_at
+  ) {
+    const startedAt = parseTimestamp(match.typing_test_started_at);
+    if (Date.now() - startedAt.getTime() >= TYPING_TEST_MAX_SECONDS * 1000) {
+      const participants = [
+        match.user_a_id,
+        match.user_b_id,
+        match.user_c_id,
+      ].filter((id): id is string => Boolean(id));
+      const results = parseTypingResults(match.typing_test_results);
+      const finished = new Set(results);
+      const missing = participants.filter((id) => !finished.has(id));
+      const firstId = results[0] ?? null;
+      const secondId = results[1] ?? null;
+      const updated = await db.query(
+        `UPDATE ranked_matches
+         SET typing_test_state = 'result',
+             typing_test_winner_id = $2,
+             typing_test_result_at = now(),
+             typing_test_results = $3::jsonb,
+             user_a_lives = CASE
+               WHEN $2::uuid IS NOT NULL AND user_a_id = $2 THEN user_a_lives + 1
+               WHEN user_a_id = ANY($5::uuid[]) THEN GREATEST(user_a_lives - 1, 0)
+               ELSE user_a_lives
+             END,
+             user_b_lives = CASE
+               WHEN $2::uuid IS NOT NULL AND user_b_id = $2 THEN user_b_lives + 1
+               WHEN user_b_id = ANY($5::uuid[]) THEN GREATEST(user_b_lives - 1, 0)
+               ELSE user_b_lives
+             END,
+             user_c_lives = CASE
+               WHEN $2::uuid IS NOT NULL AND user_c_id = $2
+                 THEN COALESCE(user_c_lives, ${DEFAULT_LIVES}) + 1
+               WHEN user_c_id = ANY($5::uuid[])
+                 THEN GREATEST(COALESCE(user_c_lives, ${DEFAULT_LIVES}) - 1, 0)
+               ELSE user_c_lives
+             END,
+             user_a_points = CASE
+               WHEN $4::uuid IS NOT NULL AND user_a_id = $4 THEN COALESCE(user_a_points, 0) + 1
+               ELSE user_a_points
+             END,
+             user_b_points = CASE
+               WHEN $4::uuid IS NOT NULL AND user_b_id = $4 THEN COALESCE(user_b_points, 0) + 1
+               ELSE user_b_points
+             END,
+             user_c_points = CASE
+               WHEN $4::uuid IS NOT NULL AND user_c_id = $4 THEN COALESCE(user_c_points, 0) + 1
+               ELSE user_c_points
+             END
+         WHERE id = $1 AND typing_test_state = 'active'
+         RETURNING ${rankedMatchColumns}`,
+        [match.id, firstId, JSON.stringify(results), secondId, missing]
       );
       if ((updated.rowCount ?? 0) > 0) {
         return updated.rows[0] as RankedMatchRow;

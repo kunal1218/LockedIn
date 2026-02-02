@@ -65,6 +65,7 @@ const inputClasses =
 const TURN_SECONDS = 15;
 const TYPING_TEST_MODAL_SECONDS = 3;
 const ROLE_MODAL_SECONDS = 5;
+const TYPING_TEST_SECONDS = 90;
 
 export default function RankedPlayPage() {
   const { isAuthenticated, token, user, openAuthModal } = useAuth();
@@ -159,6 +160,24 @@ export default function RankedPlayPage() {
   const isTypingTestRunning = typingTest.state === "active";
   const showTypingModal = isTypingTestCountdown || isTypingTestResult;
   const showTypingTestArena = isTypingTestRunning;
+  const typingTestTimeLeft = useMemo(() => {
+    if (!isTypingTestActive || !typingTest.startedAt) {
+      return null;
+    }
+    const startedMs = Date.parse(typingTest.startedAt);
+    if (!Number.isFinite(startedMs)) {
+      return null;
+    }
+    const nowMs = Date.now() - serverTimeOffsetRef.current;
+    const remainingMs = TYPING_TEST_SECONDS * 1000 - (nowMs - startedMs);
+    return Math.max(0, Math.ceil(remainingMs / 1000));
+  }, [isTypingTestActive, typingTest.startedAt]);
+  const typingTestProgress = useMemo(() => {
+    if (typingTestTimeLeft === null) {
+      return 0;
+    }
+    return Math.max(0, Math.min(1, typingTestTimeLeft / TYPING_TEST_SECONDS));
+  }, [typingTestTimeLeft]);
   const icebreakerQuestion =
     rankedStatus.status === "matched" ? rankedStatus.icebreakerQuestion : null;
   const cleanedIcebreaker = icebreakerQuestion?.trim();
@@ -422,10 +441,7 @@ export default function RankedPlayPage() {
   const showRoleModal = isRoleModalActive && !showTypingModal;
   const showBlockingModal = showTypingModal || showRoleModal;
   const showStatusBar =
-    rankedStatus.status === "matched" &&
-    !showCenterPanel &&
-    !showBlockingModal &&
-    !showTypingTestArena;
+    rankedStatus.status === "matched" && !showCenterPanel && !showBlockingModal;
   const isTurnBlocked = isTypingTestActive || isRoleModalActive || isJudgingPhase;
   const isPlayerAlive = !isMatched || (lives?.me ?? 1) > 0;
   const isTurnExpired =
@@ -1601,10 +1617,29 @@ export default function RankedPlayPage() {
                 <div
                   className={`mb-3 rounded-2xl border px-4 py-2 text-sm font-semibold ${matchStateTone}`}
                 >
-                  {matchStateMessage || (
-                    <span className="text-transparent" aria-hidden="true">
-                      .
-                    </span>
+                  {isTypingTestRunning ? (
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                        Typing test
+                      </span>
+                      <div className="flex-1">
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-card-border/60">
+                          <div
+                            className="h-full bg-rose-500 transition-[width] duration-300"
+                            style={{ width: `${typingTestProgress * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                      <span className="text-xs font-semibold text-muted">
+                        {typingTestTimeLeft !== null ? `${typingTestTimeLeft}s` : "--"}
+                      </span>
+                    </div>
+                  ) : (
+                    matchStateMessage || (
+                      <span className="text-transparent" aria-hidden="true">
+                        .
+                      </span>
+                    )
                   )}
                 </div>
               )}
