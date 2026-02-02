@@ -48,6 +48,64 @@ export class MapError extends Error {
 }
 
 const LOCATION_TTL_MINUTES = 30;
+let profileColumnsCache:
+  | Promise<{ profilePicture: boolean; bio: boolean }>
+  | null = null;
+let historyTableCache: Promise<boolean> | null = null;
+
+const getProfileColumnAvailability = async () => {
+  if (profileColumnsCache) {
+    return profileColumnsCache;
+  }
+
+  profileColumnsCache = (async () => {
+    try {
+      const result = await db.query(
+        `SELECT column_name
+         FROM information_schema.columns
+         WHERE table_name = 'users'
+           AND column_name IN ('profile_picture_url', 'bio')`
+      );
+      const columns = new Set(
+        (result.rows as Array<{ column_name: string }>).map(
+          (row) => row.column_name
+        )
+      );
+      return {
+        profilePicture: columns.has("profile_picture_url"),
+        bio: columns.has("bio"),
+      };
+    } catch (error) {
+      console.warn("[map] unable to check profile columns", error);
+      return { profilePicture: false, bio: false };
+    }
+  })();
+
+  return profileColumnsCache;
+};
+
+const hasHistoryTable = async () => {
+  if (historyTableCache) {
+    return historyTableCache;
+  }
+
+  historyTableCache = (async () => {
+    try {
+      const result = await db.query(
+        `SELECT 1
+         FROM information_schema.tables
+         WHERE table_name = 'user_location_history'
+         LIMIT 1`
+      );
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.warn("[map] unable to check location history table", error);
+      return false;
+    }
+  })();
+
+  return historyTableCache;
+};
 
 const ensureLocationTable = async () => {
   await ensureUsersTable();
@@ -77,21 +135,27 @@ const ensureLocationTable = async () => {
 
 const ensureLocationHistoryTable = async () => {
   await ensureUsersTable();
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS user_location_history (
+        id bigserial PRIMARY KEY,
+        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        latitude double precision,
+        longitude double precision,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS user_location_history (
-      id bigserial PRIMARY KEY,
-      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      latitude double precision,
-      longitude double precision,
-      updated_at timestamptz NOT NULL DEFAULT now()
-    );
-  `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS user_location_history_user_idx
+        ON user_location_history (user_id, updated_at DESC);
+    `);
 
-  await db.query(`
-    CREATE INDEX IF NOT EXISTS user_location_history_user_idx
-      ON user_location_history (user_id, updated_at DESC);
-  `);
+    historyTableCache = Promise.resolve(true);
+  } catch (error) {
+    console.warn("[map] unable to ensure history table", error);
+    historyTableCache = Promise.resolve(false);
+  }
 };
 
 const toIsoString = (value: string | Date) =>
@@ -171,11 +235,17 @@ export const upsertUserLocation = async (params: {
     ]
   );
 
-  await db.query(
-    `INSERT INTO user_location_history (user_id, latitude, longitude)
-     VALUES ($1, $2, $3)`,
-    [params.userId, params.latitude, params.longitude]
-  );
+  if (await hasHistoryTable()) {
+    try {
+      await db.query(
+        `INSERT INTO user_location_history (user_id, latitude, longitude)
+         VALUES ($1, $2, $3)`,
+        [params.userId, params.latitude, params.longitude]
+      );
+    } catch (error) {
+      console.warn("[map] unable to insert history row", error);
+    }
+  }
 };
 
 export const fetchFriendLocations = async (
@@ -183,6 +253,29 @@ export const fetchFriendLocations = async (
 ): Promise<FriendLocation[]> => {
   await ensureLocationTable();
   await ensureFriendTables();
+
+  const profileColumns = await getProfileColumnAvailability();
+  const historyAvailable = await hasHistoryTable();
+  const profilePictureSelect = profileColumns.profilePicture
+    ? "users.profile_picture_url"
+    : "NULL::text";
+  const bioSelect = profileColumns.bio ? "users.bio" : "NULL::text";
+  const previousLatitudeSelect = historyAvailable
+    ? "prev.latitude AS previous_latitude"
+    : "NULL::double precision AS previous_latitude";
+  const previousLongitudeSelect = historyAvailable
+    ? "prev.longitude AS previous_longitude"
+    : "NULL::double precision AS previous_longitude";
+  const historyJoin = historyAvailable
+    ? `LEFT JOIN LATERAL (
+         SELECT latitude, longitude
+         FROM user_location_history history
+         WHERE history.user_id = locations.user_id
+         ORDER BY history.updated_at DESC
+         OFFSET 1
+         LIMIT 1
+       ) prev ON true`
+    : "";
 
   const result = await db.query(
     `WITH friend_ids AS (
@@ -207,24 +300,17 @@ export const fetchFriendLocations = async (
      SELECT users.id,
             users.name,
             users.handle,
-            users.profile_picture_url,
-            users.bio,
+            ${profilePictureSelect} AS profile_picture_url,
+            ${bioSelect} AS bio,
             locations.latitude,
             locations.longitude,
             locations.updated_at,
-            prev.latitude AS previous_latitude,
-            prev.longitude AS previous_longitude
+            ${previousLatitudeSelect},
+            ${previousLongitudeSelect}
      FROM unblocked
      JOIN user_locations locations ON locations.user_id = unblocked.friend_id
-     JOIN users ON users.id = unblocked.friend_id
-     LEFT JOIN LATERAL (
-       SELECT latitude, longitude
-       FROM user_location_history history
-       WHERE history.user_id = locations.user_id
-       ORDER BY history.updated_at DESC
-       OFFSET 1
-       LIMIT 1
-     ) prev ON true
+     LEFT JOIN users ON users.id = unblocked.friend_id
+     ${historyJoin}
      WHERE locations.share_location = true
        AND locations.ghost_mode = false
        AND locations.latitude IS NOT NULL
@@ -236,8 +322,8 @@ export const fetchFriendLocations = async (
 
   const friends = (result.rows as FriendLocationRow[]).map((row) => ({
     id: row.id,
-    name: row.name,
-    handle: row.handle,
+    name: row.name ?? "Unknown",
+    handle: row.handle ?? "@unknown",
     profilePictureUrl: row.profile_picture_url ?? null,
     bio: row.bio ?? null,
     latitude: Number(row.latitude),
@@ -253,23 +339,16 @@ export const fetchFriendLocations = async (
     `SELECT users.id,
             users.name,
             users.handle,
-            users.profile_picture_url,
-            users.bio,
+            ${profilePictureSelect} AS profile_picture_url,
+            ${bioSelect} AS bio,
             locations.latitude,
             locations.longitude,
             locations.updated_at,
-            prev.latitude AS previous_latitude,
-            prev.longitude AS previous_longitude
+            ${previousLatitudeSelect},
+            ${previousLongitudeSelect}
      FROM user_locations locations
-     JOIN users ON users.id = locations.user_id
-     LEFT JOIN LATERAL (
-       SELECT latitude, longitude
-       FROM user_location_history history
-       WHERE history.user_id = locations.user_id
-       ORDER BY history.updated_at DESC
-       OFFSET 1
-       LIMIT 1
-     ) prev ON true
+     LEFT JOIN users ON users.id = locations.user_id
+     ${historyJoin}
      WHERE locations.user_id = $1
        AND locations.share_location = true
        AND locations.ghost_mode = false
@@ -286,8 +365,8 @@ export const fetchFriendLocations = async (
     if (!alreadyIncluded) {
       friends.unshift({
         id: row.id,
-        name: row.name,
-        handle: row.handle,
+        name: row.name ?? "Unknown",
+        handle: row.handle ?? "@unknown",
         profilePictureUrl: row.profile_picture_url ?? null,
         bio: row.bio ?? null,
         latitude: Number(row.latitude),

@@ -61,9 +61,74 @@ export const MapCanvas = () => {
   const [selectedFriend, setSelectedFriend] = useState<FriendLocation | null>(
     null
   );
+  const [mapInstanceKey, setMapInstanceKey] = useState(0);
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  const missingFieldsLoggedRef = useRef<Set<string>>(new Set());
 
   const markersRef = useRef<mapboxgl.Marker[]>([]);
+
+  const normalizeFriend = useCallback(
+    (raw: FriendLocation & {
+      profile_picture_url?: string | null;
+      previous_latitude?: number | string | null;
+      previous_longitude?: number | string | null;
+      last_updated?: string;
+    }): FriendLocation => {
+      const profilePictureUrl =
+        raw.profilePictureUrl ?? raw.profile_picture_url ?? null;
+      const bio = raw.bio ?? "";
+      const previousLatitudeRaw =
+        raw.previousLatitude ?? raw.previous_latitude ?? null;
+      const previousLongitudeRaw =
+        raw.previousLongitude ?? raw.previous_longitude ?? null;
+      const lastUpdated =
+        raw.lastUpdated ?? raw.last_updated ?? new Date().toISOString();
+
+      const friend: FriendLocation = {
+        id: raw.id,
+        name: raw.name ?? "Unknown",
+        handle: raw.handle ?? "@unknown",
+        latitude: Number(raw.latitude),
+        longitude: Number(raw.longitude),
+        lastUpdated,
+        profilePictureUrl,
+        bio,
+        previousLatitude:
+          previousLatitudeRaw != null ? Number(previousLatitudeRaw) : null,
+        previousLongitude:
+          previousLongitudeRaw != null ? Number(previousLongitudeRaw) : null,
+      };
+
+      if (process.env.NODE_ENV !== "production") {
+        const missing: string[] = [];
+        if (!("profilePictureUrl" in raw) && !("profile_picture_url" in raw)) {
+          missing.push("profilePictureUrl");
+        }
+        if (!("bio" in raw)) {
+          missing.push("bio");
+        }
+        if (!("previousLatitude" in raw) && !("previous_latitude" in raw)) {
+          missing.push("previousLatitude");
+        }
+        if (!("previousLongitude" in raw) && !("previous_longitude" in raw)) {
+          missing.push("previousLongitude");
+        }
+        if (
+          missing.length > 0 &&
+          !missingFieldsLoggedRef.current.has(friend.id)
+        ) {
+          console.info("[map] friend missing fields", {
+            id: friend.id,
+            missing,
+          });
+          missingFieldsLoggedRef.current.add(friend.id);
+        }
+      }
+
+      return friend;
+    },
+    []
+  );
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current || !mapboxToken) {
@@ -89,7 +154,7 @@ export const MapCanvas = () => {
       map.remove();
       mapRef.current = null;
     };
-  }, [mapboxToken]);
+  }, [mapboxToken, mapInstanceKey]);
 
   const buildMarker = useCallback(
     (friend: FriendLocation) => {
@@ -97,6 +162,17 @@ export const MapCanvas = () => {
       if (!map) {
         return null;
       }
+
+      if (!Number.isFinite(friend.latitude) || !Number.isFinite(friend.longitude)) {
+        return null;
+      }
+
+      const profilePictureUrl =
+        friend.profilePictureUrl ??
+        (friend as FriendLocation & { profile_picture_url?: string | null })
+          .profile_picture_url ??
+        null;
+      const safeBio = friend.bio ?? "";
 
       const wrapper = document.createElement("div");
       wrapper.className = "relative flex h-14 w-14 items-center justify-center";
@@ -125,9 +201,9 @@ export const MapCanvas = () => {
 
       const fallback = getInitial(friend.name);
 
-      if (friend.profilePictureUrl) {
+      if (profilePictureUrl) {
         const img = document.createElement("img");
-        img.src = friend.profilePictureUrl;
+        img.src = profilePictureUrl;
         img.alt = friend.name;
         img.className = "h-full w-full object-cover";
         img.loading = "lazy";
@@ -153,7 +229,7 @@ export const MapCanvas = () => {
       wrapper.appendChild(label);
 
       wrapper.addEventListener("click", () => {
-        setSelectedFriend(friend);
+        setSelectedFriend({ ...friend, bio: safeBio, profilePictureUrl });
       });
 
       return new mapboxgl.Marker({ element: wrapper, anchor: "center" })
@@ -205,44 +281,83 @@ export const MapCanvas = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiGet<FriendsResponse>("/map/friends", token);
-      setFriends(response.friends ?? []);
-      setSettings(response.settings ?? { shareLocation: false, ghostMode: false });
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Unable to load map data."
+      const response = await apiGet<FriendsResponse | FriendLocation[]>(
+        "/map/friends",
+        token
       );
+      const rawFriends = Array.isArray(response)
+        ? response
+        : response.friends ?? [];
+      const normalized = rawFriends.map(normalizeFriend).filter((friend) =>
+        Number.isFinite(friend.latitude) && Number.isFinite(friend.longitude)
+      );
+      setFriends(normalized);
+      if (!Array.isArray(response)) {
+        setSettings(
+          response.settings ?? { shareLocation: false, ghostMode: false }
+        );
+      }
+    } catch (loadError) {
+      if (process.env.NODE_ENV !== "production") {
+        console.error("[map] failed to load friends", loadError);
+      }
+      setError("Can't load friend locations right now");
+
+      if (user?.id) {
+        try {
+          const position = await requestPosition({ suppressError: true });
+          const fallbackFriend = normalizeFriend({
+            id: user.id,
+            name: user.name ?? "You",
+            handle: user.handle ?? "@you",
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            lastUpdated: new Date().toISOString(),
+          } as FriendLocation);
+          setFriends([fallbackFriend]);
+        } catch {
+          // Ignore fallback errors; error message already set.
+        }
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [normalizeFriend, requestPosition, token, user?.handle, user?.id, user?.name]);
 
-  const requestPosition = useCallback(async () => {
-    if (!navigator.geolocation) {
-      const message = "Location services are not available in this browser.";
-      setError(message);
-      throw new Error(message);
-    }
+  const requestPosition = useCallback(
+    async (options?: { suppressError?: boolean }) => {
+      if (!navigator.geolocation) {
+        const message = "Location services are not available in this browser.";
+        if (!options?.suppressError) {
+          setError(message);
+        }
+        throw new Error(message);
+      }
 
-    try {
-      return await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 8000,
-          maximumAge: 15000,
+      try {
+        return await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 8000,
+            maximumAge: 15000,
+          });
         });
-      });
-    } catch (err) {
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? String((err as { message?: unknown }).message)
-          : "Location permission was denied.";
-      setError(message || "Location permission was denied.");
-      throw err;
-    }
-  }, []);
+      } catch (err) {
+        const message =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message?: unknown }).message)
+            : "Location permission was denied.";
+        if (!options?.suppressError) {
+          setError(message || "Location permission was denied.");
+        }
+        if (process.env.NODE_ENV !== "production") {
+          console.info("[map] geolocation error", err);
+        }
+        throw err;
+      }
+    },
+    []
+  );
 
   const updateLocation = useCallback(async () => {
     if (!token) {
@@ -398,6 +513,20 @@ export const MapCanvas = () => {
     }
   };
 
+  const handleRetry = useCallback(() => {
+    setError(null);
+    setSelectedFriend(null);
+    markersRef.current.forEach((marker) => marker.remove());
+    markersRef.current = [];
+    if (mapRef.current) {
+      mapRef.current.remove();
+      mapRef.current = null;
+    }
+    setMapReady(false);
+    setMapInstanceKey((prev) => prev + 1);
+    refreshFriends();
+  }, [refreshFriends]);
+
   if (!mapboxToken) {
     return (
       <Card className="min-h-[420px]">
@@ -422,6 +551,7 @@ export const MapCanvas = () => {
         onToggleShare={handleToggleShare}
         onToggleGhost={handleToggleGhost}
         onLogin={() => openAuthModal("login")}
+        onRetry={handleRetry}
         error={error}
         isLoading={isLoading}
       />

@@ -9,6 +9,7 @@ type MapControlsProps = {
   onToggleShare: () => void;
   onToggleGhost: () => void;
   onLogin: () => void;
+  onRetry?: () => void;
   error?: string | null;
   isLoading?: boolean;
 };
@@ -20,6 +21,7 @@ export const MapControls = ({
   onToggleShare,
   onToggleGhost,
   onLogin,
+  onRetry,
   error,
   isLoading,
 }: MapControlsProps) => {
@@ -82,7 +84,17 @@ export const MapControls = ({
 
       {error && (
         <div className="pointer-events-auto rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-xs font-semibold text-accent">
-          {error}
+          <p>{error}</p>
+          {onRetry && (
+            <Button
+              requiresAuth={false}
+              variant="outline"
+              className="mt-3 w-full min-h-[44px]"
+              onClick={onRetry}
+            >
+              Retry
+            </Button>
+          )}
         </div>
       )}
 
