@@ -91,6 +91,14 @@ const TYPING_TEST_RESULT_SECONDS = 3;
 const TYPING_TEST_MAX_SECONDS = 90;
 const TYPING_TEST_MIN_WORD_LENGTH = 3;
 const TYPING_TEST_MAX_WORD_LENGTH = 8;
+const DEBUG_RANKED = process.env.RANKED_DEBUG === "true";
+
+const logRanked = (...args: unknown[]) => {
+  if (!DEBUG_RANKED) {
+    return;
+  }
+  console.log("[ranked]", ...args);
+};
 
 const icebreakerCache: { value: string[] | null } = { value: null };
 const characterRoleCache: {
@@ -1012,6 +1020,10 @@ const startTypingTestRound = async (
   if (words.length === 0) {
     return match;
   }
+  logRanked("startTypingTestRound:attempt", {
+    matchId: match.id,
+    roundNumber: ensuredRoundNumber,
+  });
   const updated = await db.query(
     `UPDATE ranked_matches
      SET round_number = $2,
@@ -1024,14 +1036,19 @@ const startTypingTestRound = async (
          typing_test_results = '[]'::jsonb,
          typing_test_winner_id = NULL,
          typing_test_result_at = NULL,
-         typing_test_round = COALESCE(typing_test_round, 0) + 1
+         typing_test_round = $2
      WHERE id = $1
      RETURNING ${rankedMatchColumns}`,
     [match.id, ensuredRoundNumber, JSON.stringify(words)]
   );
   if ((updated.rowCount ?? 0) > 0) {
+    logRanked("startTypingTestRound:started", {
+      matchId: match.id,
+      roundNumber: ensuredRoundNumber,
+    });
     return updated.rows[0] as RankedMatchRow;
   }
+  logRanked("startTypingTestRound:noop", { matchId: match.id });
   return match;
 };
 
@@ -1053,6 +1070,12 @@ const advanceToNextChatRound = async (
   const roleA = nextGameType === "roles" ? pickCharacterRole() : null;
   const roleB = nextGameType === "roles" ? pickCharacterRole() : null;
 
+  logRanked("advanceToNextChatRound:attempt", {
+    matchId: match.id,
+    fromRound: match.round_number ?? null,
+    toRound: nextRoundNumber,
+    gameType: nextGameType,
+  });
   const updated = await db.query(
     `UPDATE ranked_matches
      SET round_number = $2,
@@ -1085,8 +1108,14 @@ const advanceToNextChatRound = async (
     ]
   );
   if ((updated.rowCount ?? 0) > 0) {
+    logRanked("advanceToNextChatRound:started", {
+      matchId: match.id,
+      roundNumber: nextRoundNumber,
+      gameType: nextGameType,
+    });
     return updated.rows[0] as RankedMatchRow;
   }
+  logRanked("advanceToNextChatRound:noop", { matchId: match.id });
   return match;
 };
 
@@ -1115,6 +1144,14 @@ const ensureRoundState = async (match: RankedMatchRow): Promise<RankedMatchRow> 
   if (current.timed_out) {
     return current;
   }
+  logRanked("ensureRoundState", {
+    matchId: current.id,
+    roundNumber: current.round_number ?? null,
+    roundGameType: current.round_game_type ?? null,
+    roundPhase: current.round_phase ?? null,
+    typingState: current.typing_test_state ?? null,
+    typingRound: current.typing_test_round ?? null,
+  });
   const roundGameType = current.round_game_type as RoundGameType | null;
   const roundPhase = (current.round_phase as RoundPhase | null) ?? "chat";
   const roundStartedAt = current.round_started_at
@@ -1131,12 +1168,29 @@ const ensureRoundState = async (match: RankedMatchRow): Promise<RankedMatchRow> 
   ) {
     const resultAt = parseTimestamp(current.typing_test_result_at);
     if (Date.now() - resultAt.getTime() >= TYPING_TEST_RESULT_SECONDS * 1000) {
+      logRanked("ensureRoundState:typingResultElapsed", {
+        matchId: current.id,
+        roundNumber: current.round_number ?? null,
+      });
       return advanceToNextChatRound(current);
     }
   }
 
   if (roundGameType === "typing_test") {
     if (!current.typing_test_state) {
+      const lastTypingRound = current.typing_test_round ?? 0;
+      const currentRound = current.round_number ?? 1;
+      const alreadyRanTypingTest =
+        lastTypingRound === currentRound ||
+        (lastTypingRound > 0 && lastTypingRound * 2 === currentRound);
+      if (alreadyRanTypingTest) {
+        logRanked("ensureRoundState:typingAlreadyRan", {
+          matchId: current.id,
+          roundNumber: currentRound,
+          typingTestRound: lastTypingRound,
+        });
+        return advanceToNextChatRound(current);
+      }
       current = await startTypingTestRound(current, current.round_number ?? 1);
     }
     return current;
@@ -1186,6 +1240,10 @@ const maybeAdvanceTypingTestState = async (
   ) {
     const startedAt = parseTimestamp(match.typing_test_started_at);
     if (Date.now() - startedAt.getTime() >= TYPING_TEST_COUNTDOWN_SECONDS * 1000) {
+      logRanked("typingTest:countdownComplete", {
+        matchId: match.id,
+        roundNumber: match.round_number ?? null,
+      });
       const updated = await db.query(
         `UPDATE ranked_matches
          SET typing_test_state = 'active'
@@ -1214,6 +1272,12 @@ const maybeAdvanceTypingTestState = async (
       const missing = participants.filter((id) => !finished.has(id));
       const firstId = results[0] ?? null;
       const secondId = results[1] ?? null;
+      logRanked("typingTest:timeout", {
+        matchId: match.id,
+        roundNumber: match.round_number ?? null,
+        finishedCount: results.length,
+        missingCount: missing.length,
+      });
       const updated = await db.query(
         `UPDATE ranked_matches
          SET typing_test_state = 'result',
@@ -1264,6 +1328,10 @@ const maybeAdvanceTypingTestState = async (
   ) {
     const resultAt = parseTimestamp(match.typing_test_result_at);
     if (Date.now() - resultAt.getTime() >= TYPING_TEST_RESULT_SECONDS * 1000) {
+      logRanked("typingTest:resultElapsed", {
+        matchId: match.id,
+        roundNumber: match.round_number ?? null,
+      });
       const cleared = await db.query(
         `UPDATE ranked_matches
          SET typing_test_state = NULL,
