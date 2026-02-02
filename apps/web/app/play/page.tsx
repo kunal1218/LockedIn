@@ -422,6 +422,7 @@ export default function RankedPlayPage() {
     !showBlockingModal &&
     !showTypingTestArena;
   const isTurnBlocked = isTypingTestActive || isRoleModalActive || isJudgingPhase;
+  const isPlayerAlive = !isMatched || (lives?.me ?? 1) > 0;
   const isTurnExpired =
     isMatched &&
     isRolesRound &&
@@ -469,9 +470,12 @@ export default function RankedPlayPage() {
     !isTypingTestRound &&
     !isJudgingPhase &&
     (isIcebreakerRound
-      ? !displayIsJudge && !hasAnsweredIcebreaker && (icebreakerTimeLeft ?? 1) > 0
+      ? !displayIsJudge &&
+        isPlayerAlive &&
+        !hasAnsweredIcebreaker &&
+        (icebreakerTimeLeft ?? 1) > 0
       : isRolesRound
-        ? !displayIsJudge && isMyTurn && !isTurnExpired
+        ? !displayIsJudge && isPlayerAlive && isMyTurn && !isTurnExpired
         : false);
   const canSendMessage =
     rankedStatus.status === "matched" &&
@@ -480,9 +484,16 @@ export default function RankedPlayPage() {
     !isTypingTestRound &&
     !isJudgingPhase &&
     (isIcebreakerRound
-      ? !displayIsJudge && !hasAnsweredIcebreaker && (icebreakerTimeLeft ?? 1) > 0
+      ? !displayIsJudge &&
+        isPlayerAlive &&
+        !hasAnsweredIcebreaker &&
+        (icebreakerTimeLeft ?? 1) > 0
       : isRolesRound
-        ? !displayIsJudge && isMyTurn && !isTurnExpired && !justSentRef.current
+        ? !displayIsJudge &&
+          isPlayerAlive &&
+          isMyTurn &&
+          !isTurnExpired &&
+          !justSentRef.current
         : false);
   const showSmiteButton =
     isAdmin && isMatched && !isMatchOver && !isTypingTestActive && !isRoleModalActive;

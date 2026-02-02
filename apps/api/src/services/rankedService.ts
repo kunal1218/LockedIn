@@ -368,10 +368,11 @@ const pickChatGameType = (): ChatGameType => {
 
 const getChatters = (match: RankedMatchRow) => {
   const judgeId = match.judge_user_id ?? null;
-  const ids = [match.user_a_id, match.user_b_id, match.user_c_id].filter(
+  const ids = [match.user_a_id, match.user_b_id].filter(
     (id): id is string => Boolean(id && id !== judgeId)
   );
-  return { chatters: ids, judgeId };
+  const alive = ids.filter((id) => getLivesForUser(match, id) > 0);
+  return { chatters: alive, judgeId };
 };
 
 const getOpponentIds = (match: RankedMatchRow, userId: string) =>
@@ -472,7 +473,9 @@ const getOpponentsForUser = async (
 };
 
 const getNextTurnUserId = (match: RankedMatchRow, currentId: string | null) => {
-  const order = [match.user_a_id, match.user_b_id].filter(Boolean) as string[];
+  const order = [match.user_a_id, match.user_b_id].filter(
+    (id): id is string => Boolean(id && getLivesForUser(match, id) > 0)
+  );
   if (order.length === 0) {
     return currentId;
   }
@@ -1096,6 +1099,14 @@ const ensureRoundState = async (match: RankedMatchRow): Promise<RankedMatchRow> 
     : new Date();
   const roundStartedAtValue = roundStartedAt.toISOString();
 
+  const { chatters } = getChatters(current);
+  if (
+    (roundGameType === "icebreaker" || roundGameType === "roles") &&
+    chatters.length < 2
+  ) {
+    return startTypingTestRound(current, (current.round_number ?? 1) + 1);
+  }
+
   if (roundGameType === "typing_test") {
     if (!current.typing_test_state) {
       current = await startTypingTestRound(current, current.round_number ?? 1);
@@ -1106,8 +1117,6 @@ const ensureRoundState = async (match: RankedMatchRow): Promise<RankedMatchRow> 
   if (roundPhase !== "chat") {
     return current;
   }
-
-  const { chatters } = getChatters(current);
   if (roundGameType === "icebreaker") {
     const elapsed = Date.now() - roundStartedAt.getTime();
     const responses = await db.query(
@@ -1273,9 +1282,42 @@ const applyTurnTimeout = async (
   return updated;
 };
 
+const ensureAliveTurnParticipant = async (
+  match: RankedMatchRow
+): Promise<RankedMatchRow> => {
+  if (match.round_game_type !== "roles" || match.round_phase !== "chat") {
+    return match;
+  }
+  const { chatters } = getChatters(match);
+  if (chatters.length === 0) {
+    return match;
+  }
+  if (match.current_turn_user_id && chatters.includes(match.current_turn_user_id)) {
+    return match;
+  }
+  const nextTurnUserId = chatters[0];
+  const updated = await db.query(
+    `UPDATE ranked_matches
+     SET current_turn_user_id = $2,
+         turn_started_at = now()
+     WHERE id = $1
+     RETURNING ${rankedMatchColumns}`,
+    [match.id, nextTurnUserId]
+  );
+  if ((updated.rowCount ?? 0) > 0) {
+    return updated.rows[0] as RankedMatchRow;
+  }
+  return {
+    ...match,
+    current_turn_user_id: nextTurnUserId,
+    turn_started_at: new Date().toISOString(),
+  };
+};
+
 const ensureMatchTimer = async (match: RankedMatchRow) => {
   let updatedMatch = await maybeAdvanceTypingTestState(match);
   updatedMatch = await ensureRoundState(updatedMatch);
+  updatedMatch = await ensureAliveTurnParticipant(updatedMatch);
   if (!updatedMatch.timed_out && shouldEndMatch(updatedMatch)) {
     const finalResult = await db.query(
       `UPDATE ranked_matches
@@ -1703,6 +1745,10 @@ export const updateRankedTyping = async (params: {
   if (match.judge_user_id === params.userId) {
     return;
   }
+  const { chatters } = getChatters(match);
+  if (!chatters.includes(params.userId)) {
+    return;
+  }
   const raw = typeof params.body === "string" ? params.body : "";
   const body = raw.slice(0, 500);
   let typingColumn = "user_a_typing";
@@ -1871,6 +1917,10 @@ export const sendRankedMessage = async (params: {
   if (isJudgeSender) {
     throw new Error("Judges cannot send chat messages");
   }
+  const { chatters } = getChatters(activeMatch);
+  if (!chatters.includes(params.senderId)) {
+    throw new Error("You can only chat when you have lives remaining.");
+  }
 
   if (activeMatch.round_game_type === "icebreaker") {
     const roundStartedAt = activeMatch.round_started_at
@@ -1995,6 +2045,9 @@ export const submitJudgeVote = async (params: {
     }
   }
   const { chatters } = getChatters(match);
+  if (chatters.length < 2) {
+    throw new Error("Not enough players to judge this round");
+  }
   if (!chatters.includes(messageRow.sender_id)) {
     throw new Error("Vote must target a chat participant");
   }
