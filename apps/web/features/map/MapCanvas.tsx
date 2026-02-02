@@ -1,22 +1,15 @@
 "use client";
 
 import mapboxgl from "mapbox-gl";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { FriendLocation } from "@lockedin/shared";
 import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
 import { useAuth } from "@/features/auth";
+import { FriendPopup } from "@/features/map/components/FriendPopup";
 import { MapControls } from "@/features/map/components/MapControls";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/time";
-
-type FriendLocation = {
-  id: string;
-  name: string;
-  handle: string;
-  latitude: number;
-  longitude: number;
-  lastUpdated: string;
-};
 
 type MapSettings = {
   shareLocation: boolean;
@@ -39,6 +32,19 @@ const MAP_STYLE = "mapbox://styles/mapbox/dark-v11";
 const DEFAULT_CENTER: [number, number] = [-73.9857, 40.7484];
 const DEFAULT_ZOOM = 12;
 const UPDATE_INTERVAL_MS = 60000;
+const RING_RECENT = "#10b981";
+const RING_ACTIVE = "#f59e0b";
+const RING_IDLE = "#6b7280";
+
+const getMinutesAgo = (timestamp: string) =>
+  (Date.now() - new Date(timestamp).getTime()) / 60000;
+
+const getRingColor = (timestamp: string) => {
+  const minutes = getMinutesAgo(timestamp);
+  if (minutes < 5) return RING_RECENT;
+  if (minutes < 15) return RING_ACTIVE;
+  return RING_IDLE;
+};
 
 export const MapCanvas = () => {
   const { token, isAuthenticated, openAuthModal, user } = useAuth();
@@ -52,45 +58,12 @@ export const MapCanvas = () => {
   const [isMapReady, setMapReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedFriend, setSelectedFriend] = useState<FriendLocation | null>(
+    null
+  );
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-  const friendFeatures = useMemo(
-    () =>
-      friends.map((friend) => ({
-        type: "Feature" as const,
-        geometry: {
-          type: "Point" as const,
-          coordinates: [friend.longitude, friend.latitude],
-        },
-        properties: {
-          id: friend.id,
-          name: friend.name,
-          handle: friend.handle,
-          initial: getInitial(friend.name),
-          color: getMarkerColor(friend.name),
-          lastSeen: formatRelativeTime(friend.lastUpdated),
-          isSelf: friend.id === user?.id,
-        },
-      })),
-    [friends, user?.id]
-  );
-
-  const updateMapData = useCallback(() => {
-    if (!mapRef.current || !isMapReady) {
-      return;
-    }
-    const source = mapRef.current.getSource("friends") as
-      | mapboxgl.GeoJSONSource
-      | undefined;
-    if (!source) {
-      return;
-    }
-
-    source.setData({
-      type: "FeatureCollection",
-      features: friendFeatures,
-    });
-  }, [friendFeatures, isMapReady]);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current || !mapboxToken) {
@@ -109,161 +82,6 @@ export const MapCanvas = () => {
     mapRef.current = map;
 
     map.on("load", () => {
-      map.addSource("friends", {
-        type: "geojson",
-        data: {
-          type: "FeatureCollection",
-          features: [],
-        },
-        cluster: true,
-        clusterRadius: 50,
-        clusterMaxZoom: 14,
-      });
-
-      map.addLayer({
-        id: "friend-clusters",
-        type: "circle",
-        source: "friends",
-        filter: ["has", "point_count"],
-        paint: {
-          "circle-color": "#ff8658",
-          "circle-opacity": 0.85,
-          "circle-radius": [
-            "step",
-            ["get", "point_count"],
-            18,
-            10,
-            22,
-            30,
-            28,
-          ],
-        },
-      });
-
-      map.addLayer({
-        id: "friend-cluster-count",
-        type: "symbol",
-        source: "friends",
-        filter: ["has", "point_count"],
-        layout: {
-          "text-field": ["get", "point_count_abbreviated"],
-          "text-size": 12,
-          "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
-        },
-        paint: {
-          "text-color": "#1b1a17",
-        },
-      });
-
-      map.addLayer({
-        id: "friend-points",
-        type: "circle",
-        source: "friends",
-        filter: ["!", ["has", "point_count"]],
-        paint: {
-          "circle-color": ["get", "color"],
-          "circle-radius": 16,
-          "circle-stroke-width": 2,
-          "circle-stroke-color": "#1b1a17",
-        },
-      });
-
-      map.addLayer(
-        {
-          id: "friend-pulse",
-          type: "circle",
-          source: "friends",
-          filter: [
-            "all",
-            ["!", ["has", "point_count"]],
-            ["==", ["get", "isSelf"], true],
-          ],
-          paint: {
-            "circle-color": "#ffb088",
-            "circle-radius": 18,
-            "circle-opacity": 0.35,
-            "circle-blur": 0.6,
-          },
-        },
-        "friend-points"
-      );
-
-      map.addLayer({
-        id: "friend-initials",
-        type: "symbol",
-        source: "friends",
-        filter: ["!", ["has", "point_count"]],
-        layout: {
-          "text-field": ["get", "initial"],
-          "text-size": 12,
-          "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
-          "text-offset": [0, 0],
-        },
-        paint: {
-          "text-color": "#1b1a17",
-        },
-      });
-
-      map.addLayer({
-        id: "friend-last-seen",
-        type: "symbol",
-        source: "friends",
-        filter: ["!", ["has", "point_count"]],
-        layout: {
-          "text-field": ["get", "lastSeen"],
-          "text-size": 10,
-          "text-offset": [0, 1.6],
-          "text-anchor": "top",
-        },
-        paint: {
-          "text-color": "#f7f4ef",
-          "text-halo-color": "rgba(27,26,23,0.65)",
-          "text-halo-width": 1,
-        },
-      });
-
-      map.on("click", "friend-clusters", (event) => {
-        const features = map.queryRenderedFeatures(event.point, {
-          layers: ["friend-clusters"],
-        });
-        const cluster = features[0];
-        if (!cluster || cluster.properties?.cluster_id == null) {
-          return;
-        }
-
-        const source = map.getSource("friends") as mapboxgl.GeoJSONSource | undefined;
-        if (!source) {
-          return;
-        }
-
-        source.getClusterExpansionZoom(
-          Number(cluster.properties.cluster_id),
-          (error, zoom) => {
-            if (error) {
-              return;
-            }
-            if (zoom == null) {
-              return;
-            }
-            if (cluster.geometry.type !== "Point") {
-              return;
-            }
-            map.easeTo({
-              center: cluster.geometry.coordinates as [number, number],
-              zoom,
-            });
-          }
-        );
-      });
-
-      map.on("mouseenter", "friend-clusters", () => {
-        map.getCanvas().style.cursor = "pointer";
-      });
-
-      map.on("mouseleave", "friend-clusters", () => {
-        map.getCanvas().style.cursor = "";
-      });
-
       setMapReady(true);
     });
 
@@ -273,39 +91,112 @@ export const MapCanvas = () => {
     };
   }, [mapboxToken]);
 
-  useEffect(() => {
-    updateMapData();
-  }, [isMapReady, updateMapData]);
+  const buildMarker = useCallback(
+    (friend: FriendLocation) => {
+      const map = mapRef.current;
+      if (!map) {
+        return null;
+      }
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "relative flex h-14 w-14 items-center justify-center";
+      wrapper.style.cursor = "pointer";
+      wrapper.style.pointerEvents = "auto";
+
+      const ringColor = getRingColor(friend.lastUpdated);
+
+      if (friend.id === user?.id) {
+        const pulse = document.createElement("span");
+        pulse.className = "absolute inset-0 rounded-full animate-ping";
+        pulse.style.border = `4px solid ${ringColor}`;
+        pulse.style.opacity = "0.3";
+        pulse.style.pointerEvents = "none";
+        wrapper.appendChild(pulse);
+      }
+
+      const ring = document.createElement("div");
+      ring.className = "relative flex h-14 w-14 items-center justify-center rounded-full";
+      ring.style.border = `4px solid ${ringColor}`;
+
+      const inner = document.createElement("div");
+      inner.className =
+        "relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white text-sm font-semibold text-white shadow-[0_10px_24px_rgba(0,0,0,0.25)]";
+      inner.style.backgroundColor = getMarkerColor(friend.name);
+
+      const fallback = getInitial(friend.name);
+
+      if (friend.profilePictureUrl) {
+        const img = document.createElement("img");
+        img.src = friend.profilePictureUrl;
+        img.alt = friend.name;
+        img.className = "h-full w-full object-cover";
+        img.loading = "lazy";
+        img.onerror = () => {
+          if (!inner.textContent) {
+            inner.textContent = fallback;
+          }
+          img.remove();
+        };
+        inner.appendChild(img);
+      } else {
+        inner.textContent = fallback;
+      }
+
+      ring.appendChild(inner);
+      wrapper.appendChild(ring);
+
+      const label = document.createElement("div");
+      label.className =
+        "absolute left-1/2 top-full mt-1 -translate-x-1/2 rounded-full bg-ink/70 px-2 py-0.5 text-[10px] font-semibold text-white/80 shadow-sm backdrop-blur";
+      label.textContent = formatRelativeTime(friend.lastUpdated);
+      label.style.pointerEvents = "none";
+      wrapper.appendChild(label);
+
+      wrapper.addEventListener("click", () => {
+        setSelectedFriend(friend);
+      });
+
+      return new mapboxgl.Marker({ element: wrapper, anchor: "center" })
+        .setLngLat([friend.longitude, friend.latitude])
+        .addTo(map);
+    },
+    [user?.id]
+  );
 
   useEffect(() => {
-    if (!isMapReady || !mapRef.current) {
+    if (!mapRef.current || !isMapReady) {
       return;
     }
 
-    let frameId = 0;
-    const animate = () => {
-      const map = mapRef.current;
-      if (!map || !map.getLayer("friend-pulse")) {
-        frameId = window.requestAnimationFrame(animate);
-        return;
-      }
+    markersRef.current.forEach((marker) => marker.remove());
+    markersRef.current = [];
 
-      const t = (performance.now() / 1000) % 1;
-      const radius = 18 + t * 10;
-      const opacity = 0.4 * (1 - t);
+    const nextMarkers = friends
+      .map((friend) => buildMarker(friend))
+      .filter((marker): marker is mapboxgl.Marker => marker !== null);
 
-      map.setPaintProperty("friend-pulse", "circle-radius", radius);
-      map.setPaintProperty("friend-pulse", "circle-opacity", opacity);
-
-      frameId = window.requestAnimationFrame(animate);
-    };
-
-    frameId = window.requestAnimationFrame(animate);
+    markersRef.current = nextMarkers;
 
     return () => {
-      window.cancelAnimationFrame(frameId);
+      markersRef.current.forEach((marker) => marker.remove());
+      markersRef.current = [];
     };
-  }, [isMapReady]);
+  }, [buildMarker, friends, isMapReady]);
+
+  useEffect(() => {
+    if (!selectedFriend) {
+      return;
+    }
+    const updated = friends.find((friend) => friend.id === selectedFriend.id);
+    if (!updated) {
+      setSelectedFriend(null);
+      return;
+    }
+    if (updated !== selectedFriend) {
+      setSelectedFriend(updated);
+    }
+  }, [friends, selectedFriend]);
+
 
   const refreshFriends = useCallback(async () => {
     if (!token) {
@@ -619,6 +510,12 @@ export const MapCanvas = () => {
           </div>
         </div>
       </div>
+      {selectedFriend && (
+        <FriendPopup
+          friend={selectedFriend}
+          onClose={() => setSelectedFriend(null)}
+        />
+      )}
     </div>
   );
 };

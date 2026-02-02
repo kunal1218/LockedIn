@@ -14,6 +14,10 @@ export type FriendLocation = {
   latitude: number;
   longitude: number;
   lastUpdated: string;
+  profilePictureUrl?: string | null;
+  bio?: string | null;
+  previousLatitude?: number | null;
+  previousLongitude?: number | null;
 };
 
 type MapSettingsRow = {
@@ -25,9 +29,13 @@ type FriendLocationRow = {
   id: string;
   name: string;
   handle: string;
+  profile_picture_url?: string | null;
+  bio?: string | null;
   latitude: number | string;
   longitude: number | string;
   updated_at: string | Date;
+  previous_latitude?: number | string | null;
+  previous_longitude?: number | string | null;
 };
 
 export class MapError extends Error {
@@ -43,6 +51,7 @@ const LOCATION_TTL_MINUTES = 30;
 
 const ensureLocationTable = async () => {
   await ensureUsersTable();
+  await ensureLocationHistoryTable();
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS user_locations (
@@ -63,6 +72,25 @@ const ensureLocationTable = async () => {
   await db.query(`
     CREATE INDEX IF NOT EXISTS user_locations_share_idx
       ON user_locations (share_location, ghost_mode);
+  `);
+};
+
+const ensureLocationHistoryTable = async () => {
+  await ensureUsersTable();
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS user_location_history (
+      id bigserial PRIMARY KEY,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      latitude double precision,
+      longitude double precision,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS user_location_history_user_idx
+      ON user_location_history (user_id, updated_at DESC);
   `);
 };
 
@@ -142,6 +170,12 @@ export const upsertUserLocation = async (params: {
       settings.ghostMode,
     ]
   );
+
+  await db.query(
+    `INSERT INTO user_location_history (user_id, latitude, longitude)
+     VALUES ($1, $2, $3)`,
+    [params.userId, params.latitude, params.longitude]
+  );
 };
 
 export const fetchFriendLocations = async (
@@ -173,12 +207,24 @@ export const fetchFriendLocations = async (
      SELECT users.id,
             users.name,
             users.handle,
+            users.profile_picture_url,
+            users.bio,
             locations.latitude,
             locations.longitude,
-            locations.updated_at
+            locations.updated_at,
+            prev.latitude AS previous_latitude,
+            prev.longitude AS previous_longitude
      FROM unblocked
      JOIN user_locations locations ON locations.user_id = unblocked.friend_id
      JOIN users ON users.id = unblocked.friend_id
+     LEFT JOIN LATERAL (
+       SELECT latitude, longitude
+       FROM user_location_history history
+       WHERE history.user_id = locations.user_id
+       ORDER BY history.updated_at DESC
+       OFFSET 1
+       LIMIT 1
+     ) prev ON true
      WHERE locations.share_location = true
        AND locations.ghost_mode = false
        AND locations.latitude IS NOT NULL
@@ -192,20 +238,38 @@ export const fetchFriendLocations = async (
     id: row.id,
     name: row.name,
     handle: row.handle,
+    profilePictureUrl: row.profile_picture_url ?? null,
+    bio: row.bio ?? null,
     latitude: Number(row.latitude),
     longitude: Number(row.longitude),
     lastUpdated: toIsoString(row.updated_at),
+    previousLatitude:
+      row.previous_latitude != null ? Number(row.previous_latitude) : null,
+    previousLongitude:
+      row.previous_longitude != null ? Number(row.previous_longitude) : null,
   }));
 
   const selfResult = await db.query(
     `SELECT users.id,
             users.name,
             users.handle,
+            users.profile_picture_url,
+            users.bio,
             locations.latitude,
             locations.longitude,
-            locations.updated_at
+            locations.updated_at,
+            prev.latitude AS previous_latitude,
+            prev.longitude AS previous_longitude
      FROM user_locations locations
      JOIN users ON users.id = locations.user_id
+     LEFT JOIN LATERAL (
+       SELECT latitude, longitude
+       FROM user_location_history history
+       WHERE history.user_id = locations.user_id
+       ORDER BY history.updated_at DESC
+       OFFSET 1
+       LIMIT 1
+     ) prev ON true
      WHERE locations.user_id = $1
        AND locations.share_location = true
        AND locations.ghost_mode = false
@@ -224,9 +288,15 @@ export const fetchFriendLocations = async (
         id: row.id,
         name: row.name,
         handle: row.handle,
+        profilePictureUrl: row.profile_picture_url ?? null,
+        bio: row.bio ?? null,
         latitude: Number(row.latitude),
         longitude: Number(row.longitude),
         lastUpdated: toIsoString(row.updated_at),
+        previousLatitude:
+          row.previous_latitude != null ? Number(row.previous_latitude) : null,
+        previousLongitude:
+          row.previous_longitude != null ? Number(row.previous_longitude) : null,
       });
     }
   }

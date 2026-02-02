@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "@/components/Button";
 
 type MapControlsProps = {
@@ -34,14 +36,14 @@ export const MapControls = ({
           <button
             type="button"
             aria-pressed={shareLocation}
-            className={`relative h-6 w-11 rounded-full transition ${
+            className={`relative h-11 w-16 rounded-full transition ${
               shareLocation ? "bg-accent" : "bg-ink/10"
             }`}
             onClick={onToggleShare}
           >
             <span
-              className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${
-                shareLocation ? "left-6" : "left-1"
+              className={`absolute top-2 h-7 w-7 rounded-full bg-white transition ${
+                shareLocation ? "left-8" : "left-2"
               }`}
             />
           </button>
@@ -58,7 +60,7 @@ export const MapControls = ({
           </div>
           <button
             type="button"
-            className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+            className={`min-h-[44px] rounded-full border px-4 py-2 text-[11px] font-semibold transition ${
               ghostMode
                 ? "border-accent bg-accent/15 text-accent"
                 : "border-card-border/70 text-ink/70 hover:border-accent/40"
