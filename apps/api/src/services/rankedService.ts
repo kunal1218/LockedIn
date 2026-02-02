@@ -1124,6 +1124,17 @@ const ensureRoundState = async (match: RankedMatchRow): Promise<RankedMatchRow> 
 
   const { chatters } = getChatters(current);
 
+  if (
+    roundGameType === "typing_test" &&
+    current.typing_test_state === "result" &&
+    current.typing_test_result_at
+  ) {
+    const resultAt = parseTimestamp(current.typing_test_result_at);
+    if (Date.now() - resultAt.getTime() >= TYPING_TEST_RESULT_SECONDS * 1000) {
+      return advanceToNextChatRound(current);
+    }
+  }
+
   if (roundGameType === "typing_test") {
     if (!current.typing_test_state) {
       current = await startTypingTestRound(current, current.round_number ?? 1);

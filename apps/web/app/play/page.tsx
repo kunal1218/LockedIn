@@ -97,6 +97,7 @@ export default function RankedPlayPage() {
   const [typingTestError, setTypingTestError] = useState<string | null>(null);
   const [isTypingSubmitting, setIsTypingSubmitting] = useState(false);
   const [typingModalTick, setTypingModalTick] = useState(0);
+  const [typingTestTick, setTypingTestTick] = useState(0);
   const [roleModalTick, setRoleModalTick] = useState(0);
   const [roleModalStartMs, setRoleModalStartMs] = useState<number | null>(null);
   const [isSmiting, setIsSmiting] = useState(false);
@@ -171,7 +172,7 @@ export default function RankedPlayPage() {
     const nowMs = Date.now() - serverTimeOffsetRef.current;
     const remainingMs = TYPING_TEST_SECONDS * 1000 - (nowMs - startedMs);
     return Math.max(0, Math.ceil(remainingMs / 1000));
-  }, [isTypingTestActive, typingTest.startedAt]);
+  }, [isTypingTestActive, typingTest.startedAt, typingTestTick]);
   const typingTestProgress = useMemo(() => {
     if (typingTestTimeLeft === null) {
       return 0;
@@ -720,6 +721,16 @@ export default function RankedPlayPage() {
     }, 100);
     return () => window.clearInterval(interval);
   }, [isTypingTestCountdown, isTypingTestResult]);
+
+  useEffect(() => {
+    if (!isTypingTestActive) {
+      return;
+    }
+    const interval = window.setInterval(() => {
+      setTypingTestTick(Date.now());
+    }, 250);
+    return () => window.clearInterval(interval);
+  }, [isTypingTestActive]);
 
   useEffect(() => {
     if (roleModalStartMs === null) {
