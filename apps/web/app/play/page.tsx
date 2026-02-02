@@ -495,8 +495,7 @@ export default function RankedPlayPage() {
           !isTurnExpired &&
           !justSentRef.current
         : false);
-  const showSmiteButton =
-    isAdmin && isMatched && !isMatchOver && !isTypingTestActive && !isRoleModalActive;
+  const showSmiteButton = isAdmin && isMatched && !isMatchOver;
   const typingWordsText =
     typingTest.words.length > 0 ? typingTest.words.join(" ") : "Loading words...";
   const typingTestDisabled = false;
