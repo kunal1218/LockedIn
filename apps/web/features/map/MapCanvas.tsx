@@ -273,6 +273,40 @@ export const MapCanvas = () => {
     }
   }, [friends, selectedFriend]);
 
+  const requestPosition = useCallback(
+    async (options?: { suppressError?: boolean }) => {
+      if (!navigator.geolocation) {
+        const message = "Location services are not available in this browser.";
+        if (!options?.suppressError) {
+          setError(message);
+        }
+        throw new Error(message);
+      }
+
+      try {
+        return await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 8000,
+            maximumAge: 15000,
+          });
+        });
+      } catch (err) {
+        const message =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message?: unknown }).message)
+            : "Location permission was denied.";
+        if (!options?.suppressError) {
+          setError(message || "Location permission was denied.");
+        }
+        if (process.env.NODE_ENV !== "production") {
+          console.info("[map] geolocation error", err);
+        }
+        throw err;
+      }
+    },
+    []
+  );
 
   const refreshFriends = useCallback(async () => {
     if (!token) {
@@ -323,41 +357,6 @@ export const MapCanvas = () => {
       setIsLoading(false);
     }
   }, [normalizeFriend, requestPosition, token, user?.handle, user?.id, user?.name]);
-
-  const requestPosition = useCallback(
-    async (options?: { suppressError?: boolean }) => {
-      if (!navigator.geolocation) {
-        const message = "Location services are not available in this browser.";
-        if (!options?.suppressError) {
-          setError(message);
-        }
-        throw new Error(message);
-      }
-
-      try {
-        return await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 8000,
-            maximumAge: 15000,
-          });
-        });
-      } catch (err) {
-        const message =
-          err && typeof err === "object" && "message" in err
-            ? String((err as { message?: unknown }).message)
-            : "Location permission was denied.";
-        if (!options?.suppressError) {
-          setError(message || "Location permission was denied.");
-        }
-        if (process.env.NODE_ENV !== "production") {
-          console.info("[map] geolocation error", err);
-        }
-        throw err;
-      }
-    },
-    []
-  );
 
   const updateLocation = useCallback(async () => {
     if (!token) {
