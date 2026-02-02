@@ -727,7 +727,11 @@ const findWaitingPartners = async (userId: string): Promise<string[]> => {
 
 const createMatch = async (userIds: string[]) => {
   const matchId = randomUUID();
-  const shuffled = [...userIds].sort(() => Math.random() - 0.5);
+  const shuffled = [...userIds];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
   const [userA, userB, userC] = shuffled;
   if (!userA || !userB || !userC) {
     throw new Error("Three users are required to start a match");
@@ -930,15 +934,31 @@ const isTypingTestBlocking = (match: RankedMatchRow) =>
   !!match.typing_test_state;
 
 const ensureRoundDefaults = async (match: RankedMatchRow): Promise<RankedMatchRow> => {
-  const roundNumber = match.round_number ?? 1;
-  const isEvenRound = roundNumber % 2 === 0;
+  let roundNumber = match.round_number ?? 1;
   const existingChatType =
     match.round_game_type === "icebreaker" || match.round_game_type === "roles"
       ? (match.round_game_type as ChatGameType)
       : null;
-  const roundGameType: RoundGameType = isEvenRound
-    ? "typing_test"
-    : existingChatType ?? pickChatGameType();
+  let roundGameType: RoundGameType;
+  if (match.round_game_type === "typing_test") {
+    roundGameType = "typing_test";
+    if (roundNumber % 2 !== 0) {
+      roundNumber += 1;
+    }
+  } else if (existingChatType) {
+    roundGameType = existingChatType;
+    if (roundNumber % 2 === 0) {
+      roundNumber += 1;
+    }
+  } else {
+    roundGameType = roundNumber % 2 === 0 ? "typing_test" : pickChatGameType();
+  }
+  if (roundGameType === "typing_test" && roundNumber % 2 !== 0) {
+    roundNumber += 1;
+  }
+  if (roundGameType !== "typing_test" && roundNumber % 2 === 0) {
+    roundNumber += 1;
+  }
   const existingPhase = match.round_phase as RoundPhase | null;
   const roundPhase =
     roundGameType === "typing_test"
