@@ -1100,12 +1100,6 @@ const ensureRoundState = async (match: RankedMatchRow): Promise<RankedMatchRow> 
   const roundStartedAtValue = roundStartedAt.toISOString();
 
   const { chatters } = getChatters(current);
-  if (
-    (roundGameType === "icebreaker" || roundGameType === "roles") &&
-    chatters.length < 2
-  ) {
-    return startTypingTestRound(current, (current.round_number ?? 1) + 1);
-  }
 
   if (roundGameType === "typing_test") {
     if (!current.typing_test_state) {
@@ -2045,17 +2039,11 @@ export const submitJudgeVote = async (params: {
     }
   }
   const { chatters } = getChatters(match);
-  if (chatters.length < 2) {
-    throw new Error("Not enough players to judge this round");
-  }
   if (!chatters.includes(messageRow.sender_id)) {
     throw new Error("Vote must target a chat participant");
   }
   const winnerId = messageRow.sender_id;
-  const loserId = chatters.find((id) => id !== winnerId);
-  if (!loserId) {
-    throw new Error("Unable to resolve opponent");
-  }
+  const loserId = chatters.find((id) => id !== winnerId) ?? null;
 
   const updated = await db.query(
     `UPDATE ranked_matches
@@ -2072,15 +2060,16 @@ export const submitJudgeVote = async (params: {
            ELSE user_c_points
          END,
          user_a_lives = CASE
-           WHEN user_a_id = $3 THEN GREATEST(user_a_lives - 1, 0)
+           WHEN $3::uuid IS NOT NULL AND user_a_id = $3 THEN GREATEST(user_a_lives - 1, 0)
            ELSE user_a_lives
          END,
          user_b_lives = CASE
-           WHEN user_b_id = $3 THEN GREATEST(user_b_lives - 1, 0)
+           WHEN $3::uuid IS NOT NULL AND user_b_id = $3 THEN GREATEST(user_b_lives - 1, 0)
            ELSE user_b_lives
          END,
          user_c_lives = CASE
-           WHEN user_c_id = $3 THEN GREATEST(COALESCE(user_c_lives, ${DEFAULT_LIVES}) - 1, 0)
+           WHEN $3::uuid IS NOT NULL AND user_c_id = $3
+             THEN GREATEST(COALESCE(user_c_lives, ${DEFAULT_LIVES}) - 1, 0)
            ELSE user_c_lives
          END
      WHERE id = $1
