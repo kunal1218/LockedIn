@@ -41,12 +41,18 @@ type RankedStatus =
       opponents: MessageUser[];
       startedAt: string;
       lives?: { me: number; opponents: number[] };
+      points?: { me: number; opponents: number[] };
       turnStartedAt?: string;
       serverTime?: string;
       isMyTurn?: boolean;
       currentTurnUserId?: string | null;
       isJudge?: boolean;
       judgeUserId?: string | null;
+      roundNumber?: number;
+      roundGameType?: string;
+      roundPhase?: string;
+      roundStartedAt?: string;
+      roleAssignments?: Array<{ userId: string; role: string }>;
       icebreakerQuestion?: string | null;
       characterRole?: string | null;
       characterRoleAssignedAt?: string | null;
@@ -92,6 +98,7 @@ export default function RankedPlayPage() {
   const [roleModalTick, setRoleModalTick] = useState(0);
   const [roleModalStartMs, setRoleModalStartMs] = useState<number | null>(null);
   const [isSmiting, setIsSmiting] = useState(false);
+  const [isVoting, setIsVoting] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
@@ -99,7 +106,7 @@ export default function RankedPlayPage() {
   const hasLoadedMessagesRef = useRef<boolean>(false);
   const isLoadingMessagesRef = useRef<boolean>(false);
   const activeMatchIdRef = useRef<string | null>(null);
-  const roleModalSeenRef = useRef<Record<string, boolean>>({});
+  const roleModalKeyRef = useRef<string | null>(null);
   const justSentRef = useRef<boolean>(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const serverTimeOffsetRef = useRef<number>(0);
@@ -111,14 +118,14 @@ export default function RankedPlayPage() {
     rankedStatus.status === "matched"
       ? rankedStatus.lives ?? { me: 3, opponents: [3, 3] }
       : null;
-  const maybeStartRoleModal = useCallback((matchId: string | null) => {
-    if (!matchId) {
+  const maybeStartRoleModal = useCallback((roundKey: string | null) => {
+    if (!roundKey) {
       return;
     }
-    if (roleModalSeenRef.current[matchId]) {
+    if (roleModalKeyRef.current === roundKey) {
       return;
     }
-    roleModalSeenRef.current[matchId] = true;
+    roleModalKeyRef.current = roundKey;
     setRoleModalStartMs(Date.now());
   }, []);
   const derivedIsMyTurn = useMemo(() => {
@@ -158,18 +165,53 @@ export default function RankedPlayPage() {
   const characterRole = rankedCharacterRole;
   const characterRoleAssignedAt =
     rankedStatus.status === "matched" ? rankedStatus.characterRoleAssignedAt : null;
-  const roundNumber = (typingTest.round ?? 0) + 1;
+  const roundNumber =
+    rankedStatus.status === "matched" ? rankedStatus.roundNumber ?? 1 : 1;
+  const roundGameType =
+    rankedStatus.status === "matched"
+      ? rankedStatus.roundGameType ??
+        (roundNumber % 2 === 0 ? "typing_test" : "icebreaker")
+      : null;
+  const roundPhase =
+    rankedStatus.status === "matched"
+      ? rankedStatus.roundPhase ??
+        (roundGameType === "typing_test" ? "typing_test" : "chat")
+      : null;
+  const roundStartedAt =
+    rankedStatus.status === "matched" ? rankedStatus.roundStartedAt ?? null : null;
+  const isIcebreakerRound = roundGameType === "icebreaker";
+  const isRolesRound = roundGameType === "roles";
+  const isTypingTestRound = roundGameType === "typing_test";
+  const isJudgingPhase = roundPhase === "judging";
+  const roleModalKey = useMemo(() => {
+    if (
+      !isMatched ||
+      !activeMatchId ||
+      isMatchOver ||
+      roundPhase !== "chat" ||
+      roundGameType === "typing_test"
+    ) {
+      return null;
+    }
+    return `${activeMatchId}:${roundNumber}:${roundGameType}`;
+  }, [activeMatchId, isMatchOver, isMatched, roundGameType, roundNumber, roundPhase]);
   const matchStateMessage =
     rankedStatus.status === "matched"
       ? isMatchOver
         ? "Match over."
         : isTypingTestActive
           ? "Typing test in progress."
-          : roundNumber % 2 === 1
-            ? cleanedIcebreaker || "Start the conversation."
-            : isMyTurn
-              ? "Your Move."
-              : cleanedIcebreaker || "Start the conversation."
+          : isJudgingPhase
+            ? isJudge
+              ? "Judge: double-tap a message to vote."
+              : "Waiting for the judge's vote."
+            : roundNumber % 2 === 1
+              ? isIcebreakerRound
+                ? cleanedIcebreaker || "Answer the icebreaker."
+                : "Stay in character for this round."
+              : isMyTurn
+                ? "Your Move."
+                : "Waiting for your opponent."
       : "";
   const matchStateTone = isMatchOver
     ? "border-red-200 bg-red-50 text-red-700"
@@ -194,7 +236,6 @@ export default function RankedPlayPage() {
       ? matchSnapshot.judgeUserId
       : null;
   const displayIsJudge = isMatched ? isJudge : matchSnapshot?.isJudge ?? false;
-  const isJudgeOddRound = displayIsJudge && roundNumber % 2 === 1;
   const opponentLivesById = useMemo(() => {
     const mapping = new Map<string, number>();
     displayOpponents.forEach((opponent, index) => {
@@ -218,6 +259,17 @@ export default function RankedPlayPage() {
     }
     return [displayOpponents[0] ?? null, displayOpponents[1] ?? null] as const;
   }, [displayOpponents, displayIsJudge, displayJudgeUserId]);
+  const roleAssignments =
+    rankedStatus.status === "matched" ? rankedStatus.roleAssignments ?? [] : [];
+  const roleByUserId = useMemo(() => {
+    const mapping = new Map<string, string>();
+    roleAssignments.forEach((assignment) => {
+      mapping.set(assignment.userId, assignment.role);
+    });
+    return mapping;
+  }, [roleAssignments]);
+  const leftRole = leftOpponent ? roleByUserId.get(leftOpponent.id) ?? null : null;
+  const rightRole = rightOpponent ? roleByUserId.get(rightOpponent.id) ?? null : null;
   const didWin =
     isMatchOver &&
     !displayIsJudge &&
@@ -362,38 +414,81 @@ export default function RankedPlayPage() {
     }
     return Date.now() - roleModalStartMs < ROLE_MODAL_SECONDS * 1000;
   }, [roleModalStartMs, roleModalTick]);
-  const showRoleModal = isRoleModalActive;
+  const showRoleModal = isRoleModalActive && !showTypingModal;
   const showBlockingModal = showTypingModal || showRoleModal;
   const showStatusBar =
     rankedStatus.status === "matched" &&
     !showCenterPanel &&
     !showBlockingModal &&
     !showTypingTestArena;
-  const isTurnBlocked = isTypingTestActive || isRoleModalActive;
+  const isTurnBlocked = isTypingTestActive || isRoleModalActive || isJudgingPhase;
   const isTurnExpired =
     isMatched &&
+    isRolesRound &&
     isMyTurn &&
     timeLeft <= 0 &&
     !isMatchOver &&
     !isTypingTestActive &&
     !isRoleModalActive;
+  const icebreakerDeadlineMs = useMemo(() => {
+    if (!roundStartedAt) {
+      return null;
+    }
+    const parsed = Date.parse(roundStartedAt);
+    if (!Number.isFinite(parsed)) {
+      return null;
+    }
+    return parsed + 30 * 1000;
+  }, [roundStartedAt]);
+  const icebreakerTimeLeft = useMemo(() => {
+    if (!icebreakerDeadlineMs) {
+      return null;
+    }
+    return Math.max(0, Math.ceil((icebreakerDeadlineMs - Date.now()) / 1000));
+  }, [icebreakerDeadlineMs]);
+  const hasAnsweredIcebreaker = useMemo(() => {
+    if (!isIcebreakerRound || !roundStartedAt || !user?.id) {
+      return false;
+    }
+    const roundStartMs = Date.parse(roundStartedAt);
+    if (!Number.isFinite(roundStartMs)) {
+      return false;
+    }
+    return messages.some((message) => {
+      if (message.sender.id !== user.id) {
+        return false;
+      }
+      const createdAtMs = Date.parse(message.createdAt);
+      return Number.isFinite(createdAtMs) && createdAtMs >= roundStartMs;
+    });
+  }, [isIcebreakerRound, messages, roundStartedAt, user?.id]);
   const canTypeMessage =
     rankedStatus.status === "matched" &&
     !isMatchOver &&
     !isTurnBlocked &&
-    !isTurnExpired &&
-    (displayIsJudge ? !isJudgeOddRound : isMyTurn);
+    !isTypingTestRound &&
+    !isJudgingPhase &&
+    (isIcebreakerRound
+      ? !displayIsJudge && !hasAnsweredIcebreaker && (icebreakerTimeLeft ?? 1) > 0
+      : isRolesRound
+        ? !displayIsJudge && isMyTurn && !isTurnExpired
+        : false);
   const canSendMessage =
     rankedStatus.status === "matched" &&
     !isMatchOver &&
     !isTurnBlocked &&
-    !isTurnExpired &&
-    (displayIsJudge ? !isJudgeOddRound : isMyTurn && !justSentRef.current);
+    !isTypingTestRound &&
+    !isJudgingPhase &&
+    (isIcebreakerRound
+      ? !displayIsJudge && !hasAnsweredIcebreaker && (icebreakerTimeLeft ?? 1) > 0
+      : isRolesRound
+        ? !displayIsJudge && isMyTurn && !isTurnExpired && !justSentRef.current
+        : false);
   const showSmiteButton =
     isAdmin && isMatched && !isMatchOver && !isTypingTestActive && !isRoleModalActive;
   const typingWordsText =
     typingTest.words.length > 0 ? typingTest.words.join(" ") : "Loading words...";
-  const typingTestDisabled = displayIsJudge;
+  const typingTestDisabled = false;
   const typingWinnerName =
     typingTest.winnerId && typingTest.winnerId !== user?.id
       ? displayOpponents.find((opponent) => opponent.id === typingTest.winnerId)
@@ -426,13 +521,18 @@ export default function RankedPlayPage() {
     if (!id || !showTimerSnapshot) {
       return TURN_SECONDS;
     }
-    if (!currentTurnUserId || isTurnBlocked || isMatchOver) {
+    if (!currentTurnUserId || isTurnBlocked || isMatchOver || !isRolesRound) {
       return TURN_SECONDS;
     }
     return currentTurnUserId === id ? activeTurnSeconds : TURN_SECONDS;
   };
   const isTimerActiveForUser = (id?: string | null) =>
-    isMatched && !isMatchOver && !isTurnBlocked && !!id && currentTurnUserId === id;
+    isMatched &&
+    !isMatchOver &&
+    !isTurnBlocked &&
+    isRolesRound &&
+    !!id &&
+    currentTurnUserId === id;
   const syncTimer = useCallback(
     (turnStartedAt: string | null, serverTime?: string, timedOut?: boolean) => {
       if (!turnStartedAt) {
@@ -519,12 +619,12 @@ export default function RankedPlayPage() {
   }, [typingTest.round, typingTest.state]);
 
   useEffect(() => {
-    if (rankedStatus.status !== "matched" || !activeMatchId) {
+    if (!roleModalKey) {
       setRoleModalStartMs(null);
       return;
     }
-    maybeStartRoleModal(activeMatchId);
-  }, [activeMatchId, characterRole, maybeStartRoleModal, rankedStatus.status]);
+    maybeStartRoleModal(roleModalKey);
+  }, [maybeStartRoleModal, roleModalKey]);
 
   useEffect(() => {
     if (!isTypingTestCountdown && !isTypingTestResult) {
@@ -578,7 +678,6 @@ export default function RankedPlayPage() {
       const status = await apiGet<RankedStatus>("/ranked/status", token);
       setRankedStatus(status);
       if (status.status === "matched") {
-        maybeStartRoleModal(status.matchId);
         if (status.serverTime) {
           const serverMs = Date.parse(status.serverTime);
           if (Number.isFinite(serverMs)) {
@@ -608,7 +707,7 @@ export default function RankedPlayPage() {
       console.error("Ranked status error", error);
       setQueueError(error instanceof Error ? error.message : "Unable to load status.");
     }
-  }, [hasMatchEnded, maybeStartRoleModal, syncTimer, token]);
+  }, [hasMatchEnded, syncTimer, token]);
 
   const loadMessages = useCallback(async () => {
     if (!token || !activeMatchId) {
@@ -635,6 +734,12 @@ export default function RankedPlayPage() {
         isJudge?: boolean;
         judgeUserId?: string | null;
         lives?: { me: number; opponents: number[] };
+        points?: { me: number; opponents: number[] };
+        roundNumber?: number;
+        roundGameType?: string;
+        roundPhase?: string;
+        roundStartedAt?: string;
+        roleAssignments?: Array<{ userId: string; role: string }>;
         typing?: string;
         typingTest?: TypingTestPayload;
         icebreakerQuestion?: string | null;
@@ -661,6 +766,12 @@ export default function RankedPlayPage() {
               isJudge: payload.isJudge ?? prev.isJudge,
               judgeUserId: payload.judgeUserId ?? prev.judgeUserId,
               lives: payload.lives ?? prev.lives,
+              points: payload.points ?? prev.points,
+              roundNumber: payload.roundNumber ?? prev.roundNumber,
+              roundGameType: payload.roundGameType ?? prev.roundGameType,
+              roundPhase: payload.roundPhase ?? prev.roundPhase,
+              roundStartedAt: payload.roundStartedAt ?? prev.roundStartedAt,
+              roleAssignments: payload.roleAssignments ?? prev.roleAssignments,
               turnStartedAt: payload.turnStartedAt ?? prev.turnStartedAt,
               serverTime: payload.serverTime ?? prev.serverTime,
               icebreakerQuestion:
@@ -671,7 +782,6 @@ export default function RankedPlayPage() {
             }
           : prev
       );
-      maybeStartRoleModal(activeMatchId);
       const matchOver =
         payload.timedOut ||
         (payload.lives?.me ?? 1) <= 0 ||
@@ -714,7 +824,7 @@ export default function RankedPlayPage() {
       hasLoadedMessagesRef.current = true;
       isLoadingMessagesRef.current = false;
     }
-  }, [activeMatchId, hasMatchEnded, maybeStartRoleModal, rankedStatus.status, syncTimer, token]);
+  }, [activeMatchId, hasMatchEnded, rankedStatus.status, syncTimer, token]);
 
   const sendTypingUpdate = useCallback(
     async (text: string) => {
@@ -762,12 +872,7 @@ export default function RankedPlayPage() {
     if (!token || rankedStatus.status !== "matched" || !activeMatchId) {
       return;
     }
-    const canType =
-      !isMatchOver &&
-      !isTurnExpired &&
-      !isTurnBlocked &&
-      (displayIsJudge ? !isJudgeOddRound : isMyTurn);
-    const nextText = canType ? draft : "";
+    const nextText = canTypeMessage ? draft : "";
 
     if (typingDebounceRef.current) {
       window.clearTimeout(typingDebounceRef.current);
@@ -790,9 +895,7 @@ export default function RankedPlayPage() {
   }, [
     activeMatchId,
     draft,
-    displayIsJudge,
-    isJudgeOddRound,
-    isMyTurn,
+    canTypeMessage,
     isMatchOver,
     isTurnBlocked,
     isTurnExpired,
@@ -928,7 +1031,6 @@ export default function RankedPlayPage() {
       const status = await apiPost<RankedStatus>("/ranked/play", {}, token);
       setRankedStatus(status);
       if (status.status === "matched") {
-        maybeStartRoleModal(status.matchId);
         const matchOver =
           (status.lives?.me ?? 1) <= 0 || didOpponentsLose(status.lives);
         if (matchOver) {
@@ -990,12 +1092,33 @@ export default function RankedPlayPage() {
       setChatError("Match is over.");
       return;
     }
-    if (displayIsJudge) {
-      if (isJudgeOddRound) {
-        setChatError("Judges sit out odd rounds.");
+    if (isJudgingPhase) {
+      setChatError("Waiting for the judge's vote.");
+      return;
+    }
+    if (isTypingTestRound) {
+      setChatError("Typing test in progress.");
+      return;
+    }
+    if (isIcebreakerRound) {
+      if (displayIsJudge) {
+        setChatError("Judges don't answer the icebreaker.");
         return;
       }
-    } else {
+      if (hasAnsweredIcebreaker) {
+        setChatError("You already answered the icebreaker.");
+        return;
+      }
+      if ((icebreakerTimeLeft ?? 1) <= 0) {
+        setChatError("Icebreaker time is up.");
+        return;
+      }
+    }
+    if (isRolesRound) {
+      if (displayIsJudge) {
+        setChatError("Judges don't send chat messages.");
+        return;
+      }
       if (!isMyTurn || justSentRef.current) {
         setChatError("Wait for your opponent to reply before sending again.");
         return;
@@ -1111,6 +1234,37 @@ export default function RankedPlayPage() {
     }
   };
 
+  const handleJudgeVote = async (messageId: string) => {
+    if (!token || !activeMatchId || rankedStatus.status !== "matched") {
+      return;
+    }
+    if (!displayIsJudge || !isJudgingPhase) {
+      setChatError("Voting is not available right now.");
+      return;
+    }
+    if (!isIcebreakerRound && !isRolesRound) {
+      setChatError("This round is not judged.");
+      return;
+    }
+    setIsVoting(true);
+    setChatError(null);
+    try {
+      await apiPost(
+        `/ranked/match/${encodeURIComponent(activeMatchId)}/vote`,
+        { messageId },
+        token
+      );
+      await loadMessages();
+      await loadStatus();
+    } catch (error) {
+      setChatError(
+        error instanceof Error ? error.message : "Unable to submit vote."
+      );
+    } finally {
+      setIsVoting(false);
+    }
+  };
+
   const handleTypingTestSubmit = async (
     event?: FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>
   ) => {
@@ -1178,7 +1332,7 @@ export default function RankedPlayPage() {
       return;
     }
     const timer = window.setInterval(() => {
-      if (isTurnBlocked) {
+      if (isTurnBlocked || !isRolesRound) {
         setTimeLeft(TURN_SECONDS);
         return;
       }
@@ -1339,6 +1493,35 @@ export default function RankedPlayPage() {
                   )}
                 </div>
               )}
+              {displayIsJudge &&
+                isRolesRound &&
+                !showCenterPanel &&
+                !showBlockingModal &&
+                (leftRole || rightRole) && (
+                  <div className="mb-3 flex items-center justify-center gap-6 text-xs font-semibold text-muted">
+                    {leftRole && (
+                      <div className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+                        <span>{leftRole}</span>
+                      </div>
+                    )}
+                    {rightRole && (
+                      <div className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />
+                        <span>{rightRole}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              {!displayIsJudge &&
+                isRolesRound &&
+                characterRole &&
+                !showCenterPanel &&
+                !showBlockingModal && (
+                  <div className="mb-3 text-center text-xs font-semibold text-muted">
+                    Your role: {characterRole}
+                  </div>
+                )}
               <div
                 ref={listRef}
                 className={`min-h-0 flex-1 pr-1 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
@@ -1385,11 +1568,7 @@ export default function RankedPlayPage() {
                           onChange={(event) => setTypingAttempt(event.target.value)}
                           onKeyDown={handleTypingAttemptKeyDown}
                           className="w-full rounded-full border border-card-border/70 bg-white/90 px-5 py-3 text-sm text-ink outline-none transition focus:border-accent/60"
-                          placeholder={
-                            typingTestDisabled
-                              ? "Judges observe the typing test."
-                              : "Type the 10 words here"
-                          }
+                          placeholder="Type the 10 words here"
                           disabled={typingTestDisabled}
                         />
                         {typingTestError && (
@@ -1433,6 +1612,8 @@ export default function RankedPlayPage() {
                           {messages.map((message) => {
                             const isMine = message.sender.id === user?.id;
                             const isSelected = selectedMessageId === message.id;
+                            const isVoteable =
+                              displayIsJudge && isJudgingPhase && !isMine && !isVoting;
                             const judgeOpponentIndex = displayOpponents.findIndex(
                               (opponent) => opponent.id === message.sender.id
                             );
@@ -1462,9 +1643,15 @@ export default function RankedPlayPage() {
                               >
                                 <div
                                   onClick={() => setSelectedMessageId(message.id)}
+                                  onDoubleClick={
+                                    isVoteable ? () => handleJudgeVote(message.id) : undefined
+                                  }
                                   className={`max-w-[90%] rounded-2xl px-4 py-2 text-sm shadow-sm ${messageTone} ${
                                     isSelected ? "ring-2 ring-accent/40" : ""
-                                  }`}
+                                  } ${isVoteable ? "cursor-pointer" : ""}`}
+                                  title={
+                                    isVoteable ? "Double-click to vote for this message." : undefined
+                                  }
                                 >
                                   <p className="whitespace-pre-wrap">{message.body}</p>
                                 </div>
@@ -1545,12 +1732,25 @@ export default function RankedPlayPage() {
               {showRoleModal ? (
                 <>
                   <p className="text-base font-semibold text-ink">
-                    {`Round ${roundNumber}: Icebreaker`}
+                    {roundGameType === "roles"
+                      ? `Round ${roundNumber}: Character Roles`
+                      : roundGameType === "icebreaker"
+                        ? `Round ${roundNumber}: Icebreaker`
+                        : `Round ${roundNumber}: Typing Test`}
                   </p>
+                  {!displayIsJudge && isRolesRound && characterRole && (
+                    <p className="mt-2 text-sm font-semibold text-ink">
+                      Your role: {characterRole}
+                    </p>
+                  )}
                   <p className="mt-2 text-xs text-muted">
                     {displayIsJudge
                       ? "You are the judge for this round."
-                      : "Get ready to start the conversation."}
+                      : isIcebreakerRound
+                        ? "Get ready to answer the icebreaker."
+                        : isRolesRound
+                          ? "Stay in character and start the conversation."
+                          : "Get ready for the typing test."}
                   </p>
                   <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-card-border/60">
                     <div

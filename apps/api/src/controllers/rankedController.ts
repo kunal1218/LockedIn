@@ -13,6 +13,7 @@ import {
   updateRankedMessage,
   deleteRankedMessageById,
   smiteRankedOpponent,
+  submitJudgeVote,
 } from "../services/rankedService";
 
 const getToken = (req: Request) => {
@@ -218,6 +219,22 @@ export const postRankedSmite = async (req: Request, res: Response) => {
     const matchId = parseMatchId(req.params?.matchId);
     await smiteRankedOpponent({ matchId, userId: user.id });
     res.status(204).end();
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const postRankedVote = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const matchId = parseMatchId(req.params?.matchId);
+    const messageId = parseMessageId(req.body?.messageId);
+    const result = await submitJudgeVote({
+      matchId,
+      userId: user.id,
+      messageId,
+    });
+    res.json({ match: result });
   } catch (error) {
     handleError(res, error);
   }
