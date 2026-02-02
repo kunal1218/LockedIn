@@ -1045,9 +1045,7 @@ export default function RankedPlayPage() {
     turnStartedAtRef.current = rankedStatus.turnStartedAt ?? null;
     if (rankedStatus.turnStartedAt) {
       const matchOver =
-        (rankedStatus.lives?.me ?? 1) <= 0 ||
-        didOpponentsLose(rankedStatus.lives) ||
-        hasMatchEnded;
+        didOpponentsLose(rankedStatus.lives) || hasMatchEnded;
       if (matchOver) {
         setIsTimeout(true);
         setTimeLeft(TURN_SECONDS);
@@ -1123,8 +1121,7 @@ export default function RankedPlayPage() {
       const status = await apiPost<RankedStatus>("/ranked/play", {}, token);
       setRankedStatus(status);
       if (status.status === "matched") {
-        const matchOver =
-          (status.lives?.me ?? 1) <= 0 || didOpponentsLose(status.lives);
+        const matchOver = didOpponentsLose(status.lives);
         if (matchOver) {
           setIsTimeout(true);
           setTimeLeft(TURN_SECONDS);
