@@ -288,13 +288,30 @@ export const MapCanvas = () => {
       return;
     }
 
-    const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: true,
-        timeout: 8000,
-        maximumAge: 15000,
+    let position: GeolocationPosition;
+    try {
+      position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 8000,
+          maximumAge: 15000,
+        });
       });
-    });
+    } catch (err) {
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message?: unknown }).message)
+          : "Location permission was denied.";
+      setError(message || "Location permission was denied.");
+      throw err;
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[map] location captured", {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      });
+    }
 
     await apiPost(
       "/map/location",
@@ -364,7 +381,7 @@ export const MapCanvas = () => {
       }
     } catch (toggleError) {
       setError(
-        toggleError instanceof Error
+        toggleError instanceof Error && toggleError.message
           ? toggleError.message
           : "Unable to update location settings."
       );

@@ -188,7 +188,7 @@ export const fetchFriendLocations = async (
     [userId]
   );
 
-  return (result.rows as FriendLocationRow[]).map((row) => ({
+  const friends = (result.rows as FriendLocationRow[]).map((row) => ({
     id: row.id,
     name: row.name,
     handle: row.handle,
@@ -196,4 +196,39 @@ export const fetchFriendLocations = async (
     longitude: Number(row.longitude),
     lastUpdated: toIsoString(row.updated_at),
   }));
+
+  const selfResult = await db.query(
+    `SELECT users.id,
+            users.name,
+            users.handle,
+            locations.latitude,
+            locations.longitude,
+            locations.updated_at
+     FROM user_locations locations
+     JOIN users ON users.id = locations.user_id
+     WHERE locations.user_id = $1
+       AND locations.share_location = true
+       AND locations.latitude IS NOT NULL
+       AND locations.longitude IS NOT NULL
+       AND locations.updated_at >= now() - INTERVAL '${LOCATION_TTL_MINUTES} minutes'
+     LIMIT 1`,
+    [userId]
+  );
+
+  if ((selfResult.rowCount ?? 0) > 0) {
+    const row = selfResult.rows[0] as FriendLocationRow;
+    const alreadyIncluded = friends.some((friend) => friend.id === row.id);
+    if (!alreadyIncluded) {
+      friends.unshift({
+        id: row.id,
+        name: row.name,
+        handle: row.handle,
+        latitude: Number(row.latitude),
+        longitude: Number(row.longitude),
+        lastUpdated: toIsoString(row.updated_at),
+      });
+    }
+  }
+
+  return friends;
 };
