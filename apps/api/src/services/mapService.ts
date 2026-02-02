@@ -1,6 +1,7 @@
 import { db } from "../db";
 import { ensureUsersTable } from "./authService";
 import { ensureFriendTables } from "./friendService";
+import { getSocketServer } from "./socketService";
 
 export type MapSettings = {
   shareLocation: boolean;
@@ -48,6 +49,37 @@ export class MapError extends Error {
 }
 
 const LOCATION_TTL_MINUTES = 30;
+const EMIT_DISTANCE_METERS = 10;
+const TELEPORT_DISTANCE_METERS = 1000;
+const TELEPORT_WINDOW_MS = 10_000;
+const lastEmittedByUser = new Map<
+  string,
+  { latitude: number; longitude: number; timestamp: number }
+>();
+
+const toRad = (value: number) => (value * Math.PI) / 180;
+
+const distanceMeters = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+) => {
+  const earthRadius = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadius * c;
+};
+
+const isValidCoordinate = (value: number, min: number, max: number) =>
+  Number.isFinite(value) && value >= min && value <= max;
 let profileColumnsCache:
   | Promise<{ profilePicture: boolean; bio: boolean }>
   | null = null;
@@ -216,9 +248,29 @@ export const upsertUserLocation = async (params: {
 }): Promise<void> => {
   await ensureLocationTable();
 
+  const latitude = Number(params.latitude);
+  const longitude = Number(params.longitude);
+  if (!isValidCoordinate(latitude, -90, 90) || !isValidCoordinate(longitude, -180, 180)) {
+    throw new MapError("Valid latitude and longitude are required.", 400);
+  }
+
   const settings = await getMapSettings(params.userId);
   if (!settings.shareLocation) {
     throw new MapError("Enable location sharing first.", 403);
+  }
+
+  const lastEmitted = lastEmittedByUser.get(params.userId);
+  if (lastEmitted) {
+    const elapsed = Date.now() - lastEmitted.timestamp;
+    const distance = distanceMeters(
+      lastEmitted.latitude,
+      lastEmitted.longitude,
+      latitude,
+      longitude
+    );
+    if (distance > TELEPORT_DISTANCE_METERS && elapsed < TELEPORT_WINDOW_MS) {
+      throw new MapError("Location update rejected.", 400);
+    }
   }
 
   await db.query(
@@ -228,8 +280,8 @@ export const upsertUserLocation = async (params: {
      DO UPDATE SET latitude = $2, longitude = $3, updated_at = now()`,
     [
       params.userId,
-      params.latitude,
-      params.longitude,
+      latitude,
+      longitude,
       settings.shareLocation,
       settings.ghostMode,
     ]
@@ -240,12 +292,40 @@ export const upsertUserLocation = async (params: {
       await db.query(
         `INSERT INTO user_location_history (user_id, latitude, longitude)
          VALUES ($1, $2, $3)`,
-        [params.userId, params.latitude, params.longitude]
+        [params.userId, latitude, longitude]
       );
     } catch (error) {
       console.warn("[map] unable to insert history row", error);
     }
   }
+
+  const io = getSocketServer();
+  if (!io) {
+    return;
+  }
+
+  const shouldEmit =
+    !lastEmitted ||
+    distanceMeters(lastEmitted.latitude, lastEmitted.longitude, latitude, longitude) >=
+      EMIT_DISTANCE_METERS;
+
+  if (!shouldEmit) {
+    return;
+  }
+
+  const timestamp = new Date().toISOString();
+  io.to("location-updates").emit("friend-location-update", {
+    userId: params.userId,
+    latitude,
+    longitude,
+    timestamp,
+  });
+
+  lastEmittedByUser.set(params.userId, {
+    latitude,
+    longitude,
+    timestamp: Date.now(),
+  });
 };
 
 export const fetchFriendLocations = async (

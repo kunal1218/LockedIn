@@ -1,11 +1,14 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import http from "http";
+import { initializeSocketServer } from "./services/socketService";
 import { registerRoutes } from "./routes";
 
 dotenv.config();
 
 const app = express();
+const httpServer = http.createServer(app);
 
 app.use(cors());
 app.use(express.json({ limit: "6mb" }));
@@ -18,6 +21,8 @@ app.use((req, res) => {
 
 const port = process.env.PORT ? Number(process.env.PORT) : 4001;
 
-app.listen(port, () => {
+initializeSocketServer(httpServer);
+
+httpServer.listen(port, () => {
   console.log(`LockedIn API listening on ${port}`);
 });

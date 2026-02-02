@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { socket } from "@/lib/socket";
 import { Button } from "@/components/Button";
 
 type MapControlsProps = {
@@ -25,8 +27,50 @@ export const MapControls = ({
   error,
   isLoading,
 }: MapControlsProps) => {
+  const [status, setStatus] = useState<"connected" | "connecting" | "disconnected">(
+    socket.connected ? "connected" : "disconnected"
+  );
+
+  useEffect(() => {
+    const handleConnect = () => setStatus("connected");
+    const handleDisconnect = () => setStatus("disconnected");
+    const handleConnecting = () => setStatus("connecting");
+
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+    socket.on("connect_error", handleConnecting);
+    socket.io.on("reconnect_attempt", handleConnecting);
+
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.off("connect_error", handleConnecting);
+      socket.io.off("reconnect_attempt", handleConnecting);
+    };
+  }, []);
+
+  const statusColor =
+    status === "connected"
+      ? "#10b981"
+      : status === "connecting"
+        ? "#f59e0b"
+        : "#ef4444";
+  const statusLabel =
+    status === "connected"
+      ? "Connected"
+      : status === "connecting"
+        ? "Connecting..."
+        : "Disconnected";
+
   return (
     <div className="pointer-events-none absolute right-4 top-4 z-20 flex w-[260px] flex-col gap-3">
+      <div className="pointer-events-auto flex items-center justify-end">
+        <span
+          title={statusLabel}
+          className="h-2 w-2 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.2)]"
+          style={{ backgroundColor: statusColor }}
+        />
+      </div>
       <div className="pointer-events-auto rounded-2xl border border-card-border/60 bg-white/85 p-4 text-xs text-ink/80 shadow-[0_18px_40px_rgba(27,26,23,0.18)] backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div>
