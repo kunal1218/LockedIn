@@ -55,6 +55,38 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
     socket.join("location-updates");
     console.info(`[socket] user ${userId} connected`);
 
+    socket.on("join-event", (eventId: number | string) => {
+      const parsed = Number(eventId);
+      if (!Number.isFinite(parsed)) {
+        return;
+      }
+      socket.join(`event-${parsed}`);
+    });
+
+    socket.on("leave-event", (eventId: number | string) => {
+      const parsed = Number(eventId);
+      if (!Number.isFinite(parsed)) {
+        return;
+      }
+      socket.leave(`event-${parsed}`);
+    });
+
+    socket.on("join-event-room", (eventId: number | string) => {
+      const parsed = Number(eventId);
+      if (!Number.isFinite(parsed)) {
+        return;
+      }
+      socket.join(`event-${parsed}`);
+    });
+
+    socket.on("leave-event-room", (eventId: number | string) => {
+      const parsed = Number(eventId);
+      if (!Number.isFinite(parsed)) {
+        return;
+      }
+      socket.leave(`event-${parsed}`);
+    });
+
     socket.on("disconnect", () => {
       if (userSocketMap.get(userId) === socket.id) {
         userSocketMap.delete(userId);

@@ -2,19 +2,23 @@
 
 import mapboxgl from "mapbox-gl";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { FriendLocation } from "@lockedin/shared";
+import { createRoot, type Root } from "react-dom/client";
+import type { EventWithDetails, FriendLocation } from "@lockedin/shared";
 import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
 import { useAuth } from "@/features/auth";
+import { EventMarker } from "@/features/map/components/EventMarker";
 import { FriendPopup } from "@/features/map/components/FriendPopup";
 import { MapControls } from "@/features/map/components/MapControls";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
+import { getNearbyEvents } from "@/lib/api/events";
 import {
   connectSocket,
   disconnectSocket,
   onFriendLocationUpdate,
   socket,
 } from "@/lib/socket";
+import { formatEventTooltipTime } from "@/features/map/utils/eventHelpers";
 import { formatRelativeTime } from "@/lib/time";
 
 type MapSettings = {
@@ -42,6 +46,8 @@ const RING_RECENT = "#10b981";
 const RING_ACTIVE = "#f59e0b";
 const RING_IDLE = "#6b7280";
 const MARKER_ANIMATION_MS = 1200;
+const EVENT_FETCH_RADIUS_KM = 5;
+const EVENT_MOVE_THRESHOLD_KM = 1;
 
 const getMinutesAgo = (timestamp: string) =>
   (Date.now() - new Date(timestamp).getTime()) / 60000;
@@ -53,11 +59,27 @@ const getRingColor = (timestamp: string) => {
   return RING_IDLE;
 };
 
+const distanceKmBetween = (from: mapboxgl.LngLat, to: mapboxgl.LngLat) => {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRad(to.lat - from.lat);
+  const dLng = toRad(to.lng - from.lng);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(from.lat)) *
+      Math.cos(toRad(to.lat)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
+};
+
 export const MapCanvas = () => {
   const { token, isAuthenticated, openAuthModal, user } = useAuth();
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [friends, setFriends] = useState<FriendLocation[]>([]);
+  const [events, setEvents] = useState<EventWithDetails[]>([]);
   const [settings, setSettings] = useState<MapSettings>({
     shareLocation: false,
     ghostMode: false,
@@ -68,12 +90,19 @@ export const MapCanvas = () => {
   const [selectedFriend, setSelectedFriend] = useState<FriendLocation | null>(
     null
   );
+  const [selectedEvent, setSelectedEvent] = useState<EventWithDetails | null>(
+    null
+  );
+  const [eventClock, setEventClock] = useState(0);
   const [mapInstanceKey, setMapInstanceKey] = useState(0);
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   const missingFieldsLoggedRef = useRef<Set<string>>(new Set());
 
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const markerAnimationsRef = useRef<Map<string, number>>(new Map());
+  const eventMarkersRef = useRef<Map<number, mapboxgl.Marker>>(new Map());
+  const eventMarkerRootsRef = useRef<Map<number, Root>>(new Map());
+  const lastEventCenterRef = useRef<mapboxgl.LngLat | null>(null);
 
   const normalizeFriend = useCallback(
     (raw: FriendLocation & {
@@ -137,6 +166,23 @@ export const MapCanvas = () => {
     },
     []
   );
+
+  const buildEventTooltip = useCallback((event: EventWithDetails) => {
+    const count = Math.max(0, Number(event.attendee_count ?? 0));
+    const timeLabel = formatEventTooltipTime(event.start_time);
+    return `${event.title} • ${timeLabel} • ${count} going`;
+  }, []);
+
+  const handleSelectEvent = useCallback((event: EventWithDetails) => {
+    setSelectedEvent(event);
+    const map = mapRef.current;
+    if (map) {
+      map.easeTo({
+        center: [event.longitude, event.latitude],
+        zoom: Math.max(map.getZoom(), 14),
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current || !mapboxToken) {
@@ -341,6 +387,24 @@ export const MapCanvas = () => {
     []
   );
 
+  const renderEventMarker = useCallback(
+    (event: EventWithDetails, isSelected: boolean) => {
+      const tooltip = buildEventTooltip(event);
+      const root = eventMarkerRootsRef.current.get(event.id);
+      if (root) {
+        root.render(
+          <EventMarker
+            event={event}
+            isSelected={isSelected}
+            tooltip={tooltip}
+            onClick={handleSelectEvent}
+          />
+        );
+      }
+    },
+    [buildEventTooltip, handleSelectEvent]
+  );
+
   useEffect(() => {
     if (!mapRef.current || !isMapReady) {
       return;
@@ -380,6 +444,59 @@ export const MapCanvas = () => {
   }, [animateMarkerTo, buildMarker, friends, isMapReady, updateMarkerElement]);
 
   useEffect(() => {
+    if (!mapRef.current || !isMapReady) {
+      return;
+    }
+
+    const map = mapRef.current;
+    const markerMap = eventMarkersRef.current;
+    const rootMap = eventMarkerRootsRef.current;
+    const nextIds = new Set(events.map((event) => event.id));
+
+    events.forEach((event) => {
+      const existing = markerMap.get(event.id);
+      if (existing) {
+        renderEventMarker(event, selectedEvent?.id === event.id);
+        existing.setLngLat([event.longitude, event.latitude]);
+      } else {
+        const element = document.createElement("div");
+        const root = createRoot(element);
+        root.render(
+          <EventMarker
+            event={event}
+            isSelected={selectedEvent?.id === event.id}
+            tooltip={buildEventTooltip(event)}
+            onClick={handleSelectEvent}
+          />
+        );
+        rootMap.set(event.id, root);
+        const marker = new mapboxgl.Marker({ element, anchor: "center" })
+          .setLngLat([event.longitude, event.latitude])
+          .addTo(map);
+        markerMap.set(event.id, marker);
+      }
+    });
+
+    markerMap.forEach((marker, id) => {
+      if (!nextIds.has(id)) {
+        marker.remove();
+        markerMap.delete(id);
+        const root = rootMap.get(id);
+        root?.unmount();
+        rootMap.delete(id);
+      }
+    });
+  }, [
+    buildEventTooltip,
+    eventClock,
+    events,
+    handleSelectEvent,
+    isMapReady,
+    renderEventMarker,
+    selectedEvent,
+  ]);
+
+  useEffect(() => {
     return () => {
       markersRef.current.forEach((marker) => marker.remove());
       markersRef.current.clear();
@@ -387,7 +504,18 @@ export const MapCanvas = () => {
         window.cancelAnimationFrame(rafId);
       });
       markerAnimationsRef.current.clear();
+      eventMarkersRef.current.forEach((marker) => marker.remove());
+      eventMarkersRef.current.clear();
+      eventMarkerRootsRef.current.forEach((root) => root.unmount());
+      eventMarkerRootsRef.current.clear();
     };
+  }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setEventClock((prev) => prev + 1);
+    }, 60000);
+    return () => window.clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -403,6 +531,20 @@ export const MapCanvas = () => {
       setSelectedFriend(updated);
     }
   }, [friends, selectedFriend]);
+
+  useEffect(() => {
+    if (!selectedEvent) {
+      return;
+    }
+    const updated = events.find((event) => event.id === selectedEvent.id);
+    if (!updated) {
+      setSelectedEvent(null);
+      return;
+    }
+    if (updated !== selectedEvent) {
+      setSelectedEvent(updated);
+    }
+  }, [events, selectedEvent]);
 
   const requestPosition = useCallback(
     async (options?: { suppressError?: boolean }) => {
@@ -437,6 +579,44 @@ export const MapCanvas = () => {
       }
     },
     []
+  );
+
+  const refreshEvents = useCallback(
+    async (options?: { force?: boolean; center?: mapboxgl.LngLat }) => {
+      if (!token || !mapRef.current) {
+        setEvents([]);
+        return;
+      }
+
+      const map = mapRef.current;
+      const center = options?.center ?? map.getCenter();
+      const lastCenter = lastEventCenterRef.current;
+
+      if (
+        !options?.force &&
+        lastCenter &&
+        distanceKmBetween(lastCenter, center) < EVENT_MOVE_THRESHOLD_KM
+      ) {
+        return;
+      }
+
+      lastEventCenterRef.current = center;
+
+      try {
+        const nearby = await getNearbyEvents(
+          center.lat,
+          center.lng,
+          EVENT_FETCH_RADIUS_KM,
+          token
+        );
+        setEvents(nearby);
+      } catch (loadError) {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[map] failed to load events", loadError);
+        }
+      }
+    },
+    [token]
   );
 
   const refreshFriends = useCallback(async () => {
@@ -572,6 +752,30 @@ export const MapCanvas = () => {
   }, [refreshFriends, token]);
 
   useEffect(() => {
+    if (!mapRef.current || !isMapReady) {
+      return;
+    }
+
+    if (!token) {
+      setEvents([]);
+      setSelectedEvent(null);
+      return;
+    }
+
+    const map = mapRef.current;
+    const handleMoveEnd = () => {
+      refreshEvents();
+    };
+
+    refreshEvents({ force: true, center: map.getCenter() });
+    map.on("moveend", handleMoveEnd);
+
+    return () => {
+      map.off("moveend", handleMoveEnd);
+    };
+  }, [isMapReady, mapInstanceKey, refreshEvents, token]);
+
+  useEffect(() => {
     if (!token || !settings.shareLocation || settings.ghostMode) {
       return;
     }
@@ -644,12 +848,17 @@ export const MapCanvas = () => {
   const handleRetry = useCallback(() => {
     setError(null);
     setSelectedFriend(null);
+    setSelectedEvent(null);
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current.clear();
     markerAnimationsRef.current.forEach((rafId) => {
       window.cancelAnimationFrame(rafId);
     });
     markerAnimationsRef.current.clear();
+    eventMarkersRef.current.forEach((marker) => marker.remove());
+    eventMarkersRef.current.clear();
+    eventMarkerRootsRef.current.forEach((root) => root.unmount());
+    eventMarkerRootsRef.current.clear();
     if (mapRef.current) {
       mapRef.current.remove();
       mapRef.current = null;
@@ -657,7 +866,8 @@ export const MapCanvas = () => {
     setMapReady(false);
     setMapInstanceKey((prev) => prev + 1);
     refreshFriends();
-  }, [refreshFriends]);
+    refreshEvents({ force: true });
+  }, [refreshEvents, refreshFriends]);
 
   useEffect(() => {
     if (!token) {
@@ -687,18 +897,56 @@ export const MapCanvas = () => {
       });
     });
 
+    const handleRsvpUpdate = (data: {
+      eventId: number;
+      newAttendeeCount: number;
+    }) => {
+      setEvents((prev) =>
+        prev.map((event) =>
+          event.id === data.eventId
+            ? { ...event, attendee_count: data.newAttendeeCount }
+            : event
+        )
+      );
+    };
+
+    const handleCheckin = (data: { userName?: string }) => {
+      if (process.env.NODE_ENV !== "production") {
+        console.info("[map] event check-in", data);
+      }
+    };
+
     const handleConnect = () => {
       refreshFriends();
+      refreshEvents({ force: true });
     };
 
     socket.on("connect", handleConnect);
+    socket.on("event-rsvp-update", handleRsvpUpdate);
+    socket.on("event-checkin", handleCheckin);
 
     return () => {
       unsubscribe();
       socket.off("connect", handleConnect);
+      socket.off("event-rsvp-update", handleRsvpUpdate);
+      socket.off("event-checkin", handleCheckin);
       disconnectSocket();
     };
-  }, [refreshFriends, token]);
+  }, [refreshEvents, refreshFriends, token]);
+
+  useEffect(() => {
+    if (!selectedEvent) {
+      return;
+    }
+
+    socket.emit("join-event", selectedEvent.id);
+    socket.emit("join-event-room", selectedEvent.id);
+
+    return () => {
+      socket.emit("leave-event", selectedEvent.id);
+      socket.emit("leave-event-room", selectedEvent.id);
+    };
+  }, [selectedEvent]);
 
   if (!mapboxToken) {
     return (
