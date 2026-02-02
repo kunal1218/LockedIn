@@ -1772,8 +1772,17 @@ export const fetchRankedMessages = async (
   characterRoleAssignedAt: string | null;
 }> => {
   await ensureRankedTables();
+  logRanked("fetchRankedMessages:begin", { matchId, userId });
   const match = await assertParticipant(matchId, userId);
   const timerState = await ensureMatchTimer(match);
+  logRanked("fetchRankedMessages:state", {
+    matchId,
+    roundNumber: timerState.match.round_number ?? null,
+    roundGameType: timerState.match.round_game_type ?? null,
+    roundPhase: timerState.match.round_phase ?? null,
+    typingState: timerState.match.typing_test_state ?? null,
+    typingRound: timerState.match.typing_test_round ?? null,
+  });
   const withIcebreaker = await ensureIcebreakerQuestion(timerState.match);
   const withRole = await ensureCharacterRole(withIcebreaker);
   const activeMatch = await maybeStartTypingTest(matchId, withRole);
