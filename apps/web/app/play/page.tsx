@@ -1628,7 +1628,7 @@ export default function RankedPlayPage() {
         ) : (
           <>
             <div className="flex min-h-0 flex-col">
-              {queueError && rankedStatus.status === "idle" && !isQueuing && (
+              {queueError && (isQueuing || rankedStatus.status === "waiting") && (
                 <div className="mb-3 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm font-semibold text-accent">
                   {queueError}
                 </div>

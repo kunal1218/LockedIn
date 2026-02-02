@@ -1241,15 +1241,32 @@ const ensureRoundState = async (match: RankedMatchRow): Promise<RankedMatchRow> 
 const maybeAdvanceTypingTestState = async (
   match: RankedMatchRow
 ): Promise<RankedMatchRow> => {
+  const parseTimestampMs = (value: string | Date | null | undefined) => {
+    if (!value) {
+      return null;
+    }
+    const ms = value instanceof Date ? value.getTime() : Date.parse(value);
+    return Number.isFinite(ms) ? ms : null;
+  };
   if (!match.typing_test_state) {
     return match;
   }
-  if (
-    match.typing_test_state === "countdown" &&
-    match.typing_test_started_at
-  ) {
-    const startedAt = parseTimestamp(match.typing_test_started_at);
-    if (Date.now() - startedAt.getTime() >= TYPING_TEST_COUNTDOWN_SECONDS * 1000) {
+  if (match.typing_test_state === "countdown") {
+    const startedAtMs = parseTimestampMs(match.typing_test_started_at);
+    if (!startedAtMs) {
+      logRanked("typingTest:countdownMissingStart", { matchId: match.id });
+      const updated = await db.query(
+        `UPDATE ranked_matches
+         SET typing_test_state = 'active',
+             typing_test_started_at = now()
+         WHERE id = $1 AND typing_test_state = 'countdown'
+         RETURNING ${rankedMatchColumns}`,
+        [match.id]
+      );
+      if ((updated.rowCount ?? 0) > 0) {
+        return updated.rows[0] as RankedMatchRow;
+      }
+    } else if (Date.now() - startedAtMs >= TYPING_TEST_COUNTDOWN_SECONDS * 1000) {
       logRanked("typingTest:countdownComplete", {
         matchId: match.id,
         roundNumber: match.round_number ?? null,
@@ -1266,12 +1283,17 @@ const maybeAdvanceTypingTestState = async (
       }
     }
   }
-  if (
-    match.typing_test_state === "active" &&
-    match.typing_test_started_at
-  ) {
-    const startedAt = parseTimestamp(match.typing_test_started_at);
-    if (Date.now() - startedAt.getTime() >= TYPING_TEST_MAX_SECONDS * 1000) {
+  if (match.typing_test_state === "active") {
+    const startedAtMs = parseTimestampMs(match.typing_test_started_at);
+    if (!startedAtMs) {
+      logRanked("typingTest:activeMissingStart", { matchId: match.id });
+      await db.query(
+        `UPDATE ranked_matches
+         SET typing_test_started_at = now()
+         WHERE id = $1 AND typing_test_state = 'active'`,
+        [match.id]
+      );
+    } else if (Date.now() - startedAtMs >= TYPING_TEST_MAX_SECONDS * 1000) {
       const participants = [
         match.user_a_id,
         match.user_b_id,
@@ -1332,12 +1354,28 @@ const maybeAdvanceTypingTestState = async (
       }
     }
   }
-  if (
-    match.typing_test_state === "result" &&
-    match.typing_test_result_at
-  ) {
-    const resultAt = parseTimestamp(match.typing_test_result_at);
-    if (Date.now() - resultAt.getTime() >= TYPING_TEST_RESULT_SECONDS * 1000) {
+  if (match.typing_test_state === "result") {
+    const resultAtMs = parseTimestampMs(match.typing_test_result_at);
+    if (!resultAtMs) {
+      logRanked("typingTest:resultMissingAt", { matchId: match.id });
+      const cleared = await db.query(
+        `UPDATE ranked_matches
+         SET typing_test_state = NULL,
+             typing_test_started_at = NULL,
+             typing_test_words = NULL,
+             typing_test_results = NULL,
+             typing_test_winner_id = NULL,
+             typing_test_result_at = NULL,
+             turn_started_at = now()
+         WHERE id = $1 AND typing_test_state = 'result'
+         RETURNING ${rankedMatchColumns}`,
+        [match.id]
+      );
+      if ((cleared.rowCount ?? 0) > 0) {
+        const row = cleared.rows[0] as RankedMatchRow;
+        return advanceToNextChatRound(row);
+      }
+    } else if (Date.now() - resultAtMs >= TYPING_TEST_RESULT_SECONDS * 1000) {
       logRanked("typingTest:resultElapsed", {
         matchId: match.id,
         roundNumber: match.round_number ?? null,
