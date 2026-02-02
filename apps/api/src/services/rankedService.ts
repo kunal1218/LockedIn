@@ -507,7 +507,12 @@ const fetchUserById = async (userId: string): Promise<MessageUser> => {
   );
 
   if ((result.rowCount ?? 0) === 0) {
-    throw new Error("User not found");
+    logRanked("fetchUserById:missing", { userId });
+    return {
+      id: userId,
+      name: "Unknown player",
+      handle: `@unknown-${userId.slice(0, 6)}`,
+    };
   }
 
   return mapUser(result.rows[0] as { id: string; name: string; handle: string });
@@ -832,8 +837,13 @@ const getMatch = async (matchId: string): Promise<RankedMatchRow | null> => {
   return row;
 };
 
-const parseTimestamp = (value: string | Date) =>
-  value instanceof Date ? value : new Date(value);
+const parseTimestamp = (value: string | Date | null | undefined) => {
+  if (!value) {
+    return new Date();
+  }
+  const parsed = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+};
 
 const normalizeTypingAttempt = (value: string) =>
   value
@@ -1582,56 +1592,66 @@ export const enqueueAndMatch = async (userId: string): Promise<RankedStatus> => 
   const partners = await findWaitingPartners(userId);
 
   if (partners.length >= 2) {
-    // Pair with the oldest waiting partners.
-    await Promise.all(partners.map((id) => removeFromQueue(id)));
-    const {
-      matchId,
-      startingTurnUserId,
-      icebreakerQuestion,
-      characterRoleA,
-      characterRoleB,
-      userA,
-      userB,
-      userC,
-      judgeUserId,
-      roundGameType,
-    } =
-      await createMatch([userId, ...partners]);
-    const opponentIds = [userA, userB, userC].filter((id) => id !== userId);
-    const opponents = await Promise.all(opponentIds.map((id) => fetchUserById(id)));
-    const nowIso = new Date().toISOString();
-    const isJudge = judgeUserId === userId;
-    const characterRole =
-      userId === userA ? characterRoleA ?? null : userId === userB ? characterRoleB ?? null : null;
-    const roleAssignments =
-      isJudge && roundGameType === "roles"
-        ? [
-            characterRoleA && userA !== judgeUserId ? { userId: userA, role: characterRoleA } : null,
-            characterRoleB && userB !== judgeUserId ? { userId: userB, role: characterRoleB } : null,
-          ].filter(Boolean)
-        : undefined;
-    return {
-      status: "matched",
-      matchId,
-      opponents,
-      startedAt: nowIso,
-      lives: { me: DEFAULT_LIVES, opponents: [DEFAULT_LIVES, DEFAULT_LIVES] },
-      points: { me: 0, opponents: [0, 0] },
-      turnStartedAt: nowIso,
-      serverTime: nowIso,
-      isMyTurn: !isJudge && startingTurnUserId === userId,
-      currentTurnUserId: startingTurnUserId,
-      isJudge,
-      judgeUserId,
-      roundNumber: 1,
-      roundGameType,
-      roundPhase: "chat",
-      roundStartedAt: nowIso,
-      roleAssignments: roleAssignments as Array<{ userId: string; role: string }> | undefined,
-      icebreakerQuestion,
-      characterRole,
-      characterRoleAssignedAt: characterRole ? nowIso : null,
-    };
+    try {
+      // Pair with the oldest waiting partners.
+      await Promise.all(partners.map((id) => removeFromQueue(id)));
+      const {
+        matchId,
+        startingTurnUserId,
+        icebreakerQuestion,
+        characterRoleA,
+        characterRoleB,
+        userA,
+        userB,
+        userC,
+        judgeUserId,
+        roundGameType,
+      } =
+        await createMatch([userId, ...partners]);
+      const opponentIds = [userA, userB, userC].filter((id) => id !== userId);
+      const opponents = await Promise.all(opponentIds.map((id) => fetchUserById(id)));
+      const nowIso = new Date().toISOString();
+      const isJudge = judgeUserId === userId;
+      const characterRole =
+        userId === userA ? characterRoleA ?? null : userId === userB ? characterRoleB ?? null : null;
+      const roleAssignments =
+        isJudge && roundGameType === "roles"
+          ? [
+              characterRoleA && userA !== judgeUserId ? { userId: userA, role: characterRoleA } : null,
+              characterRoleB && userB !== judgeUserId ? { userId: userB, role: characterRoleB } : null,
+            ].filter(Boolean)
+          : undefined;
+      return {
+        status: "matched",
+        matchId,
+        opponents,
+        startedAt: nowIso,
+        lives: { me: DEFAULT_LIVES, opponents: [DEFAULT_LIVES, DEFAULT_LIVES] },
+        points: { me: 0, opponents: [0, 0] },
+        turnStartedAt: nowIso,
+        serverTime: nowIso,
+        isMyTurn: !isJudge && startingTurnUserId === userId,
+        currentTurnUserId: startingTurnUserId,
+        isJudge,
+        judgeUserId,
+        roundNumber: 1,
+        roundGameType,
+        roundPhase: "chat",
+        roundStartedAt: nowIso,
+        roleAssignments: roleAssignments as Array<{ userId: string; role: string }> | undefined,
+        icebreakerQuestion,
+        characterRole,
+        characterRoleAssignedAt: characterRole ? nowIso : null,
+      };
+    } catch (error) {
+      logRanked("enqueueAndMatch:matchCreateFailed", {
+        userId,
+        partners,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      await enqueueUser(userId);
+      return { status: "waiting" };
+    }
   }
 
   await enqueueUser(userId);

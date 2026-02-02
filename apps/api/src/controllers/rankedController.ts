@@ -51,7 +51,12 @@ const handleError = (res: Response, error: unknown) => {
   }
 
   console.error("Ranked error:", error);
-  res.status(500).json({ error: "Unable to process ranked play" });
+  const debug = process.env.RANKED_DEBUG === "true";
+  const message =
+    debug && error instanceof Error && error.message
+      ? error.message
+      : "Unable to process ranked play";
+  res.status(500).json({ error: message });
 };
 
 const parseMatchId = (value: unknown) => {

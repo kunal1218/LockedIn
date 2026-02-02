@@ -766,6 +766,7 @@ export default function RankedPlayPage() {
 
   const loadStatus = useCallback(async () => {
     if (!token) {
+      setQueueError(null);
       setRankedStatus({ status: "idle" });
       return;
     }
@@ -773,6 +774,7 @@ export default function RankedPlayPage() {
     try {
       const status = await apiGet<RankedStatus>("/ranked/status", token);
       setRankedStatus(status);
+      setQueueError(null);
       if (status.status === "matched") {
         if (status.serverTime) {
           const serverMs = Date.parse(status.serverTime);
@@ -1120,6 +1122,7 @@ export default function RankedPlayPage() {
     try {
       const status = await apiPost<RankedStatus>("/ranked/play", {}, token);
       setRankedStatus(status);
+      setQueueError(null);
       if (status.status === "matched") {
         const matchOver = didOpponentsLose(status.lives);
         if (matchOver) {
