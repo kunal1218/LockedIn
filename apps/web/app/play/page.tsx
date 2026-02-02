@@ -909,9 +909,7 @@ export default function RankedPlayPage() {
           error instanceof Error ? error.message : "Unable to load matched chat."
         );
       }
-      setMessages([]);
       setOpponentTyping("");
-      setTypingTest({ state: "idle", words: [] });
     } finally {
       window.clearTimeout(timeout);
       setIsChatLoading(false);
@@ -953,6 +951,17 @@ export default function RankedPlayPage() {
 
   useEffect(() => {
     if (rankedStatus.status !== "waiting") {
+      return;
+    }
+
+    const interval = window.setInterval(loadStatus, 3000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [loadStatus, rankedStatus.status]);
+
+  useEffect(() => {
+    if (rankedStatus.status !== "matched") {
       return;
     }
 
@@ -1619,7 +1628,7 @@ export default function RankedPlayPage() {
         ) : (
           <>
             <div className="flex min-h-0 flex-col">
-              {queueError && (
+              {queueError && rankedStatus.status === "idle" && !isQueuing && (
                 <div className="mb-3 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm font-semibold text-accent">
                   {queueError}
                 </div>
