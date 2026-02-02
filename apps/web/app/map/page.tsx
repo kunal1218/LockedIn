@@ -1,12 +1,10 @@
-import { EventList, MapCanvas } from "@/features/map";
+import { EventDrawer, MapCanvas } from "@/features/map";
 
 export default function MapPage() {
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-16 pt-2">
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1.4fr)_0.9fr]">
-        <MapCanvas />
-        <EventList />
-      </div>
+    <div className="relative h-[calc(100svh-96px)] min-h-[calc(100vh-96px)] w-full overflow-hidden">
+      <MapCanvas />
+      <EventDrawer />
     </div>
   );
 }

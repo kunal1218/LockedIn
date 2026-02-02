@@ -208,6 +208,7 @@ export const fetchFriendLocations = async (
      JOIN users ON users.id = locations.user_id
      WHERE locations.user_id = $1
        AND locations.share_location = true
+       AND locations.ghost_mode = false
        AND locations.latitude IS NOT NULL
        AND locations.longitude IS NOT NULL
        AND locations.updated_at >= now() - INTERVAL '${LOCATION_TTL_MINUTES} minutes'

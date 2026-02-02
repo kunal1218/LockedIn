@@ -4,8 +4,8 @@ import mapboxgl from "mapbox-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
-import { Button } from "@/components/Button";
 import { useAuth } from "@/features/auth";
+import { MapControls } from "@/features/map/components/MapControls";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/time";
 
@@ -41,7 +41,7 @@ const DEFAULT_ZOOM = 12;
 const UPDATE_INTERVAL_MS = 60000;
 
 export const MapCanvas = () => {
-  const { token, isAuthenticated, openAuthModal } = useAuth();
+  const { token, isAuthenticated, openAuthModal, user } = useAuth();
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [friends, setFriends] = useState<FriendLocation[]>([]);
@@ -69,9 +69,10 @@ export const MapCanvas = () => {
           initial: getInitial(friend.name),
           color: getMarkerColor(friend.name),
           lastSeen: formatRelativeTime(friend.lastUpdated),
+          isSelf: friend.id === user?.id,
         },
       })),
-    [friends]
+    [friends, user?.id]
   );
 
   const updateMapData = useCallback(() => {
@@ -105,7 +106,6 @@ export const MapCanvas = () => {
       attributionControl: false,
     });
 
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");
     mapRef.current = map;
 
     map.on("load", () => {
@@ -167,6 +167,26 @@ export const MapCanvas = () => {
           "circle-stroke-color": "#1b1a17",
         },
       });
+
+      map.addLayer(
+        {
+          id: "friend-pulse",
+          type: "circle",
+          source: "friends",
+          filter: [
+            "all",
+            ["!", ["has", "point_count"]],
+            ["==", ["get", "isSelf"], true],
+          ],
+          paint: {
+            "circle-color": "#ffb088",
+            "circle-radius": 18,
+            "circle-opacity": 0.35,
+            "circle-blur": 0.6,
+          },
+        },
+        "friend-points"
+      );
 
       map.addLayer({
         id: "friend-initials",
@@ -257,6 +277,36 @@ export const MapCanvas = () => {
     updateMapData();
   }, [isMapReady, updateMapData]);
 
+  useEffect(() => {
+    if (!isMapReady || !mapRef.current) {
+      return;
+    }
+
+    let frameId = 0;
+    const animate = () => {
+      const map = mapRef.current;
+      if (!map || !map.getLayer("friend-pulse")) {
+        frameId = window.requestAnimationFrame(animate);
+        return;
+      }
+
+      const t = (performance.now() / 1000) % 1;
+      const radius = 18 + t * 10;
+      const opacity = 0.4 * (1 - t);
+
+      map.setPaintProperty("friend-pulse", "circle-radius", radius);
+      map.setPaintProperty("friend-pulse", "circle-opacity", opacity);
+
+      frameId = window.requestAnimationFrame(animate);
+    };
+
+    frameId = window.requestAnimationFrame(animate);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [isMapReady]);
+
   const refreshFriends = useCallback(async () => {
     if (!token) {
       return;
@@ -278,19 +328,15 @@ export const MapCanvas = () => {
     }
   }, [token]);
 
-  const updateLocation = useCallback(async () => {
-    if (!token) {
-      return;
-    }
-
+  const requestPosition = useCallback(async () => {
     if (!navigator.geolocation) {
-      setError("Location services are not available in this browser.");
-      return;
+      const message = "Location services are not available in this browser.";
+      setError(message);
+      throw new Error(message);
     }
 
-    let position: GeolocationPosition;
     try {
-      position = await new Promise<GeolocationPosition>((resolve, reject) => {
+      return await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
           timeout: 8000,
@@ -305,6 +351,14 @@ export const MapCanvas = () => {
       setError(message || "Location permission was denied.");
       throw err;
     }
+  }, []);
+
+  const updateLocation = useCallback(async () => {
+    if (!token) {
+      return;
+    }
+
+    const position = await requestPosition();
 
     if (process.env.NODE_ENV !== "production") {
       console.info("[map] location captured", {
@@ -328,7 +382,50 @@ export const MapCanvas = () => {
         zoom: Math.max(mapRef.current.getZoom(), 13),
       });
     }
-  }, [token]);
+  }, [requestPosition, token]);
+
+  const centerOnUser = useCallback(async () => {
+    const position = await requestPosition();
+
+    if (mapRef.current) {
+      mapRef.current.easeTo({
+        center: [position.coords.longitude, position.coords.latitude],
+        zoom: Math.max(mapRef.current.getZoom(), 14),
+      });
+    }
+
+    if (token && settings.shareLocation && !settings.ghostMode) {
+      await apiPost(
+        "/map/location",
+        {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        },
+        token
+      );
+    }
+  }, [requestPosition, settings.ghostMode, settings.shareLocation, token]);
+
+  const zoomToCampus = useCallback(() => {
+    mapRef.current?.easeTo({
+      center: DEFAULT_CENTER,
+      zoom: DEFAULT_ZOOM,
+    });
+  }, []);
+
+  const zoomIn = useCallback(() => {
+    if (!mapRef.current) {
+      return;
+    }
+    mapRef.current.zoomTo(mapRef.current.getZoom() + 1, { duration: 200 });
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    if (!mapRef.current) {
+      return;
+    }
+    mapRef.current.zoomTo(mapRef.current.getZoom() - 1, { duration: 200 });
+  }, []);
 
   useEffect(() => {
     if (!token) {
@@ -424,91 +521,104 @@ export const MapCanvas = () => {
   }
 
   return (
-    <Card className="relative min-h-[520px] h-[520px] overflow-hidden p-0 !bg-transparent !backdrop-blur-none">
+    <div className="relative h-full w-full overflow-hidden">
       <div ref={mapContainerRef} className="absolute inset-0 z-0 h-full w-full" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.05),transparent_55%),radial-gradient(circle_at_bottom,rgba(255,134,88,0.2),transparent_45%)] pointer-events-none" />
-      <div className="absolute left-0 top-0 z-10 flex flex-col gap-4 p-6 pointer-events-none">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <Tag tone="accent">Live map</Tag>
-            <h2 className="mt-3 font-display text-2xl font-semibold text-white">
-              Friend Finder
-            </h2>
-            <p className="text-sm text-white/70">
-              Snap-map vibes for your campus circle.
-            </p>
-          </div>
-          {!isAuthenticated && (
-            <Button
-              requiresAuth={false}
-              className="pointer-events-auto"
-              onClick={() => openAuthModal("login")}
+      <MapControls
+        isAuthenticated={isAuthenticated}
+        shareLocation={settings.shareLocation}
+        ghostMode={settings.ghostMode}
+        onToggleShare={handleToggleShare}
+        onToggleGhost={handleToggleGhost}
+        onLogin={() => openAuthModal("login")}
+        error={error}
+        isLoading={isLoading}
+      />
+      <div className="absolute bottom-6 right-4 z-20 flex flex-col gap-2 pointer-events-none">
+        <div className="flex flex-col gap-2 pointer-events-auto">
+          <button
+            type="button"
+            aria-label="Zoom to my location"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-card-border/60 bg-white/85 text-ink shadow-[0_12px_30px_rgba(27,26,23,0.18)] backdrop-blur transition hover:-translate-y-0.5"
+            onClick={() => {
+              centerOnUser().catch(() => {
+                // Error surfaced via setError.
+              });
+            }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              Log in
-            </Button>
-          )}
-        </div>
-
-        <div className="grid gap-3 sm:max-w-xs">
-          <div className="rounded-2xl border border-white/10 bg-ink/70 px-4 py-3 text-xs text-white/70 shadow-[0_14px_30px_rgba(0,0,0,0.25)]">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-white">Share my location</span>
-              <button
-                type="button"
-                className={`pointer-events-auto relative h-6 w-11 rounded-full transition ${
-                  settings.shareLocation ? "bg-accent" : "bg-white/20"
-                }`}
-                onClick={handleToggleShare}
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            aria-label="Zoom to campus"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-card-border/60 bg-white/85 text-ink shadow-[0_12px_30px_rgba(27,26,23,0.18)] backdrop-blur transition hover:-translate-y-0.5"
+            onClick={zoomToCampus}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 21h18" />
+              <path d="M4 21V9l8-4 8 4v12" />
+              <path d="M9 21V12h6v9" />
+            </svg>
+          </button>
+          <div className="mt-2 flex flex-col gap-2">
+            <button
+              type="button"
+              aria-label="Zoom in"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-card-border/60 bg-white/85 text-ink shadow-[0_12px_30px_rgba(27,26,23,0.18)] backdrop-blur transition hover:-translate-y-0.5"
+              onClick={zoomIn}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                <span
-                  className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${
-                    settings.shareLocation ? "left-6" : "left-1"
-                  }`}
-                />
-              </button>
-            </div>
-            <p className="mt-2">
-              {settings.shareLocation
-                ? "Your friends can see you for the next 30 minutes."
-                : "Stay hidden until you turn sharing on."}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-ink/70 px-4 py-3 text-xs text-white/70 shadow-[0_14px_30px_rgba(0,0,0,0.25)]">
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-semibold text-white">Ghost mode</span>
-              <button
-                type="button"
-                className={`pointer-events-auto rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
-                  settings.ghostMode
-                    ? "border-accent bg-accent/20 text-accent"
-                    : "border-white/20 text-white/80 hover:border-white/40"
-                }`}
-                onClick={handleToggleGhost}
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              aria-label="Zoom out"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-card-border/60 bg-white/85 text-ink shadow-[0_12px_30px_rgba(27,26,23,0.18)] backdrop-blur transition hover:-translate-y-0.5"
+              onClick={zoomOut}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                {settings.ghostMode ? "Ghosted" : "Go ghost"}
-              </button>
-            </div>
-            <p className="mt-2">
-              {settings.ghostMode
-                ? "You are invisible on the map right now."
-                : "Hide instantly without toggling sharing off."}
-            </p>
+                <path d="M5 12h14" />
+              </svg>
+            </button>
           </div>
-
-          {error && (
-            <div className="rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-xs font-semibold text-accent">
-              {error}
-            </div>
-          )}
-
-          {isLoading && (
-            <div className="rounded-2xl border border-white/10 bg-ink/70 px-4 py-3 text-xs text-white/70">
-              Loading friend locations...
-            </div>
-          )}
         </div>
       </div>
-    </Card>
+    </div>
   );
 };
