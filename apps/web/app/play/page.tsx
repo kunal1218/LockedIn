@@ -511,7 +511,27 @@ export default function RankedPlayPage() {
       .slice(typingTest.words.length)
       .filter((word) => word.length > 0);
   }, [typingAttemptWords, typingTest.words.length]);
-  const typingTestDisabled = false;
+  const typingTestResults = typingTest.results ?? [];
+  const normalizeTypingAttempt = useCallback(
+    (value: string) =>
+      value
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, " "),
+    []
+  );
+  const typingExpected = useMemo(
+    () => normalizeTypingAttempt(typingTest.words.join(" ")),
+    [normalizeTypingAttempt, typingTest.words]
+  );
+  const typingAttemptNormalized = useMemo(
+    () => normalizeTypingAttempt(typingAttempt),
+    [normalizeTypingAttempt, typingAttempt]
+  );
+  const typingAutoSubmitRef = useRef<string>("");
+  const isTypingCompleteForMe = Boolean(
+    user?.id && typingTestResults.includes(user.id)
+  );
   const typingWinnerName =
     typingTest.winnerId && typingTest.winnerId !== user?.id
       ? displayOpponents.find((opponent) => opponent.id === typingTest.winnerId)
@@ -556,7 +576,6 @@ export default function RankedPlayPage() {
     isRolesRound &&
     !!id &&
     currentTurnUserId === id;
-  const typingTestResults = typingTest.results ?? [];
   const getTypingTestBarOverride = (id?: string | null) => {
     if (!isTypingTestActive || !id) {
       return null;
@@ -642,11 +661,13 @@ export default function RankedPlayPage() {
   useEffect(() => {
     if (typingTest.state === "idle") {
       typingRoundRef.current = null;
+      typingAutoSubmitRef.current = "";
       return;
     }
     const round = typingTest.round ?? 0;
     if (typingRoundRef.current !== round) {
       typingRoundRef.current = round;
+      typingAutoSubmitRef.current = "";
       setTypingAttempt("");
       setTypingTestError(null);
     }
@@ -1328,14 +1349,59 @@ export default function RankedPlayPage() {
     }
   };
 
-  const handleTypingAttemptKeyDown = (
-    event: React.KeyboardEvent<HTMLInputElement>
-  ) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      handleTypingTestSubmit();
+  useEffect(() => {
+    if (!showTypingTestArena || isTypingSubmitting || isTypingCompleteForMe) {
+      return;
     }
-  };
+    if (!typingExpected || !typingAttemptNormalized) {
+      return;
+    }
+    if (typingAttemptNormalized !== typingExpected) {
+      return;
+    }
+    if (typingAutoSubmitRef.current === typingAttemptNormalized) {
+      return;
+    }
+    typingAutoSubmitRef.current = typingAttemptNormalized;
+    handleTypingTestSubmit();
+  }, [
+    handleTypingTestSubmit,
+    isTypingCompleteForMe,
+    isTypingSubmitting,
+    showTypingTestArena,
+    typingAttemptNormalized,
+    typingExpected,
+  ]);
+
+  useEffect(() => {
+    if (!showTypingTestArena || isTypingCompleteForMe) {
+      return;
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+      if (isTypingSubmitting) {
+        return;
+      }
+      const key = event.key;
+      if (key === "Backspace") {
+        event.preventDefault();
+        setTypingAttempt((prev) => prev.slice(0, -1));
+        return;
+      }
+      if (key === "Enter" || key === "Tab") {
+        event.preventDefault();
+        return;
+      }
+      if (key.length === 1) {
+        event.preventDefault();
+        setTypingAttempt((prev) => prev + key);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isTypingCompleteForMe, isTypingSubmitting, showTypingTestArena]);
 
 
   const reportTurnTimeout = useCallback(async () => {
@@ -1658,33 +1724,14 @@ export default function RankedPlayPage() {
                           ))}
                         </div>
                       )}
-                      <form
-                        onSubmit={handleTypingTestSubmit}
-                        className="mt-6 flex w-full max-w-2xl flex-col items-center gap-3"
-                      >
-                        <input
-                          type="text"
-                          value={typingAttempt}
-                          onChange={(event) => setTypingAttempt(event.target.value)}
-                          onKeyDown={handleTypingAttemptKeyDown}
-                          className="w-full rounded-full border border-card-border/70 bg-white/90 px-5 py-3 text-sm text-ink outline-none transition focus:border-accent/60"
-                          placeholder="Type the 10 words here"
-                          disabled={typingTestDisabled}
-                        />
-                        {typingTestError && (
-                          <div className="rounded-full border border-accent/30 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent">
-                            {typingTestError}
-                          </div>
-                        )}
-                        <Button
-                          type="submit"
-                          disabled={
-                            typingTestDisabled || isTypingSubmitting || !typingAttempt.trim()
-                          }
-                        >
-                          {isTypingSubmitting ? "Submitting..." : "Submit"}
-                        </Button>
-                      </form>
+                      <p className="mt-6 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                        Type the sequence to finish
+                      </p>
+                      {typingTestError && (
+                        <div className="mt-4 rounded-full border border-accent/30 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent">
+                          {typingTestError}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <>
