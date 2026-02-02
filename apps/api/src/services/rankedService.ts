@@ -352,6 +352,7 @@ type TypingTestPayload = {
   startedAt?: string;
   resultAt?: string;
   winnerId?: string | null;
+  results?: string[];
   round: number;
 };
 
@@ -916,6 +917,7 @@ const getTypingTestPayload = (match: RankedMatchRow): TypingTestPayload => {
     startedAt,
     resultAt,
     winnerId: match.typing_test_winner_id ?? null,
+    results: parseTypingResults(match.typing_test_results),
     round,
   };
 };

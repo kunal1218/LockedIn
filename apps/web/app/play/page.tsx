@@ -29,6 +29,7 @@ type TypingTestPayload = {
   startedAt?: string;
   resultAt?: string;
   winnerId?: string | null;
+  results?: string[];
   round?: number;
 };
 
@@ -364,16 +365,21 @@ export default function RankedPlayPage() {
     }
     return seconds <= 5 ? "bg-amber-500" : "bg-emerald-500";
   };
-  const renderTimerBar = (seconds: number, active: boolean, alignRight = false) => {
-    const progress = Math.max(0, Math.min(1, seconds / TURN_SECONDS));
+  const renderTimerBar = (
+    seconds: number,
+    active: boolean,
+    alignRight = false,
+    override?: { className?: string; progress?: number }
+  ) => {
+    const progress =
+      override?.progress ?? Math.max(0, Math.min(1, seconds / TURN_SECONDS));
     return (
       <div className={`w-24 ${alignRight ? "ml-auto" : ""}`}>
         <div className="h-2 w-full overflow-hidden rounded-full bg-card-border/60">
           <div
-            className={`h-full transition-[width] duration-300 ${getTimerBarClass(
-              active,
-              seconds
-            )}`}
+            className={`h-full transition-[width] duration-300 ${
+              override?.className ?? getTimerBarClass(active, seconds)
+            }`}
             style={{ width: `${progress * 100}%` }}
           />
         </div>
@@ -496,8 +502,15 @@ export default function RankedPlayPage() {
           !justSentRef.current
         : false);
   const showSmiteButton = isAdmin && isMatched && !isMatchOver;
-  const typingWordsText =
-    typingTest.words.length > 0 ? typingTest.words.join(" ") : "Loading words...";
+  const typingAttemptWords = useMemo(() => typingAttempt.split(" "), [typingAttempt]);
+  const extraTypingWords = useMemo(() => {
+    if (typingAttemptWords.length <= typingTest.words.length) {
+      return [] as string[];
+    }
+    return typingAttemptWords
+      .slice(typingTest.words.length)
+      .filter((word) => word.length > 0);
+  }, [typingAttemptWords, typingTest.words.length]);
   const typingTestDisabled = false;
   const typingWinnerName =
     typingTest.winnerId && typingTest.winnerId !== user?.id
@@ -543,6 +556,17 @@ export default function RankedPlayPage() {
     isRolesRound &&
     !!id &&
     currentTurnUserId === id;
+  const typingTestResults = typingTest.results ?? [];
+  const getTypingTestBarOverride = (id?: string | null) => {
+    if (!isTypingTestActive || !id) {
+      return null;
+    }
+    const completed = typingTestResults.includes(id);
+    return {
+      className: completed ? "bg-emerald-500" : "bg-rose-500",
+      progress: 1,
+    };
+  };
   const syncTimer = useCallback(
     (turnStartedAt: string | null, serverTime?: string, timedOut?: boolean) => {
       if (!turnStartedAt) {
@@ -1393,13 +1417,15 @@ export default function RankedPlayPage() {
                     <p className="text-sm font-semibold text-ink">{leftOpponentName}</p>
                     <p className="text-xs text-muted">{leftOpponentHandle}</p>
                   </div>
-                  <div className="mt-[6px] flex flex-col items-start gap-1">
-                    {renderHearts(leftOpponentLivesCount)}
-                    {renderTimerBar(
-                      getTimerSecondsForUser(leftOpponent?.id),
-                      isTimerActiveForUser(leftOpponent?.id)
-                    )}
-                  </div>
+                    <div className="mt-[6px] flex flex-col items-start gap-1">
+                      {renderHearts(leftOpponentLivesCount)}
+                      {renderTimerBar(
+                        getTimerSecondsForUser(leftOpponent?.id),
+                        isTimerActiveForUser(leftOpponent?.id),
+                        false,
+                        getTypingTestBarOverride(leftOpponent?.id) ?? undefined
+                      )}
+                    </div>
                 </div>
               </div>
             </div>
@@ -1430,7 +1456,9 @@ export default function RankedPlayPage() {
                       {renderHearts(myLivesCount)}
                       {renderTimerBar(
                         getTimerSecondsForUser(user?.id),
-                        isTimerActiveForUser(user?.id)
+                        isTimerActiveForUser(user?.id),
+                        false,
+                        getTypingTestBarOverride(user?.id) ?? undefined
                       )}
                     </div>
                   </div>
@@ -1463,7 +1491,8 @@ export default function RankedPlayPage() {
                     {renderTimerBar(
                       getTimerSecondsForUser(rightOpponent?.id),
                       isTimerActiveForUser(rightOpponent?.id),
-                      true
+                      true,
+                      getTypingTestBarOverride(rightOpponent?.id) ?? undefined
                     )}
                   </div>
                 </div>
@@ -1565,9 +1594,70 @@ export default function RankedPlayPage() {
                       <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted">
                         Typing Test
                       </p>
-                      <p className="mt-3 max-w-2xl text-lg font-semibold text-ink">
-                        {typingWordsText}
-                      </p>
+                      {typingTest.words.length === 0 ? (
+                        <p className="mt-3 text-sm text-muted">Loading words...</p>
+                      ) : (
+                        <div
+                          className="mt-4 flex max-w-3xl flex-wrap justify-center gap-x-3 gap-y-2 text-lg font-semibold text-ink"
+                          aria-label="Typing test words"
+                        >
+                          {typingTest.words.map((word, wordIndex) => {
+                            const typedWord = typingAttemptWords[wordIndex] ?? "";
+                            const extraLetters =
+                              typedWord.length > word.length
+                                ? typedWord.slice(word.length)
+                                : "";
+                            return (
+                              <span
+                                key={`typing-word-${wordIndex}`}
+                                className="flex items-center gap-0.5 font-mono"
+                              >
+                                {word.split("").map((letter, letterIndex) => {
+                                  const typedChar = typedWord[letterIndex];
+                                  const hasTyped = typeof typedChar === "string";
+                                  const isCorrect =
+                                    hasTyped &&
+                                    typedChar.toLowerCase() === letter.toLowerCase();
+                                  const displayChar = hasTyped ? typedChar : letter;
+                                  const tone = !hasTyped
+                                    ? "text-muted/40"
+                                    : isCorrect
+                                      ? "text-emerald-600"
+                                      : "text-rose-500";
+                                  return (
+                                    <span
+                                      key={`typing-letter-${wordIndex}-${letterIndex}`}
+                                      className={tone}
+                                    >
+                                      {displayChar}
+                                    </span>
+                                  );
+                                })}
+                                {extraLetters.split("").map((letter, extraIndex) => (
+                                  <span
+                                    key={`typing-extra-${wordIndex}-${extraIndex}`}
+                                    className="text-rose-500"
+                                  >
+                                    {letter}
+                                  </span>
+                                ))}
+                              </span>
+                            );
+                          })}
+                          {extraTypingWords.map((word, extraWordIndex) => (
+                            <span
+                              key={`typing-extra-word-${extraWordIndex}`}
+                              className="flex items-center gap-0.5 font-mono text-rose-500"
+                            >
+                              {word.split("").map((letter, index) => (
+                                <span key={`typing-extra-char-${extraWordIndex}-${index}`}>
+                                  {letter}
+                                </span>
+                              ))}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <form
                         onSubmit={handleTypingTestSubmit}
                         className="mt-6 flex w-full max-w-2xl flex-col items-center gap-3"
