@@ -151,9 +151,7 @@ export default function RankedPlayPage() {
   const haveAllOpponentsLost =
     opponentLives.length > 0 && opponentLives.every((life) => life <= 0);
   const isMatchOver =
-    hasMatchEnded ||
-    isTimeout ||
-    (isMatched && ((lives?.me ?? 1) <= 0 || haveAllOpponentsLost));
+    hasMatchEnded || isTimeout || (isMatched && haveAllOpponentsLost);
   const isTypingTestActive = typingTest.state !== "idle";
   const isTypingTestCountdown = typingTest.state === "countdown";
   const isTypingTestResult = typingTest.state === "result";
@@ -742,8 +740,7 @@ export default function RankedPlayPage() {
         if (status.turnStartedAt) {
           turnStartedAtRef.current = status.turnStartedAt;
         }
-        const matchOver =
-          (status.lives?.me ?? 1) <= 0 || didOpponentsLose(status.lives);
+        const matchOver = didOpponentsLose(status.lives);
         if (matchOver) {
           setHasMatchEnded(true);
         }
@@ -837,10 +834,7 @@ export default function RankedPlayPage() {
             }
           : prev
       );
-      const matchOver =
-        payload.timedOut ||
-        (payload.lives?.me ?? 1) <= 0 ||
-        didOpponentsLose(payload.lives);
+      const matchOver = payload.timedOut || didOpponentsLose(payload.lives);
       if (matchOver) {
         setHasMatchEnded(true);
       }
