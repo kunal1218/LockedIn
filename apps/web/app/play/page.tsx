@@ -64,8 +64,9 @@ const inputClasses =
 
 const TURN_SECONDS = 15;
 const TYPING_TEST_MODAL_SECONDS = 3;
+const CHAT_ROUND_SECONDS = 60;
 const ROLE_MODAL_SECONDS = 5;
-const TYPING_TEST_SECONDS = 90;
+const TYPING_TEST_SECONDS = 60;
 
 export default function RankedPlayPage() {
   const { isAuthenticated, token, user, openAuthModal } = useAuth();
@@ -179,6 +180,30 @@ export default function RankedPlayPage() {
     }
     return Math.max(0, Math.min(1, typingTestTimeLeft / TYPING_TEST_SECONDS));
   }, [typingTestTimeLeft]);
+  const roundTimeLeft = useMemo(() => {
+    if (!roundStartedAt) {
+      return null;
+    }
+    if (!isIcebreakerRound && !isRolesRound) {
+      return null;
+    }
+    if (roundPhase !== "chat") {
+      return null;
+    }
+    const startedMs = Date.parse(roundStartedAt);
+    if (!Number.isFinite(startedMs)) {
+      return null;
+    }
+    const nowMs = Date.now() - serverTimeOffsetRef.current;
+    const remainingMs = CHAT_ROUND_SECONDS * 1000 - (nowMs - startedMs);
+    return Math.max(0, Math.ceil(remainingMs / 1000));
+  }, [isIcebreakerRound, isRolesRound, roundPhase, roundStartedAt]);
+  const roundProgress = useMemo(() => {
+    if (roundTimeLeft === null) {
+      return 0;
+    }
+    return Math.max(0, Math.min(1, roundTimeLeft / CHAT_ROUND_SECONDS));
+  }, [roundTimeLeft]);
   const icebreakerQuestion =
     rankedStatus.status === "matched" ? rankedStatus.icebreakerQuestion : null;
   const cleanedIcebreaker = icebreakerQuestion?.trim();
@@ -461,7 +486,7 @@ export default function RankedPlayPage() {
     if (!Number.isFinite(parsed)) {
       return null;
     }
-    return parsed + 30 * 1000;
+    return parsed + CHAT_ROUND_SECONDS * 1000;
   }, [roundStartedAt]);
   const icebreakerTimeLeft = useMemo(() => {
     if (!icebreakerDeadlineMs) {
@@ -1652,6 +1677,23 @@ export default function RankedPlayPage() {
                       </div>
                       <span className="text-xs font-semibold text-muted">
                         {typingTestTimeLeft !== null ? `${typingTestTimeLeft}s` : "--"}
+                      </span>
+                    </div>
+                  ) : roundTimeLeft !== null ? (
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                        Round timer
+                      </span>
+                      <div className="flex-1">
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-card-border/60">
+                          <div
+                            className="h-full bg-rose-500 transition-[width] duration-300"
+                            style={{ width: `${roundProgress * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                      <span className="text-xs font-semibold text-muted">
+                        {roundTimeLeft !== null ? `${roundTimeLeft}s` : "--"}
                       </span>
                     </div>
                   ) : (
