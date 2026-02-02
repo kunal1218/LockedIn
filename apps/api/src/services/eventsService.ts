@@ -393,6 +393,43 @@ export const createEvent = async (userId: string, input: CreateEventInput) => {
     [event.id, userId]
   );
 
+  const io = getSocketServer();
+  if (io) {
+    const creatorResult = await db.query(
+      `SELECT id, name, handle, profile_picture_url
+       FROM users
+       WHERE id = $1
+       LIMIT 1`,
+      [userId]
+    );
+    const creatorRow = creatorResult.rows[0] as
+      | { id: string; name: string; handle: string; profile_picture_url?: string | null }
+      | undefined;
+    const creator = creatorRow
+      ? {
+          id: creatorRow.id,
+          name: creatorRow.name,
+          handle: creatorRow.handle,
+          profile_picture_url: creatorRow.profile_picture_url ?? null,
+        }
+      : {
+          id: userId,
+          name: "Unknown",
+          handle: "@unknown",
+          profile_picture_url: null,
+        };
+
+    io.to("location-updates").emit("new-event-created", {
+      event: {
+        ...event,
+        attendee_count: 1,
+        attendees: [],
+        creator,
+        user_status: "going",
+      },
+    });
+  }
+
   return event;
 };
 
@@ -1004,4 +1041,3 @@ export const deleteEvent = async (eventId: number, userId: string) => {
 
   return { status: "ok" };
 };
-
