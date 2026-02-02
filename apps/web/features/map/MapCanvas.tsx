@@ -9,6 +9,12 @@ import { useAuth } from "@/features/auth";
 import { FriendPopup } from "@/features/map/components/FriendPopup";
 import { MapControls } from "@/features/map/components/MapControls";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
+import {
+  connectSocket,
+  disconnectSocket,
+  onFriendLocationUpdate,
+  socket,
+} from "@/lib/socket";
 import { formatRelativeTime } from "@/lib/time";
 
 type MapSettings = {
@@ -65,7 +71,7 @@ export const MapCanvas = () => {
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   const missingFieldsLoggedRef = useRef<Set<string>>(new Set());
 
-  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
 
   const normalizeFriend = useCallback(
     (raw: FriendLocation & {
@@ -156,6 +162,56 @@ export const MapCanvas = () => {
     };
   }, [mapboxToken, mapInstanceKey]);
 
+  const updateMarkerElement = useCallback(
+    (element: HTMLElement, friend: FriendLocation, profilePictureUrl: string | null) => {
+      const ring = element.querySelector<HTMLElement>("[data-role='ring']");
+      const inner = element.querySelector<HTMLElement>("[data-role='inner']");
+      const label = element.querySelector<HTMLElement>("[data-role='label']");
+      const pulse = element.querySelector<HTMLElement>("[data-role='pulse']");
+
+      const ringColor = getRingColor(friend.lastUpdated);
+      if (ring) {
+        ring.style.border = `4px solid ${ringColor}`;
+      }
+      if (pulse) {
+        pulse.style.border = `4px solid ${ringColor}`;
+      }
+      if (label) {
+        label.textContent = formatRelativeTime(friend.lastUpdated);
+      }
+
+      if (inner) {
+        inner.style.backgroundColor = getMarkerColor(friend.name);
+        const fallback = getInitial(friend.name);
+        const existingImg = inner.querySelector("img");
+        if (profilePictureUrl) {
+          if (existingImg) {
+            existingImg.setAttribute("src", profilePictureUrl);
+            existingImg.setAttribute("alt", friend.name);
+          } else {
+            inner.textContent = "";
+            const img = document.createElement("img");
+            img.src = profilePictureUrl;
+            img.alt = friend.name;
+            img.className = "h-full w-full object-cover";
+            img.loading = "lazy";
+            img.onerror = () => {
+              inner.textContent = fallback;
+              img.remove();
+            };
+            inner.appendChild(img);
+          }
+        } else {
+          if (existingImg) {
+            existingImg.remove();
+          }
+          inner.textContent = fallback;
+        }
+      }
+    },
+    []
+  );
+
   const buildMarker = useCallback(
     (friend: FriendLocation) => {
       const map = mapRef.current;
@@ -178,11 +234,14 @@ export const MapCanvas = () => {
       wrapper.className = "relative flex h-14 w-14 items-center justify-center";
       wrapper.style.cursor = "pointer";
       wrapper.style.pointerEvents = "auto";
+      wrapper.style.transition = "transform 2.6s ease";
+      wrapper.style.willChange = "transform";
 
       const ringColor = getRingColor(friend.lastUpdated);
 
       if (friend.id === user?.id) {
         const pulse = document.createElement("span");
+        pulse.dataset.role = "pulse";
         pulse.className = "absolute inset-0 rounded-full animate-ping";
         pulse.style.border = `4px solid ${ringColor}`;
         pulse.style.opacity = "0.3";
@@ -191,10 +250,13 @@ export const MapCanvas = () => {
       }
 
       const ring = document.createElement("div");
-      ring.className = "relative flex h-14 w-14 items-center justify-center rounded-full";
+      ring.dataset.role = "ring";
+      ring.className =
+        "relative flex h-14 w-14 items-center justify-center rounded-full";
       ring.style.border = `4px solid ${ringColor}`;
 
       const inner = document.createElement("div");
+      inner.dataset.role = "inner";
       inner.className =
         "relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white text-sm font-semibold text-white shadow-[0_10px_24px_rgba(0,0,0,0.25)]";
       inner.style.backgroundColor = getMarkerColor(friend.name);
@@ -208,9 +270,7 @@ export const MapCanvas = () => {
         img.className = "h-full w-full object-cover";
         img.loading = "lazy";
         img.onerror = () => {
-          if (!inner.textContent) {
-            inner.textContent = fallback;
-          }
+          inner.textContent = fallback;
           img.remove();
         };
         inner.appendChild(img);
@@ -222,6 +282,7 @@ export const MapCanvas = () => {
       wrapper.appendChild(ring);
 
       const label = document.createElement("div");
+      label.dataset.role = "label";
       label.className =
         "absolute left-1/2 top-full mt-1 -translate-x-1/2 rounded-full bg-ink/70 px-2 py-0.5 text-[10px] font-semibold text-white/80 shadow-sm backdrop-blur";
       label.textContent = formatRelativeTime(friend.lastUpdated);
@@ -232,11 +293,15 @@ export const MapCanvas = () => {
         setSelectedFriend({ ...friend, bio: safeBio, profilePictureUrl });
       });
 
-      return new mapboxgl.Marker({ element: wrapper, anchor: "center" })
+      const marker = new mapboxgl.Marker({ element: wrapper, anchor: "center" })
         .setLngLat([friend.longitude, friend.latitude])
         .addTo(map);
+
+      updateMarkerElement(wrapper, friend, profilePictureUrl);
+
+      return marker;
     },
-    [user?.id]
+    [updateMarkerElement, user?.id]
   );
 
   useEffect(() => {
@@ -244,20 +309,42 @@ export const MapCanvas = () => {
       return;
     }
 
-    markersRef.current.forEach((marker) => marker.remove());
-    markersRef.current = [];
+    const markerMap = markersRef.current;
+    const nextIds = new Set(friends.map((friend) => friend.id));
 
-    const nextMarkers = friends
-      .map((friend) => buildMarker(friend))
-      .filter((marker): marker is mapboxgl.Marker => marker !== null);
+    friends.forEach((friend) => {
+      const existing = markerMap.get(friend.id);
+      if (existing) {
+        const element = existing.getElement();
+        const profilePictureUrl =
+          friend.profilePictureUrl ??
+          (friend as FriendLocation & { profile_picture_url?: string | null })
+            .profile_picture_url ??
+          null;
+        updateMarkerElement(element, friend, profilePictureUrl);
+        existing.setLngLat([friend.longitude, friend.latitude]);
+      } else {
+        const marker = buildMarker(friend);
+        if (marker) {
+          markerMap.set(friend.id, marker);
+        }
+      }
+    });
 
-    markersRef.current = nextMarkers;
+    markerMap.forEach((marker, id) => {
+      if (!nextIds.has(id)) {
+        marker.remove();
+        markerMap.delete(id);
+      }
+    });
+  }, [buildMarker, friends, isMapReady, updateMarkerElement]);
 
+  useEffect(() => {
     return () => {
       markersRef.current.forEach((marker) => marker.remove());
-      markersRef.current = [];
+      markersRef.current.clear();
     };
-  }, [buildMarker, friends, isMapReady]);
+  }, []);
 
   useEffect(() => {
     if (!selectedFriend) {
@@ -438,8 +525,6 @@ export const MapCanvas = () => {
     }
 
     refreshFriends();
-    const interval = window.setInterval(refreshFriends, UPDATE_INTERVAL_MS);
-    return () => window.clearInterval(interval);
   }, [refreshFriends, token]);
 
   useEffect(() => {
@@ -516,7 +601,7 @@ export const MapCanvas = () => {
     setError(null);
     setSelectedFriend(null);
     markersRef.current.forEach((marker) => marker.remove());
-    markersRef.current = [];
+    markersRef.current.clear();
     if (mapRef.current) {
       mapRef.current.remove();
       mapRef.current = null;
@@ -525,6 +610,47 @@ export const MapCanvas = () => {
     setMapInstanceKey((prev) => prev + 1);
     refreshFriends();
   }, [refreshFriends]);
+
+  useEffect(() => {
+    if (!token) {
+      disconnectSocket();
+      return;
+    }
+
+    connectSocket(token);
+
+    const unsubscribe = onFriendLocationUpdate((data) => {
+      setFriends((prev) => {
+        const index = prev.findIndex((friend) => friend.id === data.userId);
+        if (index < 0) {
+          return prev;
+        }
+        const current = prev[index];
+        const next = [...prev];
+        next[index] = {
+          ...current,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          lastUpdated: data.timestamp,
+          previousLatitude: current.latitude,
+          previousLongitude: current.longitude,
+        };
+        return next;
+      });
+    });
+
+    const handleConnect = () => {
+      refreshFriends();
+    };
+
+    socket.on("connect", handleConnect);
+
+    return () => {
+      unsubscribe();
+      socket.off("connect", handleConnect);
+      disconnectSocket();
+    };
+  }, [refreshFriends, token]);
 
   if (!mapboxToken) {
     return (
