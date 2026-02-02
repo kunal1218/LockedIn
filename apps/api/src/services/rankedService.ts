@@ -837,8 +837,13 @@ const getMatch = async (matchId: string): Promise<RankedMatchRow | null> => {
   return row;
 };
 
-const parseTimestamp = (value: string | Date) =>
-  value instanceof Date ? value : new Date(value);
+const parseTimestamp = (value: string | Date | null | undefined) => {
+  if (!value) {
+    return new Date();
+  }
+  const parsed = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+};
 
 const normalizeTypingAttempt = (value: string) =>
   value
