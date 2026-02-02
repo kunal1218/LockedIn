@@ -415,7 +415,7 @@ export const MapCanvas = () => {
     <Card className="relative min-h-[520px] h-[520px] overflow-hidden p-0 !bg-transparent !backdrop-blur-none">
       <div ref={mapContainerRef} className="absolute inset-0 z-0 h-full w-full" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.05),transparent_55%),radial-gradient(circle_at_bottom,rgba(255,134,88,0.2),transparent_45%)] pointer-events-none opacity-0" />
-      <div className="relative z-10 flex flex-col gap-4 p-6">
+      <div className="absolute left-0 top-0 z-10 flex flex-col gap-4 p-6 pointer-events-none">
         <div className="flex items-start justify-between gap-4">
           <div>
             <Tag tone="accent">Live map</Tag>
@@ -427,7 +427,11 @@ export const MapCanvas = () => {
             </p>
           </div>
           {!isAuthenticated && (
-            <Button requiresAuth={false} onClick={() => openAuthModal("login")}>
+            <Button
+              requiresAuth={false}
+              className="pointer-events-auto"
+              onClick={() => openAuthModal("login")}
+            >
               Log in
             </Button>
           )}
@@ -439,7 +443,7 @@ export const MapCanvas = () => {
               <span className="font-semibold text-white">Share my location</span>
               <button
                 type="button"
-                className={`relative h-6 w-11 rounded-full transition ${
+                className={`pointer-events-auto relative h-6 w-11 rounded-full transition ${
                   settings.shareLocation ? "bg-accent" : "bg-white/20"
                 }`}
                 onClick={handleToggleShare}
@@ -463,7 +467,7 @@ export const MapCanvas = () => {
               <span className="font-semibold text-white">Ghost mode</span>
               <button
                 type="button"
-                className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                className={`pointer-events-auto rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
                   settings.ghostMode
                     ? "border-accent bg-accent/20 text-accent"
                     : "border-white/20 text-white/80 hover:border-white/40"
