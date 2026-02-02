@@ -2,19 +2,28 @@
 
 import mapboxgl from "mapbox-gl";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { FriendLocation } from "@lockedin/shared";
+import { createRoot, type Root } from "react-dom/client";
+import type {
+  CreateEventRequest,
+  EventWithDetails,
+  FriendLocation,
+} from "@lockedin/shared";
 import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
 import { useAuth } from "@/features/auth";
+import { EventCreationForm } from "@/features/map/components/EventCreationForm";
+import { EventMarker } from "@/features/map/components/EventMarker";
 import { FriendPopup } from "@/features/map/components/FriendPopup";
 import { MapControls } from "@/features/map/components/MapControls";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
+import { createEvent, getNearbyEvents } from "@/lib/api/events";
 import {
   connectSocket,
   disconnectSocket,
   onFriendLocationUpdate,
   socket,
 } from "@/lib/socket";
+import { formatEventTooltipTime } from "@/features/map/utils/eventHelpers";
 import { formatRelativeTime } from "@/lib/time";
 
 type MapSettings = {
@@ -42,6 +51,8 @@ const RING_RECENT = "#10b981";
 const RING_ACTIVE = "#f59e0b";
 const RING_IDLE = "#6b7280";
 const MARKER_ANIMATION_MS = 1200;
+const EVENT_FETCH_RADIUS_KM = 5;
+const EVENT_MOVE_THRESHOLD_KM = 1;
 
 const getMinutesAgo = (timestamp: string) =>
   (Date.now() - new Date(timestamp).getTime()) / 60000;
@@ -53,11 +64,27 @@ const getRingColor = (timestamp: string) => {
   return RING_IDLE;
 };
 
+const distanceKmBetween = (from: mapboxgl.LngLat, to: mapboxgl.LngLat) => {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRad(to.lat - from.lat);
+  const dLng = toRad(to.lng - from.lng);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(from.lat)) *
+      Math.cos(toRad(to.lat)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
+};
+
 export const MapCanvas = () => {
   const { token, isAuthenticated, openAuthModal, user } = useAuth();
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [friends, setFriends] = useState<FriendLocation[]>([]);
+  const [events, setEvents] = useState<EventWithDetails[]>([]);
   const [settings, setSettings] = useState<MapSettings>({
     shareLocation: false,
     ghostMode: false,
@@ -68,12 +95,27 @@ export const MapCanvas = () => {
   const [selectedFriend, setSelectedFriend] = useState<FriendLocation | null>(
     null
   );
+  const [selectedEvent, setSelectedEvent] = useState<EventWithDetails | null>(
+    null
+  );
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [newEventLocation, setNewEventLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [, setTempMarker] = useState<mapboxgl.Marker | null>(null);
+  const [eventClock, setEventClock] = useState(0);
   const [mapInstanceKey, setMapInstanceKey] = useState(0);
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   const missingFieldsLoggedRef = useRef<Set<string>>(new Set());
 
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const markerAnimationsRef = useRef<Map<string, number>>(new Map());
+  const eventMarkersRef = useRef<Map<number, mapboxgl.Marker>>(new Map());
+  const eventMarkerRootsRef = useRef<Map<number, Root>>(new Map());
+  const lastEventCenterRef = useRef<mapboxgl.LngLat | null>(null);
+  const pressTimerRef = useRef<number | null>(null);
+  const tempMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
   const normalizeFriend = useCallback(
     (raw: FriendLocation & {
@@ -136,6 +178,135 @@ export const MapCanvas = () => {
       return friend;
     },
     []
+  );
+
+  const normalizeEvent = useCallback(
+    (raw: EventWithDetails) => {
+      const attendeeCount = Number(raw.attendee_count ?? 0);
+      const attendees = raw.attendees ?? [];
+      const creator =
+        raw.creator ??
+        (user && raw.creator_id === user.id
+          ? {
+              id: user.id,
+              name: user.name ?? "You",
+              handle: user.handle ?? "@you",
+              profile_picture_url: null,
+            }
+          : {
+              id: raw.creator_id ?? "",
+              name: "Unknown",
+              handle: "@unknown",
+              profile_picture_url: null,
+            });
+
+      return {
+        ...raw,
+        category: raw.category ?? "other",
+        attendee_count: attendeeCount,
+        attendees,
+        creator,
+        user_status: raw.user_status ?? null,
+        distance_km:
+          raw.distance_km != null ? Number(raw.distance_km) : raw.distance_km,
+      } as EventWithDetails;
+    },
+    [user]
+  );
+
+  const buildEventTooltip = useCallback((event: EventWithDetails) => {
+    const count = Math.max(0, Number(event.attendee_count ?? 0));
+    const timeLabel = formatEventTooltipTime(event.start_time);
+    return `${event.title} • ${timeLabel} • ${count} going`;
+  }, []);
+
+  const handleSelectEvent = useCallback((event: EventWithDetails) => {
+    setSelectedEvent(event);
+    const map = mapRef.current;
+    if (map) {
+      map.easeTo({
+        center: [event.longitude, event.latitude],
+        zoom: Math.max(map.getZoom(), 14),
+      });
+    }
+  }, []);
+
+  const closeEventForm = useCallback(() => {
+    setShowEventForm(false);
+    setNewEventLocation(null);
+    setTempMarker((current) => {
+      current?.remove();
+      return null;
+    });
+    if (tempMarkerRef.current) {
+      tempMarkerRef.current.remove();
+      tempMarkerRef.current = null;
+    }
+  }, []);
+
+  const handleMapClick = useCallback(
+    (lngLat: { lng: number; lat: number }) => {
+      if (!token) {
+        openAuthModal("login");
+        return;
+      }
+
+      setSelectedEvent(null);
+      const location = { latitude: lngLat.lat, longitude: lngLat.lng };
+      setNewEventLocation(location);
+      setShowEventForm(true);
+      setTempMarker((current) => {
+        current?.remove();
+        const map = mapRef.current;
+        if (!map) {
+          return null;
+        }
+        const marker = new mapboxgl.Marker({ color: "#ef4444" })
+          .setLngLat([lngLat.lng, lngLat.lat])
+          .addTo(map);
+        tempMarkerRef.current = marker;
+        return marker;
+      });
+    },
+    [openAuthModal, token]
+  );
+
+  const handleCreateEvent = useCallback(
+    async (payload: CreateEventRequest) => {
+      if (!newEventLocation) {
+        return;
+      }
+
+      try {
+        const created = await createEvent(
+          {
+            ...payload,
+            latitude: newEventLocation.latitude,
+            longitude: newEventLocation.longitude,
+          },
+          token ?? undefined
+        );
+        const normalized = normalizeEvent(created);
+
+        setEvents((prev) => {
+          const exists = prev.some((event) => event.id === normalized.id);
+          if (exists) {
+            return prev.map((event) =>
+              event.id === normalized.id ? normalized : event
+            );
+          }
+          return [...prev, normalized];
+        });
+
+        closeEventForm();
+      } catch (creationError) {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[map] failed to create event", creationError);
+        }
+        window.alert("Failed to create event. Please try again.");
+      }
+    },
+    [closeEventForm, createEvent, newEventLocation, normalizeEvent, token]
   );
 
   useEffect(() => {
@@ -341,6 +512,24 @@ export const MapCanvas = () => {
     []
   );
 
+  const renderEventMarker = useCallback(
+    (event: EventWithDetails, isSelected: boolean) => {
+      const tooltip = buildEventTooltip(event);
+      const root = eventMarkerRootsRef.current.get(event.id);
+      if (root) {
+        root.render(
+          <EventMarker
+            event={event}
+            isSelected={isSelected}
+            tooltip={tooltip}
+            onClick={handleSelectEvent}
+          />
+        );
+      }
+    },
+    [buildEventTooltip, handleSelectEvent]
+  );
+
   useEffect(() => {
     if (!mapRef.current || !isMapReady) {
       return;
@@ -380,6 +569,59 @@ export const MapCanvas = () => {
   }, [animateMarkerTo, buildMarker, friends, isMapReady, updateMarkerElement]);
 
   useEffect(() => {
+    if (!mapRef.current || !isMapReady) {
+      return;
+    }
+
+    const map = mapRef.current;
+    const markerMap = eventMarkersRef.current;
+    const rootMap = eventMarkerRootsRef.current;
+    const nextIds = new Set(events.map((event) => event.id));
+
+    events.forEach((event) => {
+      const existing = markerMap.get(event.id);
+      if (existing) {
+        renderEventMarker(event, selectedEvent?.id === event.id);
+        existing.setLngLat([event.longitude, event.latitude]);
+      } else {
+        const element = document.createElement("div");
+        const root = createRoot(element);
+        root.render(
+          <EventMarker
+            event={event}
+            isSelected={selectedEvent?.id === event.id}
+            tooltip={buildEventTooltip(event)}
+            onClick={handleSelectEvent}
+          />
+        );
+        rootMap.set(event.id, root);
+        const marker = new mapboxgl.Marker({ element, anchor: "center" })
+          .setLngLat([event.longitude, event.latitude])
+          .addTo(map);
+        markerMap.set(event.id, marker);
+      }
+    });
+
+    markerMap.forEach((marker, id) => {
+      if (!nextIds.has(id)) {
+        marker.remove();
+        markerMap.delete(id);
+        const root = rootMap.get(id);
+        root?.unmount();
+        rootMap.delete(id);
+      }
+    });
+  }, [
+    buildEventTooltip,
+    eventClock,
+    events,
+    handleSelectEvent,
+    isMapReady,
+    renderEventMarker,
+    selectedEvent,
+  ]);
+
+  useEffect(() => {
     return () => {
       markersRef.current.forEach((marker) => marker.remove());
       markersRef.current.clear();
@@ -387,7 +629,22 @@ export const MapCanvas = () => {
         window.cancelAnimationFrame(rafId);
       });
       markerAnimationsRef.current.clear();
+      eventMarkersRef.current.forEach((marker) => marker.remove());
+      eventMarkersRef.current.clear();
+      eventMarkerRootsRef.current.forEach((root) => root.unmount());
+      eventMarkerRootsRef.current.clear();
+      if (tempMarkerRef.current) {
+        tempMarkerRef.current.remove();
+        tempMarkerRef.current = null;
+      }
     };
+  }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setEventClock((prev) => prev + 1);
+    }, 60000);
+    return () => window.clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -403,6 +660,20 @@ export const MapCanvas = () => {
       setSelectedFriend(updated);
     }
   }, [friends, selectedFriend]);
+
+  useEffect(() => {
+    if (!selectedEvent) {
+      return;
+    }
+    const updated = events.find((event) => event.id === selectedEvent.id);
+    if (!updated) {
+      setSelectedEvent(null);
+      return;
+    }
+    if (updated !== selectedEvent) {
+      setSelectedEvent(updated);
+    }
+  }, [events, selectedEvent]);
 
   const requestPosition = useCallback(
     async (options?: { suppressError?: boolean }) => {
@@ -437,6 +708,44 @@ export const MapCanvas = () => {
       }
     },
     []
+  );
+
+  const refreshEvents = useCallback(
+    async (options?: { force?: boolean; center?: mapboxgl.LngLat }) => {
+      if (!token || !mapRef.current) {
+        setEvents([]);
+        return;
+      }
+
+      const map = mapRef.current;
+      const center = options?.center ?? map.getCenter();
+      const lastCenter = lastEventCenterRef.current;
+
+      if (
+        !options?.force &&
+        lastCenter &&
+        distanceKmBetween(lastCenter, center) < EVENT_MOVE_THRESHOLD_KM
+      ) {
+        return;
+      }
+
+      lastEventCenterRef.current = center;
+
+      try {
+        const nearby = await getNearbyEvents(
+          center.lat,
+          center.lng,
+          EVENT_FETCH_RADIUS_KM,
+          token
+        );
+        setEvents(nearby.map(normalizeEvent));
+      } catch (loadError) {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[map] failed to load events", loadError);
+        }
+      }
+    },
+    [normalizeEvent, token]
   );
 
   const refreshFriends = useCallback(async () => {
@@ -572,6 +881,75 @@ export const MapCanvas = () => {
   }, [refreshFriends, token]);
 
   useEffect(() => {
+    if (!mapRef.current || !isMapReady) {
+      return;
+    }
+
+    if (!token) {
+      setEvents([]);
+      setSelectedEvent(null);
+      closeEventForm();
+      return;
+    }
+
+    const map = mapRef.current;
+    const handleMoveEnd = () => {
+      refreshEvents();
+    };
+
+    refreshEvents({ force: true, center: map.getCenter() });
+    map.on("moveend", handleMoveEnd);
+
+    return () => {
+      map.off("moveend", handleMoveEnd);
+    };
+  }, [closeEventForm, isMapReady, mapInstanceKey, refreshEvents, token]);
+
+  useEffect(() => {
+    if (!mapRef.current || !isMapReady) {
+      return;
+    }
+
+    const map = mapRef.current;
+
+    const handleContextMenu = (event: mapboxgl.MapMouseEvent) => {
+      event.originalEvent?.preventDefault?.();
+      handleMapClick(event.lngLat);
+    };
+
+    const handleTouchStart = (event: mapboxgl.MapTouchEvent) => {
+      if (pressTimerRef.current) {
+        window.clearTimeout(pressTimerRef.current);
+      }
+      pressTimerRef.current = window.setTimeout(() => {
+        handleMapClick(event.lngLat);
+      }, 500);
+    };
+
+    const clearPress = () => {
+      if (pressTimerRef.current) {
+        window.clearTimeout(pressTimerRef.current);
+        pressTimerRef.current = null;
+      }
+    };
+
+    map.on("contextmenu", handleContextMenu);
+    map.on("touchstart", handleTouchStart);
+    map.on("touchend", clearPress);
+    map.on("touchcancel", clearPress);
+    map.on("touchmove", clearPress);
+
+    return () => {
+      map.off("contextmenu", handleContextMenu);
+      map.off("touchstart", handleTouchStart);
+      map.off("touchend", clearPress);
+      map.off("touchcancel", clearPress);
+      map.off("touchmove", clearPress);
+      clearPress();
+    };
+  }, [handleMapClick, isMapReady]);
+
+  useEffect(() => {
     if (!token || !settings.shareLocation || settings.ghostMode) {
       return;
     }
@@ -644,12 +1022,27 @@ export const MapCanvas = () => {
   const handleRetry = useCallback(() => {
     setError(null);
     setSelectedFriend(null);
+    setSelectedEvent(null);
+    setShowEventForm(false);
+    setNewEventLocation(null);
+    setTempMarker((current) => {
+      current?.remove();
+      return null;
+    });
+    if (tempMarkerRef.current) {
+      tempMarkerRef.current.remove();
+      tempMarkerRef.current = null;
+    }
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current.clear();
     markerAnimationsRef.current.forEach((rafId) => {
       window.cancelAnimationFrame(rafId);
     });
     markerAnimationsRef.current.clear();
+    eventMarkersRef.current.forEach((marker) => marker.remove());
+    eventMarkersRef.current.clear();
+    eventMarkerRootsRef.current.forEach((root) => root.unmount());
+    eventMarkerRootsRef.current.clear();
     if (mapRef.current) {
       mapRef.current.remove();
       mapRef.current = null;
@@ -657,7 +1050,8 @@ export const MapCanvas = () => {
     setMapReady(false);
     setMapInstanceKey((prev) => prev + 1);
     refreshFriends();
-  }, [refreshFriends]);
+    refreshEvents({ force: true });
+  }, [refreshEvents, refreshFriends]);
 
   useEffect(() => {
     if (!token) {
@@ -687,18 +1081,74 @@ export const MapCanvas = () => {
       });
     });
 
+    const handleRsvpUpdate = (data: {
+      eventId: number;
+      newAttendeeCount: number;
+    }) => {
+      setEvents((prev) =>
+        prev.map((event) =>
+          event.id === data.eventId
+            ? { ...event, attendee_count: data.newAttendeeCount }
+            : event
+        )
+      );
+    };
+
+    const handleCheckin = (data: { userName?: string }) => {
+      if (process.env.NODE_ENV !== "production") {
+        console.info("[map] event check-in", data);
+      }
+    };
+
+    const handleNewEvent = (data: { event: EventWithDetails }) => {
+      if (!data?.event) {
+        return;
+      }
+      const normalized = normalizeEvent(data.event);
+      setEvents((prev) => {
+        const exists = prev.some((event) => event.id === normalized.id);
+        if (exists) {
+          return prev.map((event) =>
+            event.id === normalized.id ? normalized : event
+          );
+        }
+        return [...prev, normalized];
+      });
+    };
+
     const handleConnect = () => {
       refreshFriends();
+      refreshEvents({ force: true });
     };
 
     socket.on("connect", handleConnect);
+    socket.on("event-rsvp-update", handleRsvpUpdate);
+    socket.on("event-checkin", handleCheckin);
+    socket.on("new-event-created", handleNewEvent);
 
     return () => {
       unsubscribe();
       socket.off("connect", handleConnect);
+      socket.off("event-rsvp-update", handleRsvpUpdate);
+      socket.off("event-checkin", handleCheckin);
+      socket.off("new-event-created", handleNewEvent);
       disconnectSocket();
     };
-  }, [refreshFriends, token]);
+  }, [normalizeEvent, refreshEvents, refreshFriends, token]);
+
+  useEffect(() => {
+    if (!selectedEvent) {
+      return;
+    }
+
+    socket.emit("join-event", selectedEvent.id);
+    socket.emit("join-event-room", selectedEvent.id);
+
+    return () => {
+      socket.emit("leave-event", selectedEvent.id);
+      socket.emit("leave-event-room", selectedEvent.id);
+    };
+  }, [selectedEvent]);
 
   if (!mapboxToken) {
     return (
@@ -817,6 +1267,13 @@ export const MapCanvas = () => {
         <FriendPopup
           friend={selectedFriend}
           onClose={() => setSelectedFriend(null)}
+        />
+      )}
+      {showEventForm && newEventLocation && (
+        <EventCreationForm
+          location={newEventLocation}
+          onClose={closeEventForm}
+          onSubmit={handleCreateEvent}
         />
       )}
     </div>
