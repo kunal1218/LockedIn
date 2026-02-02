@@ -926,12 +926,21 @@ const isTypingTestBlocking = (match: RankedMatchRow) =>
 
 const ensureRoundDefaults = async (match: RankedMatchRow): Promise<RankedMatchRow> => {
   const roundNumber = match.round_number ?? 1;
-  const derivedGameType: RoundGameType =
-    (roundNumber % 2 === 0 ? "typing_test" : pickChatGameType());
-  const roundGameType = (match.round_game_type as RoundGameType | null) ?? derivedGameType;
+  const isEvenRound = roundNumber % 2 === 0;
+  const existingChatType =
+    match.round_game_type === "icebreaker" || match.round_game_type === "roles"
+      ? (match.round_game_type as ChatGameType)
+      : null;
+  const roundGameType: RoundGameType = isEvenRound
+    ? "typing_test"
+    : existingChatType ?? pickChatGameType();
+  const existingPhase = match.round_phase as RoundPhase | null;
   const roundPhase =
-    (match.round_phase as RoundPhase | null) ??
-    (roundGameType === "typing_test" ? "typing_test" : "chat");
+    roundGameType === "typing_test"
+      ? "typing_test"
+      : existingPhase === "judging" || existingPhase === "chat"
+        ? existingPhase
+        : "chat";
   const roundStartedAt = match.round_started_at
     ? parseTimestamp(match.round_started_at)
     : new Date();
@@ -972,6 +981,7 @@ const startTypingTestRound = async (
   match: RankedMatchRow,
   roundNumber: number
 ): Promise<RankedMatchRow> => {
+  const ensuredRoundNumber = roundNumber % 2 === 0 ? roundNumber : roundNumber + 1;
   const words = getTypingTestWords();
   if (words.length === 0) {
     return match;
@@ -991,7 +1001,7 @@ const startTypingTestRound = async (
          typing_test_round = COALESCE(typing_test_round, 0) + 1
      WHERE id = $1
      RETURNING ${rankedMatchColumns}`,
-    [match.id, roundNumber, JSON.stringify(words)]
+    [match.id, ensuredRoundNumber, JSON.stringify(words)]
   );
   if ((updated.rowCount ?? 0) > 0) {
     return updated.rows[0] as RankedMatchRow;
@@ -1002,7 +1012,10 @@ const startTypingTestRound = async (
 const advanceToNextChatRound = async (
   match: RankedMatchRow
 ): Promise<RankedMatchRow> => {
-  const nextRoundNumber = (match.round_number ?? 1) + 1;
+  let nextRoundNumber = (match.round_number ?? 1) + 1;
+  if (nextRoundNumber % 2 === 0) {
+    nextRoundNumber += 1;
+  }
   const nextGameType = pickChatGameType();
   const { chatters } = getChatters(match);
   const startingTurnUserId =
