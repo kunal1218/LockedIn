@@ -1923,27 +1923,21 @@ export default function RankedPlayPage() {
             <div className="w-full max-w-md rounded-3xl border border-card-border/70 bg-white px-6 py-5 shadow-sm">
               {showRoleModal ? (
                 <>
-                  <p className="text-base font-semibold text-ink">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                    Round {roundNumber}
+                  </p>
+                  <p className="mt-2 text-base font-semibold text-ink">
                     {roundGameType === "roles"
-                      ? `Round ${roundNumber}: Character Roles`
+                      ? "Character Roles: Stay in character."
                       : roundGameType === "icebreaker"
-                        ? `Round ${roundNumber}: Icebreaker`
-                        : `Round ${roundNumber}: Typing Test`}
+                        ? "Icebreaker: Answer the question."
+                        : "Typing Test: Write 10 words."}
                   </p>
                   {!displayIsJudge && isRolesRound && characterRole && (
                     <p className="mt-2 text-sm font-semibold text-ink">
                       Your role: {characterRole}
                     </p>
                   )}
-                  <p className="mt-2 text-xs text-muted">
-                    {displayIsJudge
-                      ? "You are the judge for this round."
-                      : isIcebreakerRound
-                        ? "Get ready to answer the icebreaker."
-                        : isRolesRound
-                          ? "Stay in character and start the conversation."
-                          : "Get ready for the typing test."}
-                  </p>
                   <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-card-border/60">
                     <div
                       className="h-full bg-accent transition-[width] duration-100"
@@ -1953,13 +1947,13 @@ export default function RankedPlayPage() {
                 </>
               ) : (
                 <>
-                  <p className="text-base font-semibold text-ink">
-                    {isTypingTestCountdown ? "Typing test incoming" : typingResultTitle}
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                    Round {roundNumber}
                   </p>
-                  <p className="mt-2 text-xs text-muted">
+                  <p className="mt-2 text-base font-semibold text-ink">
                     {isTypingTestCountdown
-                      ? "Get ready to type the 10 words."
-                      : "Returning to the match..."}
+                      ? "Typing Test: Write 10 words."
+                      : `Typing Test: ${typingResultTitle}`}
                   </p>
                   <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-card-border/60">
                     <div
