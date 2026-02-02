@@ -2128,20 +2128,20 @@ export const smiteRankedOpponent = async (params: {
   if (match.timed_out) {
     throw new Error("Match has ended");
   }
-  const partnerId = getActiveOpponentId(match, params.userId);
-  if (!partnerId) {
-    throw new Error("No opponent to smite");
-  }
 
   const updated = await db.query(
     `UPDATE ranked_matches
      SET user_a_lives = CASE
-           WHEN user_a_id = $2 THEN GREATEST(user_a_lives - 3, 0)
-           ELSE user_a_lives
+           WHEN user_a_id = $2 THEN user_a_lives
+           ELSE 0
          END,
          user_b_lives = CASE
-           WHEN user_b_id = $2 THEN GREATEST(user_b_lives - 3, 0)
-           ELSE user_b_lives
+           WHEN user_b_id = $2 THEN user_b_lives
+           ELSE 0
+         END,
+         user_c_lives = CASE
+           WHEN user_c_id = $2 THEN COALESCE(user_c_lives, ${DEFAULT_LIVES})
+           ELSE 0
          END,
          timed_out = timed_out,
          typing_test_state = NULL,
@@ -2151,7 +2151,7 @@ export const smiteRankedOpponent = async (params: {
          typing_test_result_at = NULL
      WHERE id = $1
      RETURNING ${rankedMatchColumns}`,
-    [params.matchId, partnerId]
+    [params.matchId, params.userId]
   );
 
   if ((updated.rowCount ?? 0) === 0) {
