@@ -115,6 +115,7 @@ export default function RankedPlayPage() {
   const typingDebounceRef = useRef<number | null>(null);
   const lastTypingSentRef = useRef<string>("");
   const typingRoundRef = useRef<number | null>(null);
+  const typingWordsKeyRef = useRef<string>("");
   const lives =
     rankedStatus.status === "matched"
       ? rankedStatus.lives ?? { me: 3, opponents: [3, 3] }
@@ -660,6 +661,7 @@ export default function RankedPlayPage() {
     if (typingTest.state === "idle") {
       typingRoundRef.current = null;
       typingAutoSubmitRef.current = "";
+      typingWordsKeyRef.current = "";
       return;
     }
     const round = typingTest.round ?? 0;
@@ -670,6 +672,20 @@ export default function RankedPlayPage() {
       setTypingTestError(null);
     }
   }, [typingTest.round, typingTest.state]);
+
+  useEffect(() => {
+    if (!showTypingTestArena && typingTest.state !== "countdown") {
+      return;
+    }
+    const wordsKey = typingTest.words.join(" ");
+    if (typingWordsKeyRef.current === wordsKey) {
+      return;
+    }
+    typingWordsKeyRef.current = wordsKey;
+    typingAutoSubmitRef.current = "";
+    setTypingAttempt("");
+    setTypingTestError(null);
+  }, [showTypingTestArena, typingTest.state, typingTest.words]);
 
   useEffect(() => {
     if (!roleModalKey) {
