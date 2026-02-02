@@ -41,6 +41,7 @@ const UPDATE_INTERVAL_MS = 60000;
 const RING_RECENT = "#10b981";
 const RING_ACTIVE = "#f59e0b";
 const RING_IDLE = "#6b7280";
+const MARKER_ANIMATION_MS = 1200;
 
 const getMinutesAgo = (timestamp: string) =>
   (Date.now() - new Date(timestamp).getTime()) / 60000;
@@ -72,6 +73,7 @@ export const MapCanvas = () => {
   const missingFieldsLoggedRef = useRef<Set<string>>(new Set());
 
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+  const markerAnimationsRef = useRef<Map<string, number>>(new Map());
 
   const normalizeFriend = useCallback(
     (raw: FriendLocation & {
@@ -234,8 +236,6 @@ export const MapCanvas = () => {
       wrapper.className = "relative flex h-14 w-14 items-center justify-center";
       wrapper.style.cursor = "pointer";
       wrapper.style.pointerEvents = "auto";
-      wrapper.style.transition = "transform 2.6s ease";
-      wrapper.style.willChange = "transform";
 
       const ringColor = getRingColor(friend.lastUpdated);
 
@@ -304,6 +304,43 @@ export const MapCanvas = () => {
     [updateMarkerElement, user?.id]
   );
 
+  const animateMarkerTo = useCallback(
+    (id: string, marker: mapboxgl.Marker, target: [number, number]) => {
+      if (!Number.isFinite(target[0]) || !Number.isFinite(target[1])) {
+        return;
+      }
+
+      const start = marker.getLngLat();
+      if (start.lng === target[0] && start.lat === target[1]) {
+        return;
+      }
+
+      const existing = markerAnimationsRef.current.get(id);
+      if (existing) {
+        window.cancelAnimationFrame(existing);
+      }
+
+      const startTime = performance.now();
+      const animate = (time: number) => {
+        const progress = Math.min(1, (time - startTime) / MARKER_ANIMATION_MS);
+        const lng = start.lng + (target[0] - start.lng) * progress;
+        const lat = start.lat + (target[1] - start.lat) * progress;
+        marker.setLngLat([lng, lat]);
+
+        if (progress < 1) {
+          const rafId = window.requestAnimationFrame(animate);
+          markerAnimationsRef.current.set(id, rafId);
+        } else {
+          markerAnimationsRef.current.delete(id);
+        }
+      };
+
+      const rafId = window.requestAnimationFrame(animate);
+      markerAnimationsRef.current.set(id, rafId);
+    },
+    []
+  );
+
   useEffect(() => {
     if (!mapRef.current || !isMapReady) {
       return;
@@ -322,7 +359,10 @@ export const MapCanvas = () => {
             .profile_picture_url ??
           null;
         updateMarkerElement(element, friend, profilePictureUrl);
-        existing.setLngLat([friend.longitude, friend.latitude]);
+        animateMarkerTo(friend.id, existing, [
+          friend.longitude,
+          friend.latitude,
+        ]);
       } else {
         const marker = buildMarker(friend);
         if (marker) {
@@ -337,12 +377,16 @@ export const MapCanvas = () => {
         markerMap.delete(id);
       }
     });
-  }, [buildMarker, friends, isMapReady, updateMarkerElement]);
+  }, [animateMarkerTo, buildMarker, friends, isMapReady, updateMarkerElement]);
 
   useEffect(() => {
     return () => {
       markersRef.current.forEach((marker) => marker.remove());
       markersRef.current.clear();
+      markerAnimationsRef.current.forEach((rafId) => {
+        window.cancelAnimationFrame(rafId);
+      });
+      markerAnimationsRef.current.clear();
     };
   }, []);
 
@@ -602,6 +646,10 @@ export const MapCanvas = () => {
     setSelectedFriend(null);
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current.clear();
+    markerAnimationsRef.current.forEach((rafId) => {
+      window.cancelAnimationFrame(rafId);
+    });
+    markerAnimationsRef.current.clear();
     if (mapRef.current) {
       mapRef.current.remove();
       mapRef.current = null;
