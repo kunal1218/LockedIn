@@ -25,4 +25,6 @@ initializeSocketServer(httpServer);
 
 httpServer.listen(port, () => {
   console.log(`LockedIn API listening on ${port}`);
+  console.log("Deploy tag: leaderboard-route-2026-02-03");
+  console.log("API log: redeploy-2026-02-03");
 });
