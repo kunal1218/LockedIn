@@ -16,6 +16,7 @@ import { EventDetailCard } from "@/features/map/components/EventDetailCard";
 import { EventMarker } from "@/features/map/components/EventMarker";
 import { FriendPopup } from "@/features/map/components/FriendPopup";
 import { MapControls } from "@/features/map/components/MapControls";
+import { EventsSidebar } from "@/features/map/components/EventsSidebar";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { createEvent, getEventDetails, getNearbyEvents } from "@/lib/api/events";
 import {
@@ -100,6 +101,7 @@ export const MapCanvas = () => {
     null
   );
   const [isPlacingPin, setIsPlacingPin] = useState(false);
+  const [showEventsSidebar, setShowEventsSidebar] = useState(false);
   const [showEventForm, setShowEventForm] = useState(false);
   const [newEventLocation, setNewEventLocation] = useState<{
     latitude: number;
@@ -248,6 +250,36 @@ export const MapCanvas = () => {
       }
     },
     [openAuthModal, token]
+  );
+
+  const handleEventClickById = useCallback(
+    async (eventId: number) => {
+      const existing = events.find((event) => event.id === eventId);
+      if (existing) {
+        await handleEventClick(existing);
+        return;
+      }
+      if (!token) {
+        openAuthModal("login");
+        return;
+      }
+      try {
+        const details = await getEventDetails(eventId, token);
+        setSelectedEvent(details);
+        if (mapRef.current) {
+          mapRef.current.flyTo({
+            center: [details.longitude, details.latitude],
+            zoom: Math.max(mapRef.current.getZoom(), 15),
+            duration: 1000,
+          });
+        }
+      } catch (loadError) {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[map] failed to load event details", loadError);
+        }
+      }
+    },
+    [events, handleEventClick, openAuthModal, token]
   );
 
   const handleEventRSVP = useCallback(
@@ -1054,6 +1086,18 @@ export const MapCanvas = () => {
     if (!mapRef.current || !isMapReady) {
       return;
     }
+    const map = mapRef.current;
+    const paddingRight = showEventsSidebar && window.innerWidth > 640 ? 384 : 0;
+    map.easeTo({
+      padding: { right: paddingRight },
+      duration: 300,
+    });
+  }, [isMapReady, showEventsSidebar]);
+
+  useEffect(() => {
+    if (!mapRef.current || !isMapReady) {
+      return;
+    }
 
     const map = mapRef.current;
     const handleClick = (event: mapboxgl.MapMouseEvent) => {
@@ -1316,6 +1360,16 @@ export const MapCanvas = () => {
         error={error}
         isLoading={isLoading}
       />
+      {!showEventsSidebar && (
+        <button
+          type="button"
+          onClick={() => setShowEventsSidebar(true)}
+          className="pointer-events-auto fixed bottom-6 left-6 z-30 flex items-center gap-2 rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-orange-600"
+        >
+          <span className="text-xl">📍</span>
+          View Events{events.length > 0 ? ` (${events.length})` : ""}
+        </button>
+      )}
       {isPlacingPin && (
         <div className="pointer-events-none absolute left-1/2 top-24 z-30 -translate-x-1/2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(27,26,23,0.25)] animate-bounce">
           📍 Click anywhere on the map to place your event
@@ -1410,6 +1464,14 @@ export const MapCanvas = () => {
         <FriendPopup
           friend={selectedFriend}
           onClose={() => setSelectedFriend(null)}
+        />
+      )}
+      {showEventsSidebar && (
+        <EventsSidebar
+          events={events}
+          onClose={() => setShowEventsSidebar(false)}
+          onEventClick={handleEventClickById}
+          userLocation={newEventLocation}
         />
       )}
       {selectedEvent && (
