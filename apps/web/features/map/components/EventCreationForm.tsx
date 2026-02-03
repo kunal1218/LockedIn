@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { CreateEventRequest } from "@lockedin/shared";
 import { Button } from "@/components/Button";
-import { Tag } from "@/components/Tag";
 
 const toLocalInputValue = (date: Date) => {
   const pad = (value: number) => String(value).padStart(2, "0");
@@ -121,38 +120,44 @@ export const EventCreationForm = ({
         onClick={onClose}
         aria-hidden="true"
       />
-      <div
-        className={`relative w-full max-h-[80vh] rounded-t-[32px] border border-card-border/60 bg-white/95 px-6 pb-8 pt-6 shadow-[0_24px_60px_rgba(27,26,23,0.25)] backdrop-blur transition-transform duration-300 ${
-          isVisible ? "translate-y-0" : "translate-y-full"
-        }`}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <Tag tone="accent">Create event</Tag>
-            <h2 className="mt-2 text-xl font-semibold text-ink">
-              Drop your plan
-            </h2>
-            <p className="mt-1 text-xs text-muted">
-              Pin is set at {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-card-border/70 text-ink/70 transition hover:border-accent/40"
-            aria-label="Close"
+      <div className="relative w-full">
+        <form
+          id="event-create-form"
+          onSubmit={handleSubmit}
+          className="relative w-full"
+        >
+          <div
+            className={`relative max-h-[65vh] overflow-y-auto rounded-t-[32px] border border-card-border/60 bg-[#FAF8F3] px-6 pb-24 pt-6 shadow-[0_24px_60px_rgba(27,26,23,0.25)] backdrop-blur transition-transform duration-300 ${
+              isVisible ? "translate-y-0" : "translate-y-full"
+            }`}
           >
-            <span className="text-lg">×</span>
-          </button>
-        </div>
+            <div className="pb-[env(safe-area-inset-bottom)]">
+              <div className="sticky top-0 z-10 -mx-6 mb-4 border-b border-card-border/60 bg-[#FAF8F3] px-6 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-ink">Create Event</h2>
+                    <p className="mt-1 text-sm text-muted">
+                      Pin is set at {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-card-border/70 text-ink/70 transition hover:border-accent/40"
+                    aria-label="Close"
+                  >
+                    <span className="text-lg">×</span>
+                  </button>
+                </div>
+              </div>
 
-        {error && (
-          <div className="mb-4 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-xs font-semibold text-accent">
-            {error}
-          </div>
-        )}
+              {error && (
+                <div className="mb-4 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-xs font-semibold text-accent">
+                  {error}
+                </div>
+              )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-xs font-semibold text-muted">Title *</label>
             <input
@@ -273,25 +278,31 @@ export const EventCreationForm = ({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-2">
+              </div>
+            </div>
+          </div>
+          <div className="bg-[#FAF8F3] px-6 py-4 shadow-[0_-12px_24px_rgba(27,26,23,0.08)]">
+          <div className="flex items-center gap-3">
             <Button
               type="button"
               variant="outline"
               requiresAuth={false}
-              className="min-h-[44px]"
+              className="min-h-[44px] flex-1"
               onClick={onClose}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
             <Button
               type="submit"
               requiresAuth={false}
-              className="min-h-[44px]"
+              className="min-h-[44px] flex-1"
               disabled={isSubmitting}
             >
               {isSubmitting ? "Creating..." : "Create event"}
             </Button>
           </div>
+        </div>
         </form>
       </div>
     </div>
