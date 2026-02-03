@@ -64,29 +64,34 @@ export const EventsSidebar = ({
   }, [events]);
 
   return (
-    <>
-      <div
-        className="fixed inset-x-0 bottom-0 top-24 z-40 bg-ink/20 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div className="fixed right-0 top-24 z-50 flex h-[calc(100%-96px)] w-full flex-col bg-white/95 shadow-2xl backdrop-blur-md sm:w-80 animate-slide-in-right">
-        <div className="flex items-center justify-between border-b border-ink/10 bg-white/95 p-4 backdrop-blur-md">
+    <div className="fixed inset-0 left-0 z-40 w-full bg-white shadow-xl sm:inset-y-auto sm:top-[96px] sm:h-[calc(100vh-96px)] sm:w-[400px]">
+      <div className="flex h-full flex-col">
+        <div className="flex items-center justify-between border-b border-ink/10 bg-white p-4">
           <div>
             <h2 className="text-2xl font-bold text-ink">Nearby Events</h2>
             <p className="text-sm text-muted">{events.length} events found</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center text-2xl text-ink/50 hover:text-ink"
-            aria-label="Close"
-          >
-            ×
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="hidden text-sm font-semibold text-ink/60 hover:text-ink sm:block"
+              title="Close sidebar"
+            >
+              ← Hide
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-10 w-10 items-center justify-center text-2xl text-ink/50 hover:text-ink sm:hidden"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 space-y-2 overflow-y-auto bg-white/80 p-3">
+        <div className="flex-1 space-y-2 overflow-y-auto bg-white p-3">
           {sortedEvents.length === 0 ? (
             <div className="py-12 text-center text-muted">
               <p className="mb-2 text-4xl">📍</p>
@@ -162,19 +167,6 @@ export const EventsSidebar = ({
           )}
         </div>
       </div>
-      <style>{`
-        @keyframes slide-in-right {
-          from {
-            transform: translateX(100%);
-          }
-          to {
-            transform: translateX(0);
-          }
-        }
-        .animate-slide-in-right {
-          animation: slide-in-right 0.3s ease-out;
-        }
-      `}</style>
-    </>
+    </div>
   );
 };
