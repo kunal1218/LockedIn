@@ -98,6 +98,7 @@ export const MapCanvas = () => {
   const [selectedEvent, setSelectedEvent] = useState<EventWithDetails | null>(
     null
   );
+  const [isPlacingPin, setIsPlacingPin] = useState(false);
   const [showEventForm, setShowEventForm] = useState(false);
   const [newEventLocation, setNewEventLocation] = useState<{
     latitude: number;
@@ -116,6 +117,7 @@ export const MapCanvas = () => {
   const lastEventCenterRef = useRef<mapboxgl.LngLat | null>(null);
   const pressTimerRef = useRef<number | null>(null);
   const tempMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const normalizeFriend = useCallback(
     (raw: FriendLocation & {
@@ -234,6 +236,7 @@ export const MapCanvas = () => {
   const closeEventForm = useCallback(() => {
     setShowEventForm(false);
     setNewEventLocation(null);
+    setIsPlacingPin(false);
     setTempMarker((current) => {
       current?.remove();
       return null;
@@ -252,6 +255,7 @@ export const MapCanvas = () => {
       }
 
       setSelectedEvent(null);
+      setIsPlacingPin(false);
       const location = { latitude: lngLat.lat, longitude: lngLat.lng };
       setNewEventLocation(location);
       setShowEventForm(true);
@@ -913,17 +917,45 @@ export const MapCanvas = () => {
     const map = mapRef.current;
 
     const handleContextMenu = (event: mapboxgl.MapMouseEvent) => {
+      event.preventDefault();
       event.originalEvent?.preventDefault?.();
       handleMapClick(event.lngLat);
     };
 
     const handleTouchStart = (event: mapboxgl.MapTouchEvent) => {
+      const touch = event.originalEvent.touches[0];
+      if (!touch) {
+        return;
+      }
+      touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
       if (pressTimerRef.current) {
         window.clearTimeout(pressTimerRef.current);
       }
       pressTimerRef.current = window.setTimeout(() => {
-        handleMapClick(event.lngLat);
-      }, 500);
+        const startPos = touchStartPosRef.current;
+        if (!startPos) {
+          return;
+        }
+        const lngLat = map.unproject([startPos.x, startPos.y]);
+        handleMapClick(lngLat);
+        navigator.vibrate?.(50);
+      }, 600);
+    };
+
+    const handleTouchMove = (event: mapboxgl.MapTouchEvent) => {
+      if (!pressTimerRef.current || !touchStartPosRef.current) {
+        return;
+      }
+      const touch = event.originalEvent.touches[0];
+      if (!touch) {
+        return;
+      }
+      const dx = touch.clientX - touchStartPosRef.current.x;
+      const dy = touch.clientY - touchStartPosRef.current.y;
+      if (Math.hypot(dx, dy) > 10) {
+        window.clearTimeout(pressTimerRef.current);
+        pressTimerRef.current = null;
+      }
     };
 
     const clearPress = () => {
@@ -931,23 +963,52 @@ export const MapCanvas = () => {
         window.clearTimeout(pressTimerRef.current);
         pressTimerRef.current = null;
       }
+      touchStartPosRef.current = null;
     };
 
     map.on("contextmenu", handleContextMenu);
     map.on("touchstart", handleTouchStart);
     map.on("touchend", clearPress);
     map.on("touchcancel", clearPress);
-    map.on("touchmove", clearPress);
+    map.on("touchmove", handleTouchMove);
 
     return () => {
       map.off("contextmenu", handleContextMenu);
       map.off("touchstart", handleTouchStart);
       map.off("touchend", clearPress);
       map.off("touchcancel", clearPress);
-      map.off("touchmove", clearPress);
+      map.off("touchmove", handleTouchMove);
       clearPress();
     };
   }, [handleMapClick, isMapReady]);
+
+  useEffect(() => {
+    if (!mapRef.current || !isMapReady) {
+      return;
+    }
+
+    const map = mapRef.current;
+    const handleClick = (event: mapboxgl.MapMouseEvent) => {
+      if (!isPlacingPin) {
+        return;
+      }
+      handleMapClick(event.lngLat);
+    };
+
+    map.on("click", handleClick);
+
+    return () => {
+      map.off("click", handleClick);
+    };
+  }, [handleMapClick, isMapReady, isPlacingPin]);
+
+  useEffect(() => {
+    if (!mapRef.current || !isMapReady) {
+      return;
+    }
+    const canvas = mapRef.current.getCanvas();
+    canvas.style.cursor = isPlacingPin ? "crosshair" : "";
+  }, [isMapReady, isPlacingPin]);
 
   useEffect(() => {
     if (!token || !settings.shareLocation || settings.ghostMode) {
@@ -1023,6 +1084,7 @@ export const MapCanvas = () => {
     setError(null);
     setSelectedFriend(null);
     setSelectedEvent(null);
+    setIsPlacingPin(false);
     setShowEventForm(false);
     setNewEventLocation(null);
     setTempMarker((current) => {
@@ -1178,6 +1240,26 @@ export const MapCanvas = () => {
         error={error}
         isLoading={isLoading}
       />
+      {isPlacingPin && (
+        <div className="pointer-events-none absolute left-1/2 top-24 z-30 -translate-x-1/2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(27,26,23,0.25)] animate-bounce">
+          📍 Click anywhere on the map to place your event
+        </div>
+      )}
+      {!showEventForm && (
+        <button
+          type="button"
+          onClick={() => setIsPlacingPin((prev) => !prev)}
+          className={`pointer-events-auto absolute bottom-28 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full text-2xl font-bold text-white shadow-[0_18px_40px_rgba(27,26,23,0.25)] transition ${
+            isPlacingPin
+              ? "bg-red-500 hover:bg-red-600"
+              : "bg-accent hover:bg-accent/90"
+          }`}
+          title={isPlacingPin ? "Cancel" : "Create Event"}
+          aria-label={isPlacingPin ? "Cancel pin drop" : "Create event"}
+        >
+          {isPlacingPin ? "×" : "+"}
+        </button>
+      )}
       <div className="absolute bottom-6 right-4 z-20 flex flex-col gap-2 pointer-events-none">
         <div className="flex flex-col gap-2 pointer-events-auto">
           <button
