@@ -1379,6 +1379,7 @@ const maybeAdvanceTypingTestState = async (
       logRanked("typingTest:resultElapsed", {
         matchId: match.id,
         roundNumber: match.round_number ?? null,
+        elapsedMs: Date.now() - resultAtMs,
       });
       const cleared = await db.query(
         `UPDATE ranked_matches
@@ -1396,6 +1397,11 @@ const maybeAdvanceTypingTestState = async (
       if ((cleared.rowCount ?? 0) > 0) {
         const row = cleared.rows[0] as RankedMatchRow;
         return advanceToNextChatRound(row);
+      }
+      logRanked("typingTest:resultAdvanceNoop", { matchId: match.id });
+      const refreshed = await getMatch(match.id);
+      if (refreshed && refreshed.typing_test_state !== "result") {
+        return advanceToNextChatRound(refreshed);
       }
     }
   }

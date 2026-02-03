@@ -180,30 +180,6 @@ export default function RankedPlayPage() {
     }
     return Math.max(0, Math.min(1, typingTestTimeLeft / TYPING_TEST_SECONDS));
   }, [typingTestTimeLeft]);
-  const roundTimeLeft = useMemo(() => {
-    if (!roundStartedAt) {
-      return null;
-    }
-    if (!isIcebreakerRound && !isRolesRound) {
-      return null;
-    }
-    if (roundPhase !== "chat") {
-      return null;
-    }
-    const startedMs = Date.parse(roundStartedAt);
-    if (!Number.isFinite(startedMs)) {
-      return null;
-    }
-    const nowMs = Date.now() - serverTimeOffsetRef.current;
-    const remainingMs = CHAT_ROUND_SECONDS * 1000 - (nowMs - startedMs);
-    return Math.max(0, Math.ceil(remainingMs / 1000));
-  }, [isIcebreakerRound, isRolesRound, roundPhase, roundStartedAt]);
-  const roundProgress = useMemo(() => {
-    if (roundTimeLeft === null) {
-      return 0;
-    }
-    return Math.max(0, Math.min(1, roundTimeLeft / CHAT_ROUND_SECONDS));
-  }, [roundTimeLeft]);
   const icebreakerQuestion =
     rankedStatus.status === "matched" ? rankedStatus.icebreakerQuestion : null;
   const cleanedIcebreaker = icebreakerQuestion?.trim();
@@ -228,6 +204,30 @@ export default function RankedPlayPage() {
   const isRolesRound = roundGameType === "roles";
   const isTypingTestRound = roundGameType === "typing_test";
   const isJudgingPhase = roundPhase === "judging";
+  const roundTimeLeft = useMemo(() => {
+    if (!roundStartedAt) {
+      return null;
+    }
+    if (!isIcebreakerRound && !isRolesRound) {
+      return null;
+    }
+    if (roundPhase !== "chat") {
+      return null;
+    }
+    const startedMs = Date.parse(roundStartedAt);
+    if (!Number.isFinite(startedMs)) {
+      return null;
+    }
+    const nowMs = Date.now() - serverTimeOffsetRef.current;
+    const remainingMs = CHAT_ROUND_SECONDS * 1000 - (nowMs - startedMs);
+    return Math.max(0, Math.ceil(remainingMs / 1000));
+  }, [isIcebreakerRound, isRolesRound, roundPhase, roundStartedAt]);
+  const roundProgress = useMemo(() => {
+    if (roundTimeLeft === null) {
+      return 0;
+    }
+    return Math.max(0, Math.min(1, roundTimeLeft / CHAT_ROUND_SECONDS));
+  }, [roundTimeLeft]);
   const roleModalKey = useMemo(() => {
     if (
       !isMatched ||
