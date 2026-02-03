@@ -45,7 +45,7 @@ const getMarkerColor = (name: string) =>
 
 const getInitial = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
 
-const MAP_STYLE = "mapbox://styles/mapbox/light-v11";
+const MAP_STYLE = "mapbox://styles/mapbox/streets-v12";
 const DEFAULT_CENTER: [number, number] = [-73.9857, 40.7484];
 const DEFAULT_ZOOM = 12;
 const UPDATE_INTERVAL_MS = 60000;
