@@ -1094,11 +1094,11 @@ const advanceToNextChatRound = async (
          round_started_at = now(),
          turn_started_at = now(),
          current_turn_user_id = $4,
-         icebreaker_question = $5,
-         character_role_a = $6,
-         character_role_b = $7,
-         character_role_assigned_at_a = CASE WHEN $6 IS NULL THEN NULL ELSE now() END,
-         character_role_assigned_at_b = CASE WHEN $7 IS NULL THEN NULL ELSE now() END,
+         icebreaker_question = $5::text,
+         character_role_a = $6::text,
+         character_role_b = $7::text,
+         character_role_assigned_at_a = CASE WHEN $6::text IS NULL THEN NULL ELSE now() END,
+         character_role_assigned_at_b = CASE WHEN $7::text IS NULL THEN NULL ELSE now() END,
          typing_test_state = NULL,
          typing_test_started_at = NULL,
          typing_test_words = NULL,
@@ -1862,7 +1862,7 @@ export const fetchRankedMessages = async (
      JOIN users sender ON sender.id = m.sender_id
      JOIN ranked_matches rm ON rm.id = m.match_id
      WHERE m.match_id = $1
-       AND m.created_at >= rm.started_at
+       AND m.created_at >= COALESCE(rm.round_started_at, rm.started_at)
      ORDER BY m.created_at ASC`,
     [matchId]
   );
