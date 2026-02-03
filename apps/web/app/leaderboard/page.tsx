@@ -31,11 +31,40 @@ export default function LeaderboardPage() {
     setIsLoading(true);
     setError(null);
 
-    apiGet<{ entries: LeaderboardEntry[] }>("/leaderboard", token)
-      .then((payload) => {
+    const load = async () => {
+      try {
+        const payload = await apiGet<{ entries: LeaderboardEntry[] }>(
+          "/leaderboard",
+          token
+        );
+        if (isActive) {
+          setEntries(payload.entries ?? []);
+        }
+        return;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "";
+        if (!message.includes("Route /leaderboard not found")) {
+          throw err;
+        }
+      }
+
+      try {
+        const payload = await apiGet<{ entries: LeaderboardEntry[] }>(
+          "/ranked/leaderboard",
+          token
+        );
+        if (isActive) {
+          setEntries(payload.entries ?? []);
+        }
+      } catch (err) {
         if (!isActive) return;
-        setEntries(payload.entries ?? []);
-      })
+        setError(
+          err instanceof Error ? err.message : "Unable to load leaderboard."
+        );
+      }
+    };
+
+    load()
       .catch((err) => {
         if (!isActive) return;
         setError(err instanceof Error ? err.message : "Unable to load leaderboard.");
