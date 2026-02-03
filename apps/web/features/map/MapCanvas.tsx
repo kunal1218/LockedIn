@@ -1249,7 +1249,7 @@ export const MapCanvas = () => {
         <button
           type="button"
           onClick={() => setIsPlacingPin((prev) => !prev)}
-          className={`pointer-events-auto fixed top-[470px] right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full text-2xl font-bold text-white shadow-lg transition-all duration-200 ${
+          className={`pointer-events-auto fixed top-[480px] right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full text-2xl font-bold text-white shadow-lg transition-all duration-200 ${
             isPlacingPin
               ? "bg-red-500 hover:bg-red-600"
               : "bg-orange-500 hover:bg-orange-600"
