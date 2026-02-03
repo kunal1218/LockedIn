@@ -70,17 +70,17 @@ export const EventDetailCard = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="relative w-full max-h-[75vh] overflow-y-auto rounded-t-[32px] border border-card-border/60 bg-white/95 shadow-[0_24px_60px_rgba(27,26,23,0.2)]">
-        <div className="sticky top-0 z-10 flex items-start justify-between border-b border-card-border/60 bg-white/95 px-6 py-4">
+      <div className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-card-border/60 bg-white shadow-[0_24px_60px_rgba(27,26,23,0.25)] max-h-[85vh] animate-scale-in">
+        <div className="sticky top-0 z-10 flex items-start justify-between border-b border-card-border/60 bg-white px-6 py-4">
           <div>
             <div className="mb-2 flex items-center gap-2 text-sm text-muted">
-              <span className="text-2xl">{categoryIcon}</span>
+              <span className="text-3xl">{categoryIcon}</span>
               <span className="capitalize">{event.category}</span>
             </div>
             <h2 className="text-2xl font-semibold text-ink">{event.title}</h2>
@@ -95,7 +95,7 @@ export const EventDetailCard = ({
           </button>
         </div>
 
-        <div className="space-y-6 px-6 py-5">
+        <div className="flex-1 overflow-y-auto px-6 py-5">
           <div className="space-y-3">
             <div className="flex items-start gap-3">
               <span className="text-xl">📅</span>
@@ -194,7 +194,7 @@ export const EventDetailCard = ({
           )}
         </div>
 
-        <div className="sticky bottom-0 border-t border-card-border/60 bg-white/95 px-6 py-4">
+        <div className="sticky bottom-0 border-t border-card-border/60 bg-white px-6 py-4">
           <div className="space-y-3">
             {userStatus && (
               <p className="text-center text-xs text-muted">
@@ -246,6 +246,21 @@ export const EventDetailCard = ({
           </div>
         </div>
       </div>
+      <style>{`
+        @keyframes scale-in {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .animate-scale-in {
+          animation: scale-in 0.2s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
