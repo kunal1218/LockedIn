@@ -1087,7 +1087,7 @@ export const MapCanvas = () => {
       return;
     }
     const map = mapRef.current;
-    const paddingRight = showEventsSidebar && window.innerWidth > 640 ? 384 : 0;
+    const paddingRight = showEventsSidebar && window.innerWidth > 640 ? 320 : 0;
     map.easeTo({
       padding: { right: paddingRight },
       duration: 300,

@@ -66,12 +66,12 @@ export const EventsSidebar = ({
   return (
     <>
       <div
-        className="fixed inset-x-0 bottom-0 top-24 z-40 bg-ink/40 backdrop-blur-sm"
+        className="fixed inset-x-0 bottom-0 top-24 z-40 bg-ink/20 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="fixed right-0 top-24 z-50 flex h-[calc(100%-96px)] w-full flex-col bg-white shadow-2xl sm:w-96 animate-slide-in-right">
-        <div className="flex items-center justify-between border-b border-ink/10 p-6">
+      <div className="fixed right-0 top-24 z-50 flex h-[calc(100%-96px)] w-full flex-col bg-white/95 shadow-2xl backdrop-blur-md sm:w-80 animate-slide-in-right">
+        <div className="flex items-center justify-between border-b border-ink/10 bg-white/95 p-4 backdrop-blur-md">
           <div>
             <h2 className="text-2xl font-bold text-ink">Nearby Events</h2>
             <p className="text-sm text-muted">{events.length} events found</p>
@@ -86,7 +86,7 @@ export const EventsSidebar = ({
           </button>
         </div>
 
-        <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        <div className="flex-1 space-y-2 overflow-y-auto bg-white/80 p-3">
           {sortedEvents.length === 0 ? (
             <div className="py-12 text-center text-muted">
               <p className="mb-2 text-4xl">📍</p>
@@ -109,14 +109,14 @@ export const EventsSidebar = ({
                     onClose();
                   }
                 }}
-                className="cursor-pointer rounded-2xl border border-ink/10 bg-white p-4 transition hover:shadow-md"
+                className="cursor-pointer rounded-2xl border border-ink/10 bg-white/90 p-3 backdrop-blur-sm transition hover:bg-white hover:shadow-md"
               >
                 <div className="mb-2 flex items-start gap-3">
                   <span className="text-3xl">
                     {CATEGORY_ICONS[event.category] ?? CATEGORY_ICONS.other}
                   </span>
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold leading-tight text-ink">
+                    <h3 className="text-base font-semibold leading-tight text-ink">
                       {event.title}
                     </h3>
                     {event.venue_name && (
