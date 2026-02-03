@@ -47,3 +47,4 @@ Backend + DB (Railway)
 - Chat and map provider data are intentionally stubbed for MVP speed.
 - Mock data lives in `apps/web/features/*/mock.ts` and `apps/api/src/services/mockData.ts`.
 - Auth uses a `users` table in Postgres and stores sessions in Redis.
+
