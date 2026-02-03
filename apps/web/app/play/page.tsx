@@ -1722,6 +1722,14 @@ export default function RankedPlayPage() {
                   )}
                 </div>
               )}
+              {isIcebreakerRound &&
+                cleanedIcebreaker &&
+                !showCenterPanel &&
+                !showBlockingModal && (
+                  <div className="mb-3 flex items-center justify-center text-xs font-semibold text-muted">
+                    {cleanedIcebreaker}
+                  </div>
+                )}
               {displayIsJudge &&
                 isRolesRound &&
                 !showCenterPanel &&
