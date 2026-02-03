@@ -12,11 +12,12 @@ import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
 import { useAuth } from "@/features/auth";
 import { EventCreationForm } from "@/features/map/components/EventCreationForm";
+import { EventDetailCard } from "@/features/map/components/EventDetailCard";
 import { EventMarker } from "@/features/map/components/EventMarker";
 import { FriendPopup } from "@/features/map/components/FriendPopup";
 import { MapControls } from "@/features/map/components/MapControls";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
-import { createEvent, getNearbyEvents } from "@/lib/api/events";
+import { createEvent, getEventDetails, getNearbyEvents } from "@/lib/api/events";
 import {
   connectSocket,
   disconnectSocket,
@@ -222,16 +223,69 @@ export const MapCanvas = () => {
     return `${event.title} • ${timeLabel} • ${count} going`;
   }, []);
 
-  const handleSelectEvent = useCallback((event: EventWithDetails) => {
-    setSelectedEvent(event);
-    const map = mapRef.current;
-    if (map) {
-      map.easeTo({
-        center: [event.longitude, event.latitude],
-        zoom: Math.max(map.getZoom(), 14),
+  const handleEventClick = useCallback(
+    async (event: EventWithDetails) => {
+      if (!token) {
+        openAuthModal("login");
+        return;
+      }
+      try {
+        setSelectedEvent(event);
+        const details = await getEventDetails(event.id, token);
+        setSelectedEvent(details);
+
+        if (mapRef.current) {
+          mapRef.current.flyTo({
+            center: [details.longitude, details.latitude],
+            zoom: Math.max(mapRef.current.getZoom(), 15),
+            duration: 1000,
+          });
+        }
+      } catch (loadError) {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[map] failed to load event details", loadError);
+        }
+      }
+    },
+    [openAuthModal, token]
+  );
+
+  const handleEventRSVP = useCallback(
+    (eventId: number, status: "going" | "maybe" | "declined") => {
+      const isAttending = (value: string | null | undefined) =>
+        value === "going" || value === "maybe";
+      setEvents((prev) =>
+        prev.map((event) => {
+          if (event.id !== eventId) {
+            return event;
+          }
+          const prevAttending = isAttending(event.user_status);
+          const nextAttending = isAttending(status);
+          const delta = (nextAttending ? 1 : 0) - (prevAttending ? 1 : 0);
+          return {
+            ...event,
+            attendee_count: Math.max(0, event.attendee_count + delta),
+            user_status: status,
+          };
+        })
+      );
+
+      setSelectedEvent((current) => {
+        if (!current || current.id !== eventId) {
+          return current;
+        }
+        const prevAttending = isAttending(current.user_status);
+        const nextAttending = isAttending(status);
+        const delta = (nextAttending ? 1 : 0) - (prevAttending ? 1 : 0);
+        return {
+          ...current,
+          attendee_count: Math.max(0, current.attendee_count + delta),
+          user_status: status,
+        };
       });
-    }
-  }, []);
+    },
+    []
+  );
 
   const closeEventForm = useCallback(() => {
     setShowEventForm(false);
@@ -526,12 +580,12 @@ export const MapCanvas = () => {
             event={event}
             isSelected={isSelected}
             tooltip={tooltip}
-            onClick={handleSelectEvent}
+            onClick={handleEventClick}
           />
         );
       }
     },
-    [buildEventTooltip, handleSelectEvent]
+    [buildEventTooltip, handleEventClick]
   );
 
   useEffect(() => {
@@ -595,7 +649,7 @@ export const MapCanvas = () => {
             event={event}
             isSelected={selectedEvent?.id === event.id}
             tooltip={buildEventTooltip(event)}
-            onClick={handleSelectEvent}
+            onClick={handleEventClick}
           />
         );
         rootMap.set(event.id, root);
@@ -619,7 +673,6 @@ export const MapCanvas = () => {
     buildEventTooltip,
     eventClock,
     events,
-    handleSelectEvent,
     isMapReady,
     renderEventMarker,
     selectedEvent,
@@ -675,7 +728,22 @@ export const MapCanvas = () => {
       return;
     }
     if (updated !== selectedEvent) {
-      setSelectedEvent(updated);
+      setSelectedEvent((current) => {
+        if (!current || current.id !== updated.id) {
+          return current;
+        }
+        return {
+          ...current,
+          ...updated,
+          description: current.description ?? updated.description,
+          attendees:
+            current.attendees?.length && current.attendees.length > 0
+              ? current.attendees
+              : updated.attendees,
+          creator: current.creator ?? updated.creator,
+          user_status: current.user_status ?? updated.user_status,
+        };
+      });
     }
   }, [events, selectedEvent]);
 
@@ -1154,6 +1222,11 @@ export const MapCanvas = () => {
             : event
         )
       );
+      setSelectedEvent((current) =>
+        current && current.id === data.eventId
+          ? { ...current, attendee_count: data.newAttendeeCount }
+          : current
+      );
     };
 
     const handleCheckin = (data: { userName?: string }) => {
@@ -1337,6 +1410,13 @@ export const MapCanvas = () => {
         <FriendPopup
           friend={selectedFriend}
           onClose={() => setSelectedFriend(null)}
+        />
+      )}
+      {selectedEvent && (
+        <EventDetailCard
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+          onRSVP={(status) => handleEventRSVP(selectedEvent.id, status)}
         />
       )}
       {showEventForm && newEventLocation && (
