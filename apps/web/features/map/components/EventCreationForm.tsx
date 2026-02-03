@@ -303,7 +303,7 @@ export const EventCreationForm = ({
           </div>
         </div>
       </div>
-      <style jsx global>{`
+      <style>{`
         @keyframes slide-up {
           from {
             transform: translateY(100%);
