@@ -1233,8 +1233,11 @@ export const MapCanvas = () => {
         isAuthenticated={isAuthenticated}
         shareLocation={settings.shareLocation}
         ghostMode={settings.ghostMode}
+        isPlacingPin={isPlacingPin}
         onToggleShare={handleToggleShare}
         onToggleGhost={handleToggleGhost}
+        onToggleCreateEvent={() => setIsPlacingPin((prev) => !prev)}
+        showCreateEvent={!showEventForm}
         onLogin={() => openAuthModal("login")}
         onRetry={handleRetry}
         error={error}
@@ -1244,21 +1247,6 @@ export const MapCanvas = () => {
         <div className="pointer-events-none absolute left-1/2 top-24 z-30 -translate-x-1/2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(27,26,23,0.25)] animate-bounce">
           📍 Click anywhere on the map to place your event
         </div>
-      )}
-      {!showEventForm && (
-        <button
-          type="button"
-          onClick={() => setIsPlacingPin((prev) => !prev)}
-          className={`pointer-events-auto fixed top-[480px] right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full text-2xl font-bold text-white shadow-lg transition-all duration-200 ${
-            isPlacingPin
-              ? "bg-red-500 hover:bg-red-600"
-              : "bg-orange-500 hover:bg-orange-600"
-          }`}
-          title={isPlacingPin ? "Cancel" : "Create Event"}
-          aria-label={isPlacingPin ? "Cancel pin drop" : "Create event"}
-        >
-          {isPlacingPin ? "×" : "+"}
-        </button>
       )}
       <div className="absolute bottom-6 right-4 z-20 flex flex-col gap-2 pointer-events-none">
         <div className="flex flex-col gap-2 pointer-events-auto">

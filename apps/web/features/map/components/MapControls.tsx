@@ -8,8 +8,11 @@ type MapControlsProps = {
   isAuthenticated: boolean;
   shareLocation: boolean;
   ghostMode: boolean;
+  isPlacingPin?: boolean;
   onToggleShare: () => void;
   onToggleGhost: () => void;
+  onToggleCreateEvent?: () => void;
+  showCreateEvent?: boolean;
   onLogin: () => void;
   onRetry?: () => void;
   error?: string | null;
@@ -20,8 +23,11 @@ export const MapControls = ({
   isAuthenticated,
   shareLocation,
   ghostMode,
+  isPlacingPin,
   onToggleShare,
   onToggleGhost,
+  onToggleCreateEvent,
+  showCreateEvent = true,
   onLogin,
   onRetry,
   error,
@@ -117,6 +123,24 @@ export const MapControls = ({
           </button>
         </div>
       </div>
+
+      {showCreateEvent && onToggleCreateEvent && (
+        <div className="pointer-events-auto flex justify-end">
+          <button
+            type="button"
+            onClick={onToggleCreateEvent}
+            className={`flex h-14 w-14 items-center justify-center rounded-full text-2xl font-bold text-white shadow-lg transition-all duration-200 ${
+              isPlacingPin
+                ? "bg-red-500 hover:bg-red-600"
+                : "bg-orange-500 hover:bg-orange-600"
+            }`}
+            title={isPlacingPin ? "Cancel" : "Create Event"}
+            aria-label={isPlacingPin ? "Cancel pin drop" : "Create event"}
+          >
+            {isPlacingPin ? "×" : "+"}
+          </button>
+        </div>
+      )}
 
       {!isAuthenticated && (
         <div className="pointer-events-auto">
