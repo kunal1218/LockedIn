@@ -66,11 +66,11 @@ export const EventsSidebar = ({
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-ink/40 backdrop-blur-sm"
+        className="fixed inset-x-0 bottom-0 top-24 z-40 bg-ink/40 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="fixed right-0 top-0 z-50 flex h-full w-full flex-col bg-white shadow-2xl sm:w-96 animate-slide-in-right">
+      <div className="fixed right-0 top-24 z-50 flex h-[calc(100%-96px)] w-full flex-col bg-white shadow-2xl sm:w-96 animate-slide-in-right">
         <div className="flex items-center justify-between border-b border-ink/10 p-6">
           <div>
             <h2 className="text-2xl font-bold text-ink">Nearby Events</h2>
