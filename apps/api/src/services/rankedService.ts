@@ -82,13 +82,13 @@ const rankedMatchColumns = `
 
 const DEFAULT_LIVES = 3;
 const TURN_SECONDS = 15;
-const ICEBREAKER_SECONDS = 30;
-const ROLE_ROUND_SECONDS = 90;
+const ICEBREAKER_SECONDS = 60;
+const ROLE_ROUND_SECONDS = 60;
 const WIN_REWARD_COINS = 100;
 const TYPING_TEST_WORD_COUNT = 10;
 const TYPING_TEST_COUNTDOWN_SECONDS = 3;
 const TYPING_TEST_RESULT_SECONDS = 3;
-const TYPING_TEST_MAX_SECONDS = 90;
+const TYPING_TEST_MAX_SECONDS = 60;
 const TYPING_TEST_MIN_WORD_LENGTH = 3;
 const TYPING_TEST_MAX_WORD_LENGTH = 8;
 const DEBUG_RANKED = process.env.RANKED_DEBUG === "true";
@@ -1379,6 +1379,7 @@ const maybeAdvanceTypingTestState = async (
       logRanked("typingTest:resultElapsed", {
         matchId: match.id,
         roundNumber: match.round_number ?? null,
+        elapsedMs: Date.now() - resultAtMs,
       });
       const cleared = await db.query(
         `UPDATE ranked_matches
@@ -1396,6 +1397,11 @@ const maybeAdvanceTypingTestState = async (
       if ((cleared.rowCount ?? 0) > 0) {
         const row = cleared.rows[0] as RankedMatchRow;
         return advanceToNextChatRound(row);
+      }
+      logRanked("typingTest:resultAdvanceNoop", { matchId: match.id });
+      const refreshed = await getMatch(match.id);
+      if (refreshed && refreshed.typing_test_state !== "result") {
+        return advanceToNextChatRound(refreshed);
       }
     }
   }
