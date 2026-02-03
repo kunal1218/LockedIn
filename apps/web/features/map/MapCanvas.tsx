@@ -1249,7 +1249,7 @@ export const MapCanvas = () => {
         <button
           type="button"
           onClick={() => setIsPlacingPin((prev) => !prev)}
-          className={`pointer-events-auto absolute bottom-28 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full text-2xl font-bold text-white shadow-[0_18px_40px_rgba(27,26,23,0.25)] transition ${
+          className={`pointer-events-auto absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full px-6 py-3 text-base font-semibold text-white shadow-[0_18px_40px_rgba(27,26,23,0.25)] transition ${
             isPlacingPin
               ? "bg-red-500 hover:bg-red-600"
               : "bg-accent hover:bg-accent/90"
@@ -1257,7 +1257,8 @@ export const MapCanvas = () => {
           title={isPlacingPin ? "Cancel" : "Create Event"}
           aria-label={isPlacingPin ? "Cancel pin drop" : "Create event"}
         >
-          {isPlacingPin ? "×" : "+"}
+          <span className="text-xl font-bold">{isPlacingPin ? "×" : "+"}</span>
+          {isPlacingPin ? "Cancel" : "Create Event"}
         </button>
       )}
       <div className="absolute bottom-6 right-4 z-20 flex flex-col gap-2 pointer-events-none">
