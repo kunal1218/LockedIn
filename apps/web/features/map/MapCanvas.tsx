@@ -45,7 +45,7 @@ const getMarkerColor = (name: string) =>
 
 const getInitial = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
 
-const MAP_STYLE = "mapbox://styles/mapbox/dark-v11";
+const MAP_STYLE = "mapbox://styles/mapbox/light-v11";
 const DEFAULT_CENTER: [number, number] = [-73.9857, 40.7484];
 const DEFAULT_ZOOM = 12;
 const UPDATE_INTERVAL_MS = 60000;
@@ -519,7 +519,7 @@ export const MapCanvas = () => {
       const inner = document.createElement("div");
       inner.dataset.role = "inner";
       inner.className =
-        "relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white text-sm font-semibold text-white shadow-[0_10px_24px_rgba(0,0,0,0.25)]";
+        "relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white text-sm font-semibold text-white shadow-[0_2px_6px_rgba(0,0,0,0.2)]";
       inner.style.backgroundColor = getMarkerColor(friend.name);
 
       const fallback = getInitial(friend.name);
@@ -545,7 +545,7 @@ export const MapCanvas = () => {
       const label = document.createElement("div");
       label.dataset.role = "label";
       label.className =
-        "absolute left-1/2 top-full mt-1 -translate-x-1/2 rounded-full bg-ink/70 px-2 py-0.5 text-[10px] font-semibold text-white/80 shadow-sm backdrop-blur";
+        "absolute left-1/2 top-full mt-1 -translate-x-1/2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white shadow-[0_2px_6px_rgba(0,0,0,0.2)] backdrop-blur";
       label.textContent = formatRelativeTime(friend.lastUpdated);
       label.style.pointerEvents = "none";
       wrapper.appendChild(label);
@@ -1364,7 +1364,7 @@ export const MapCanvas = () => {
         <button
           type="button"
           onClick={() => setShowEventsSidebar(true)}
-          className="pointer-events-auto fixed bottom-6 left-6 z-30 flex items-center gap-2 rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-orange-600"
+          className="pointer-events-auto fixed bottom-6 left-6 z-30 flex items-center gap-2 rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(255,107,53,0.3)] transition hover:bg-orange-600"
         >
           <span className="text-xl">📍</span>
           View Events{events.length > 0 ? ` (${events.length})` : ""}
@@ -1380,7 +1380,7 @@ export const MapCanvas = () => {
           <button
             type="button"
             aria-label="Zoom to my location"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-card-border/60 bg-white/85 text-ink shadow-[0_12px_30px_rgba(27,26,23,0.18)] backdrop-blur transition hover:-translate-y-0.5"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#F3F4F6]"
             onClick={() => {
               centerOnUser().catch(() => {
                 // Error surfaced via setError.
@@ -1403,7 +1403,7 @@ export const MapCanvas = () => {
           <button
             type="button"
             aria-label="Zoom to campus"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-card-border/60 bg-white/85 text-ink shadow-[0_12px_30px_rgba(27,26,23,0.18)] backdrop-blur transition hover:-translate-y-0.5"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#F3F4F6]"
             onClick={zoomToCampus}
           >
             <svg
@@ -1424,7 +1424,7 @@ export const MapCanvas = () => {
             <button
               type="button"
               aria-label="Zoom in"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-card-border/60 bg-white/85 text-ink shadow-[0_12px_30px_rgba(27,26,23,0.18)] backdrop-blur transition hover:-translate-y-0.5"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#F3F4F6]"
               onClick={zoomIn}
             >
               <svg
@@ -1442,7 +1442,7 @@ export const MapCanvas = () => {
             <button
               type="button"
               aria-label="Zoom out"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-card-border/60 bg-white/85 text-ink shadow-[0_12px_30px_rgba(27,26,23,0.18)] backdrop-blur transition hover:-translate-y-0.5"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#F3F4F6]"
               onClick={zoomOut}
             >
               <svg

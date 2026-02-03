@@ -77,11 +77,11 @@ export const MapControls = ({
           style={{ backgroundColor: statusColor }}
         />
       </div>
-      <div className="pointer-events-auto rounded-2xl border border-card-border/60 bg-white/85 p-4 text-xs text-ink/80 shadow-[0_18px_40px_rgba(27,26,23,0.18)] backdrop-blur">
+      <div className="pointer-events-auto rounded-2xl border border-black/10 bg-white/95 p-4 text-xs text-[#6B7280] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-ink">Share my location</p>
-            <p className="mt-1 text-[11px] text-muted">
+            <p className="text-sm font-semibold text-[#1F2937]">Share my location</p>
+            <p className="mt-1 text-[11px] text-[#6B7280]">
               Your friends can see you for the next 30 minutes.
             </p>
           </div>
@@ -102,11 +102,11 @@ export const MapControls = ({
         </div>
       </div>
 
-      <div className="pointer-events-auto rounded-2xl border border-card-border/60 bg-white/85 p-4 text-xs text-ink/80 shadow-[0_18px_40px_rgba(27,26,23,0.18)] backdrop-blur">
+      <div className="pointer-events-auto rounded-2xl border border-black/10 bg-white/95 p-4 text-xs text-[#6B7280] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-ink">Go ghost 👻</p>
-            <p className="mt-1 text-[11px] text-muted">
+            <p className="text-sm font-semibold text-[#1F2937]">Go ghost 👻</p>
+            <p className="mt-1 text-[11px] text-[#6B7280]">
               Hide instantly without toggling sharing off.
             </p>
           </div>
@@ -115,7 +115,7 @@ export const MapControls = ({
             className={`min-h-[44px] rounded-full border px-4 py-2 text-[11px] font-semibold transition ${
               ghostMode
                 ? "border-accent bg-accent/15 text-accent"
-                : "border-card-border/70 text-ink/70 hover:border-accent/40"
+                : "border-black/10 text-[#6B7280] hover:border-accent/40"
             }`}
             onClick={onToggleGhost}
           >
@@ -167,7 +167,7 @@ export const MapControls = ({
       )}
 
       {isLoading && (
-        <div className="pointer-events-auto rounded-2xl border border-card-border/60 bg-white/80 px-4 py-3 text-xs text-muted backdrop-blur">
+        <div className="pointer-events-auto rounded-2xl border border-black/10 bg-white/90 px-4 py-3 text-xs text-[#6B7280] backdrop-blur">
           Loading friend locations...
         </div>
       )}
