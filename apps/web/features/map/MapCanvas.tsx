@@ -12,11 +12,13 @@ import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
 import { useAuth } from "@/features/auth";
 import { EventCreationForm } from "@/features/map/components/EventCreationForm";
+import { EventDetailCard } from "@/features/map/components/EventDetailCard";
 import { EventMarker } from "@/features/map/components/EventMarker";
 import { FriendPopup } from "@/features/map/components/FriendPopup";
 import { MapControls } from "@/features/map/components/MapControls";
+import { EventsSidebar } from "@/features/map/components/EventsSidebar";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
-import { createEvent, getNearbyEvents } from "@/lib/api/events";
+import { createEvent, getEventDetails, getNearbyEvents } from "@/lib/api/events";
 import {
   connectSocket,
   disconnectSocket,
@@ -43,7 +45,7 @@ const getMarkerColor = (name: string) =>
 
 const getInitial = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
 
-const MAP_STYLE = "mapbox://styles/mapbox/dark-v11";
+const MAP_STYLE = "mapbox://styles/mapbox/streets-v12";
 const DEFAULT_CENTER: [number, number] = [-73.9857, 40.7484];
 const DEFAULT_ZOOM = 12;
 const UPDATE_INTERVAL_MS = 60000;
@@ -99,6 +101,7 @@ export const MapCanvas = () => {
     null
   );
   const [isPlacingPin, setIsPlacingPin] = useState(false);
+  const [showEventsSidebar, setShowEventsSidebar] = useState(false);
   const [showEventForm, setShowEventForm] = useState(false);
   const [newEventLocation, setNewEventLocation] = useState<{
     latitude: number;
@@ -222,16 +225,99 @@ export const MapCanvas = () => {
     return `${event.title} • ${timeLabel} • ${count} going`;
   }, []);
 
-  const handleSelectEvent = useCallback((event: EventWithDetails) => {
-    setSelectedEvent(event);
-    const map = mapRef.current;
-    if (map) {
-      map.easeTo({
-        center: [event.longitude, event.latitude],
-        zoom: Math.max(map.getZoom(), 14),
+  const handleEventClick = useCallback(
+    async (event: EventWithDetails) => {
+      if (!token) {
+        openAuthModal("login");
+        return;
+      }
+      try {
+        setSelectedEvent(event);
+        const details = await getEventDetails(event.id, token);
+        setSelectedEvent(details);
+
+        if (mapRef.current) {
+          mapRef.current.flyTo({
+            center: [details.longitude, details.latitude],
+            zoom: Math.max(mapRef.current.getZoom(), 15),
+            duration: 1000,
+          });
+        }
+      } catch (loadError) {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[map] failed to load event details", loadError);
+        }
+      }
+    },
+    [openAuthModal, token]
+  );
+
+  const handleEventClickById = useCallback(
+    async (eventId: number) => {
+      const existing = events.find((event) => event.id === eventId);
+      if (existing) {
+        await handleEventClick(existing);
+        return;
+      }
+      if (!token) {
+        openAuthModal("login");
+        return;
+      }
+      try {
+        const details = await getEventDetails(eventId, token);
+        setSelectedEvent(details);
+        if (mapRef.current) {
+          mapRef.current.flyTo({
+            center: [details.longitude, details.latitude],
+            zoom: Math.max(mapRef.current.getZoom(), 15),
+            duration: 1000,
+          });
+        }
+      } catch (loadError) {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[map] failed to load event details", loadError);
+        }
+      }
+    },
+    [events, handleEventClick, openAuthModal, token]
+  );
+
+  const handleEventRSVP = useCallback(
+    (eventId: number, status: "going" | "maybe" | "declined") => {
+      const isAttending = (value: string | null | undefined) =>
+        value === "going" || value === "maybe";
+      setEvents((prev) =>
+        prev.map((event) => {
+          if (event.id !== eventId) {
+            return event;
+          }
+          const prevAttending = isAttending(event.user_status);
+          const nextAttending = isAttending(status);
+          const delta = (nextAttending ? 1 : 0) - (prevAttending ? 1 : 0);
+          return {
+            ...event,
+            attendee_count: Math.max(0, event.attendee_count + delta),
+            user_status: status,
+          };
+        })
+      );
+
+      setSelectedEvent((current) => {
+        if (!current || current.id !== eventId) {
+          return current;
+        }
+        const prevAttending = isAttending(current.user_status);
+        const nextAttending = isAttending(status);
+        const delta = (nextAttending ? 1 : 0) - (prevAttending ? 1 : 0);
+        return {
+          ...current,
+          attendee_count: Math.max(0, current.attendee_count + delta),
+          user_status: status,
+        };
       });
-    }
-  }, []);
+    },
+    []
+  );
 
   const closeEventForm = useCallback(() => {
     setShowEventForm(false);
@@ -433,7 +519,7 @@ export const MapCanvas = () => {
       const inner = document.createElement("div");
       inner.dataset.role = "inner";
       inner.className =
-        "relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white text-sm font-semibold text-white shadow-[0_10px_24px_rgba(0,0,0,0.25)]";
+        "relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white text-sm font-semibold text-white shadow-[0_2px_6px_rgba(0,0,0,0.2)]";
       inner.style.backgroundColor = getMarkerColor(friend.name);
 
       const fallback = getInitial(friend.name);
@@ -459,7 +545,7 @@ export const MapCanvas = () => {
       const label = document.createElement("div");
       label.dataset.role = "label";
       label.className =
-        "absolute left-1/2 top-full mt-1 -translate-x-1/2 rounded-full bg-ink/70 px-2 py-0.5 text-[10px] font-semibold text-white/80 shadow-sm backdrop-blur";
+        "absolute left-1/2 top-full mt-1 -translate-x-1/2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white shadow-[0_2px_6px_rgba(0,0,0,0.2)] backdrop-blur";
       label.textContent = formatRelativeTime(friend.lastUpdated);
       label.style.pointerEvents = "none";
       wrapper.appendChild(label);
@@ -526,12 +612,12 @@ export const MapCanvas = () => {
             event={event}
             isSelected={isSelected}
             tooltip={tooltip}
-            onClick={handleSelectEvent}
+            onClick={handleEventClick}
           />
         );
       }
     },
-    [buildEventTooltip, handleSelectEvent]
+    [buildEventTooltip, handleEventClick]
   );
 
   useEffect(() => {
@@ -595,7 +681,7 @@ export const MapCanvas = () => {
             event={event}
             isSelected={selectedEvent?.id === event.id}
             tooltip={buildEventTooltip(event)}
-            onClick={handleSelectEvent}
+            onClick={handleEventClick}
           />
         );
         rootMap.set(event.id, root);
@@ -619,7 +705,6 @@ export const MapCanvas = () => {
     buildEventTooltip,
     eventClock,
     events,
-    handleSelectEvent,
     isMapReady,
     renderEventMarker,
     selectedEvent,
@@ -675,7 +760,22 @@ export const MapCanvas = () => {
       return;
     }
     if (updated !== selectedEvent) {
-      setSelectedEvent(updated);
+      setSelectedEvent((current) => {
+        if (!current || current.id !== updated.id) {
+          return current;
+        }
+        return {
+          ...current,
+          ...updated,
+          description: current.description ?? updated.description,
+          attendees:
+            current.attendees?.length && current.attendees.length > 0
+              ? current.attendees
+              : updated.attendees,
+          creator: current.creator ?? updated.creator,
+          user_status: current.user_status ?? updated.user_status,
+        };
+      });
     }
   }, [events, selectedEvent]);
 
@@ -986,6 +1086,18 @@ export const MapCanvas = () => {
     if (!mapRef.current || !isMapReady) {
       return;
     }
+    const map = mapRef.current;
+    const paddingLeft = showEventsSidebar && window.innerWidth >= 640 ? 400 : 0;
+    map.easeTo({
+      padding: { left: paddingLeft, right: 0 },
+      duration: 300,
+    });
+  }, [isMapReady, showEventsSidebar]);
+
+  useEffect(() => {
+    if (!mapRef.current || !isMapReady) {
+      return;
+    }
 
     const map = mapRef.current;
     const handleClick = (event: mapboxgl.MapMouseEvent) => {
@@ -1154,6 +1266,11 @@ export const MapCanvas = () => {
             : event
         )
       );
+      setSelectedEvent((current) =>
+        current && current.id === data.eventId
+          ? { ...current, attendee_count: data.newAttendeeCount }
+          : current
+      );
     };
 
     const handleCheckin = (data: { userName?: string }) => {
@@ -1233,40 +1350,37 @@ export const MapCanvas = () => {
         isAuthenticated={isAuthenticated}
         shareLocation={settings.shareLocation}
         ghostMode={settings.ghostMode}
+        isPlacingPin={isPlacingPin}
         onToggleShare={handleToggleShare}
         onToggleGhost={handleToggleGhost}
+        onToggleCreateEvent={() => setIsPlacingPin((prev) => !prev)}
+        showCreateEvent={!showEventForm}
         onLogin={() => openAuthModal("login")}
         onRetry={handleRetry}
         error={error}
         isLoading={isLoading}
       />
+      {!showEventsSidebar && (
+        <button
+          type="button"
+          onClick={() => setShowEventsSidebar(true)}
+          className="pointer-events-auto fixed bottom-6 left-6 z-30 flex items-center gap-2 rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(255,107,53,0.3)] transition hover:bg-orange-600"
+        >
+          <span className="text-xl">📍</span>
+          View Events{events.length > 0 ? ` (${events.length})` : ""}
+        </button>
+      )}
       {isPlacingPin && (
         <div className="pointer-events-none absolute left-1/2 top-24 z-30 -translate-x-1/2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(27,26,23,0.25)] animate-bounce">
           📍 Click anywhere on the map to place your event
         </div>
-      )}
-      {!showEventForm && (
-        <button
-          type="button"
-          onClick={() => setIsPlacingPin((prev) => !prev)}
-          className={`pointer-events-auto absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full px-6 py-3 text-base font-semibold text-white shadow-[0_18px_40px_rgba(27,26,23,0.25)] transition ${
-            isPlacingPin
-              ? "bg-red-500 hover:bg-red-600"
-              : "bg-accent hover:bg-accent/90"
-          }`}
-          title={isPlacingPin ? "Cancel" : "Create Event"}
-          aria-label={isPlacingPin ? "Cancel pin drop" : "Create event"}
-        >
-          <span className="text-xl font-bold">{isPlacingPin ? "×" : "+"}</span>
-          {isPlacingPin ? "Cancel" : "Create Event"}
-        </button>
       )}
       <div className="absolute bottom-6 right-4 z-20 flex flex-col gap-2 pointer-events-none">
         <div className="flex flex-col gap-2 pointer-events-auto">
           <button
             type="button"
             aria-label="Zoom to my location"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-card-border/60 bg-white/85 text-ink shadow-[0_12px_30px_rgba(27,26,23,0.18)] backdrop-blur transition hover:-translate-y-0.5"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#F3F4F6]"
             onClick={() => {
               centerOnUser().catch(() => {
                 // Error surfaced via setError.
@@ -1289,7 +1403,7 @@ export const MapCanvas = () => {
           <button
             type="button"
             aria-label="Zoom to campus"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-card-border/60 bg-white/85 text-ink shadow-[0_12px_30px_rgba(27,26,23,0.18)] backdrop-blur transition hover:-translate-y-0.5"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#F3F4F6]"
             onClick={zoomToCampus}
           >
             <svg
@@ -1310,7 +1424,7 @@ export const MapCanvas = () => {
             <button
               type="button"
               aria-label="Zoom in"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-card-border/60 bg-white/85 text-ink shadow-[0_12px_30px_rgba(27,26,23,0.18)] backdrop-blur transition hover:-translate-y-0.5"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#F3F4F6]"
               onClick={zoomIn}
             >
               <svg
@@ -1328,7 +1442,7 @@ export const MapCanvas = () => {
             <button
               type="button"
               aria-label="Zoom out"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-card-border/60 bg-white/85 text-ink shadow-[0_12px_30px_rgba(27,26,23,0.18)] backdrop-blur transition hover:-translate-y-0.5"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#F3F4F6]"
               onClick={zoomOut}
             >
               <svg
@@ -1350,6 +1464,21 @@ export const MapCanvas = () => {
         <FriendPopup
           friend={selectedFriend}
           onClose={() => setSelectedFriend(null)}
+        />
+      )}
+      {showEventsSidebar && (
+        <EventsSidebar
+          events={events}
+          onClose={() => setShowEventsSidebar(false)}
+          onEventClick={handleEventClickById}
+          userLocation={newEventLocation}
+        />
+      )}
+      {selectedEvent && (
+        <EventDetailCard
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+          onRSVP={(status) => handleEventRSVP(selectedEvent.id, status)}
         />
       )}
       {showEventForm && newEventLocation && (
