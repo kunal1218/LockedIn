@@ -31,7 +31,7 @@ export default function LeaderboardPage() {
     setIsLoading(true);
     setError(null);
 
-    apiGet<{ entries: LeaderboardEntry[] }>("/ranked/leaderboard", token)
+    apiGet<{ entries: LeaderboardEntry[] }>("/leaderboard", token)
       .then((payload) => {
         if (!isActive) return;
         setEntries(payload.entries ?? []);
