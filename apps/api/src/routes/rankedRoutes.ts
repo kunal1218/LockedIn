@@ -13,6 +13,7 @@ import {
   postRankedSmite,
   deleteRankedMessage,
   postRankedVote,
+  getRankedLeaderboardHandler,
 } from "../controllers/rankedController";
 
 const router = Router();
@@ -30,5 +31,6 @@ router.patch("/match/:matchId/typing", patchRankedTyping);
 router.post("/match/:matchId/typing-test", postRankedTypingTest);
 router.post("/match/:matchId/smite", postRankedSmite);
 router.post("/match/:matchId/vote", postRankedVote);
+router.get("/leaderboard", getRankedLeaderboardHandler);
 
 export default router;

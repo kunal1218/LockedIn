@@ -107,12 +107,17 @@ export const SiteHeader = () => {
             </Button>
           ) : (
             <>
-              <div className="flex items-center gap-1 rounded-full border border-card-border/70 bg-white/80 px-3 py-1 text-xs font-semibold text-ink shadow-sm">
+              <Link
+                href="/leaderboard"
+                onClick={handleNavClick("/leaderboard")}
+                aria-label="Leaderboard"
+                className="flex items-center gap-1 rounded-full border border-card-border/70 bg-white/80 px-3 py-1 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-accent/50"
+              >
                 <span role="img" aria-label="coins">
                   🪙
                 </span>
                 <span>{coinCount}</span>
-              </div>
+              </Link>
               <Link
                 href="/notifications"
                 onClick={handleNavClick("/notifications")}

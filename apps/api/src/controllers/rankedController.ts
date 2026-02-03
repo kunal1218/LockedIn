@@ -14,6 +14,7 @@ import {
   deleteRankedMessageById,
   smiteRankedOpponent,
   submitJudgeVote,
+  getRankedLeaderboard,
 } from "../services/rankedService";
 
 const getToken = (req: Request) => {
@@ -224,6 +225,18 @@ export const postRankedSmite = async (req: Request, res: Response) => {
     const matchId = parseMatchId(req.params?.matchId);
     await smiteRankedOpponent({ matchId, userId: user.id });
     res.status(204).end();
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const getRankedLeaderboardHandler = async (req: Request, res: Response) => {
+  try {
+    await requireUser(req);
+    const rawLimit = typeof req.query?.limit === "string" ? Number(req.query.limit) : 10;
+    const limit = Number.isFinite(rawLimit) ? rawLimit : 10;
+    const entries = await getRankedLeaderboard(limit);
+    res.json({ entries });
   } catch (error) {
     handleError(res, error);
   }
