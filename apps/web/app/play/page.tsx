@@ -99,6 +99,7 @@ export default function RankedPlayPage() {
   const [isTypingSubmitting, setIsTypingSubmitting] = useState(false);
   const [typingModalTick, setTypingModalTick] = useState(0);
   const [typingTestTick, setTypingTestTick] = useState(0);
+  const [roundTick, setRoundTick] = useState(0);
   const [roleModalTick, setRoleModalTick] = useState(0);
   const [roleModalStartMs, setRoleModalStartMs] = useState<number | null>(null);
   const [isSmiting, setIsSmiting] = useState(false);
@@ -221,7 +222,7 @@ export default function RankedPlayPage() {
     const nowMs = Date.now() - serverTimeOffsetRef.current;
     const remainingMs = CHAT_ROUND_SECONDS * 1000 - (nowMs - startedMs);
     return Math.max(0, Math.ceil(remainingMs / 1000));
-  }, [isIcebreakerRound, isRolesRound, roundPhase, roundStartedAt]);
+  }, [isIcebreakerRound, isRolesRound, roundPhase, roundStartedAt, roundTick]);
   const roundProgress = useMemo(() => {
     if (roundTimeLeft === null) {
       return 0;
@@ -756,6 +757,22 @@ export default function RankedPlayPage() {
     }, 250);
     return () => window.clearInterval(interval);
   }, [isTypingTestActive]);
+
+  useEffect(() => {
+    if (!isMatched) {
+      return;
+    }
+    if (!isIcebreakerRound && !isRolesRound) {
+      return;
+    }
+    if (roundPhase !== "chat") {
+      return;
+    }
+    const interval = window.setInterval(() => {
+      setRoundTick(Date.now());
+    }, 250);
+    return () => window.clearInterval(interval);
+  }, [isMatched, isIcebreakerRound, isRolesRound, roundPhase, roundStartedAt]);
 
   useEffect(() => {
     if (roleModalStartMs === null) {
