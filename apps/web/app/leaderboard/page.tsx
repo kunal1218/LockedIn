@@ -83,7 +83,9 @@ export default function LeaderboardPage() {
     <main className="mx-auto w-full max-w-5xl px-4 pb-20">
       <div className="flex flex-col items-start gap-2 pt-6">
         <h1 className="font-display text-2xl font-semibold text-ink">Leaderboard</h1>
-        <p className="text-sm text-muted">Top 10 players by coins earned this month.</p>
+        <p className="text-sm text-muted">
+          Whoever has the most coins at the end of every month wins a prize!
+        </p>
       </div>
 
       <Card className="mt-6">
