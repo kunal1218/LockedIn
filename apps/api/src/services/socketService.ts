@@ -1,5 +1,5 @@
 import type { Server as HttpServer } from "http";
-import { Server } from "socket.io";
+import { Server, type Socket } from "socket.io";
 import { getUserFromToken } from "./authService";
 
 let io: Server | null = null;
@@ -37,14 +37,17 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
 
   io = new Server(httpServer, {
     cors: {
-      origin: (origin, callback) => {
+      origin: (
+        origin: string | undefined,
+        callback: (error: Error | null, allow?: boolean) => void
+      ) => {
         callback(null, isAllowedOrigin(origin));
       },
       credentials: true,
     },
   });
 
-  io.use(async (socket, next) => {
+  io.use(async (socket: Socket, next: (error?: Error) => void) => {
     try {
       const token =
         (socket.handshake.auth as { token?: string } | undefined)?.token ?? "";
@@ -65,7 +68,7 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
     }
   });
 
-  io.on("connection", (socket) => {
+  io.on("connection", (socket: Socket) => {
     const userId = socket.data.userId as string | undefined;
     if (!userId) {
       socket.disconnect(true);

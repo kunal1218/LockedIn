@@ -752,7 +752,8 @@ export const applyPokerAction = async (
   if (session.status !== "in_hand") {
     throw new PokerError("No active hand. Deal a new hand to play.", 400);
   }
-  if (session.turn !== "player") {
+  const isPlayerTurn = session.turn === "player";
+  if (!isPlayerTurn) {
     throw new PokerError("Waiting for dealer bot.", 400);
   }
 
