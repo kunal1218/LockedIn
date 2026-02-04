@@ -1727,28 +1727,31 @@ export default function RankedPlayPage() {
   return (
     <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-6 flex flex-col">
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setActiveGame("covo")}
-          className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-            activeGame === "covo"
-              ? "bg-accent text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)]"
-              : "border border-card-border/70 bg-white/80 text-ink/80 hover:border-accent/40 hover:text-ink"
-          }`}
-        >
-          Covo Game
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveGame("poker")}
-          className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-            activeGame === "poker"
-              ? "bg-accent text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)]"
-              : "border border-card-border/70 bg-white/80 text-ink/80 hover:border-accent/40 hover:text-ink"
-          }`}
-        >
-          Poker
-        </button>
+        <div className="inline-flex overflow-hidden rounded-2xl border border-card-border/70 bg-white/70 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setActiveGame("covo")}
+            className={`px-5 py-2 text-xs font-semibold transition ${
+              activeGame === "covo"
+                ? "bg-white text-ink shadow-[0_6px_16px_rgba(15,23,42,0.12)]"
+                : "bg-card-border/20 text-muted hover:bg-white/80 hover:text-ink"
+            }`}
+          >
+            Covo Game
+          </button>
+          <div className="h-full w-px bg-card-border/60" />
+          <button
+            type="button"
+            onClick={() => setActiveGame("poker")}
+            className={`px-5 py-2 text-xs font-semibold transition ${
+              activeGame === "poker"
+                ? "bg-white text-ink shadow-[0_6px_16px_rgba(15,23,42,0.12)]"
+                : "bg-card-border/20 text-muted hover:bg-white/80 hover:text-ink"
+            }`}
+          >
+            Poker
+          </button>
+        </div>
       </div>
       {activeGame === "covo" ? (
         <Card className="relative grid flex-1 min-h-[520px] grid-rows-[auto_1fr_auto] gap-3 overflow-hidden border border-card-border/70 bg-white/85 shadow-sm">
