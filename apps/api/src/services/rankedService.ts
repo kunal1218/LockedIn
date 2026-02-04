@@ -44,7 +44,7 @@ export type RankedLeaderboardEntry = {
   id: string;
   name: string;
   handle: string;
-  points: number;
+  coins: number;
 };
 
 const rankedMatchColumns = `
@@ -2533,29 +2533,13 @@ export const markRankedTimeout = async (matchId: string, userId: string) => {
 export const getRankedLeaderboard = async (
   limit = 10
 ): Promise<RankedLeaderboardEntry[]> => {
-  await ensureRankedTables();
+  await ensureUsersTable();
   const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 50) : 10;
   const result = await db.query(
     `
-    WITH totals AS (
-      SELECT user_id, SUM(points) AS total_points
-      FROM (
-        SELECT user_a_id AS user_id, COALESCE(user_a_points, 0) AS points
-        FROM ranked_matches
-        UNION ALL
-        SELECT user_b_id AS user_id, COALESCE(user_b_points, 0) AS points
-        FROM ranked_matches
-        UNION ALL
-        SELECT user_c_id AS user_id, COALESCE(user_c_points, 0) AS points
-        FROM ranked_matches
-        WHERE user_c_id IS NOT NULL
-      ) AS scored
-      GROUP BY user_id
-    )
-    SELECT u.id, u.name, u.handle, COALESCE(t.total_points, 0) AS points
+    SELECT u.id, u.name, u.handle, COALESCE(u.coins, 0) AS coins
     FROM users u
-    LEFT JOIN totals t ON t.user_id = u.id
-    ORDER BY points DESC, u.handle ASC
+    ORDER BY coins DESC, u.handle ASC
     LIMIT $1
     `,
     [safeLimit]
@@ -2565,6 +2549,6 @@ export const getRankedLeaderboard = async (
     id: row.id,
     name: row.name,
     handle: row.handle,
-    points: Number(row.points) || 0,
+    coins: Number(row.coins) || 0,
   }));
 };
