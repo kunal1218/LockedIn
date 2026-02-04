@@ -83,7 +83,14 @@ export const EventDetailCard = ({
               <span className="text-3xl">{categoryIcon}</span>
               <span className="capitalize">{event.category}</span>
             </div>
-            <h2 className="text-2xl font-semibold text-ink">{event.title}</h2>
+            <div className="flex items-start justify-between gap-4">
+              <h2 className="text-2xl font-semibold text-ink">{event.title}</h2>
+              {distanceLabel && (
+                <span className="text-sm text-muted whitespace-nowrap">
+                  🚶 {distanceLabel}
+                </span>
+              )}
+            </div>
           </div>
           <button
             type="button"
