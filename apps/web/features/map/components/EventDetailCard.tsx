@@ -106,18 +106,39 @@ export const EventDetailCard = ({
           <div className="space-y-3">
             <div className="flex items-start gap-3">
               <span className="text-xl">📅</span>
-              <div className="flex-1">
-                <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
                   <p className="font-medium text-ink">
                     Starts: {formatTime(event.start_time)}
                   </p>
+                  <p className="text-sm text-muted">
+                    Ends: {formatTime(event.end_time)}
+                  </p>
+                </div>
+                <div className="flex flex-col items-start gap-2 sm:items-end">
                   <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
                     Hosted by
                   </span>
+                  <div className="flex items-center gap-3">
+                    {event.creator.profile_picture_url ? (
+                      <img
+                        src={event.creator.profile_picture_url}
+                        alt={event.creator.name}
+                        className="h-10 w-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white">
+                        {event.creator.name?.charAt(0).toUpperCase() ?? "?"}
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm font-semibold text-ink">
+                        {event.creator.name}
+                      </p>
+                      <p className="text-xs text-muted">{event.creator.handle}</p>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm text-muted">
-                  Ends: {formatTime(event.end_time)}
-                </p>
               </div>
             </div>
             {event.venue_name && (
@@ -140,28 +161,6 @@ export const EventDetailCard = ({
               <p className="text-sm text-ink/80">{event.description}</p>
             </div>
           )}
-
-          <div>
-            <div className="flex items-center gap-3">
-              {event.creator.profile_picture_url ? (
-                <img
-                  src={event.creator.profile_picture_url}
-                  alt={event.creator.name}
-                  className="h-10 w-10 rounded-full object-cover"
-                />
-              ) : (
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white">
-                  {event.creator.name?.charAt(0).toUpperCase() ?? "?"}
-                </div>
-              )}
-              <div>
-                <p className="text-sm font-semibold text-ink">
-                  {event.creator.name}
-                </p>
-                <p className="text-xs text-muted">{event.creator.handle}</p>
-              </div>
-            </div>
-          </div>
 
           <div>
             <h3 className="mb-3 text-sm font-semibold text-ink">
