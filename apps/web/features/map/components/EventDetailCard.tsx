@@ -98,7 +98,7 @@ export const EventDetailCard = ({
       />
       <div className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-card-border/60 bg-white shadow-[0_24px_60px_rgba(27,26,23,0.25)] max-h-[85vh] animate-scale-in">
         <div className="sticky top-0 z-10 flex items-start justify-between border-b border-card-border/60 bg-white px-6 py-4">
-          <div>
+          <div className="mt-6">
             <div className="mb-2 flex items-center gap-2 text-sm text-muted">
               <span className="text-3xl">{categoryIcon}</span>
               <span className="capitalize">{event.category}</span>
