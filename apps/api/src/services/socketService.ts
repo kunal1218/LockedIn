@@ -5,10 +5,30 @@ import { getUserFromToken } from "./authService";
 let io: Server | null = null;
 const userSocketMap = new Map<string, string>();
 
-const allowedOrigins = (process.env.FRONTEND_URLS ?? process.env.FRONTEND_URL ?? "http://localhost:3000")
+const normalizeOrigin = (value: string) => value.replace(/\/$/, "");
+const allowedOrigins = (process.env.FRONTEND_URLS ??
+  process.env.FRONTEND_URL ??
+  "http://localhost:3000")
   .split(",")
-  .map((value) => value.trim())
+  .map((value) => normalizeOrigin(value.trim()))
   .filter(Boolean);
+const allowedOriginSet = new Set(allowedOrigins);
+const isAllowedOrigin = (origin?: string) => {
+  if (!origin) {
+    return true;
+  }
+  const normalized = normalizeOrigin(origin);
+  if (allowedOriginSet.has(normalized)) {
+    return true;
+  }
+  if (normalized.endsWith(".vercel.app")) {
+    return true;
+  }
+  if (normalized.startsWith("http://localhost") || normalized.startsWith("http://127.0.0.1")) {
+    return true;
+  }
+  return false;
+};
 
 export const initializeSocketServer = (httpServer: HttpServer) => {
   if (io) {
@@ -18,11 +38,7 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
   io = new Server(httpServer, {
     cors: {
       origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-          callback(null, true);
-          return;
-        }
-        callback(new Error("Not allowed by CORS"));
+        callback(null, isAllowedOrigin(origin));
       },
       credentials: true,
     },
