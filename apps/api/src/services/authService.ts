@@ -77,6 +77,8 @@ export const ensureUsersTable = async () => {
       college_name text,
       college_domain text,
       coins integer NOT NULL DEFAULT 0,
+      monthly_coins integer NOT NULL DEFAULT 0,
+      monthly_coins_month date NOT NULL DEFAULT (date_trunc('month', now())::date),
       last_ranked_win_reward_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now()
     );
@@ -89,6 +91,8 @@ export const ensureUsersTable = async () => {
     ADD COLUMN IF NOT EXISTS college_name text,
     ADD COLUMN IF NOT EXISTS college_domain text,
     ADD COLUMN IF NOT EXISTS coins integer NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS monthly_coins integer NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS monthly_coins_month date NOT NULL DEFAULT (date_trunc('month', now())::date),
     ADD COLUMN IF NOT EXISTS last_ranked_win_reward_at timestamptz;
   `);
 

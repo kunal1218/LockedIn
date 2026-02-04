@@ -83,7 +83,7 @@ export default function LeaderboardPage() {
     <main className="mx-auto w-full max-w-5xl px-4 pb-20">
       <div className="flex flex-col items-start gap-2 pt-6">
         <h1 className="font-display text-2xl font-semibold text-ink">Leaderboard</h1>
-        <p className="text-sm text-muted">Top 10 players by total coins.</p>
+        <p className="text-sm text-muted">Top 10 players by coins earned this month.</p>
       </div>
 
       <Card className="mt-6">
@@ -99,7 +99,7 @@ export default function LeaderboardPage() {
         ) : error ? (
           <p className="text-sm text-rose-500">{error}</p>
         ) : entries.length === 0 ? (
-          <p className="text-sm text-muted">No coins yet.</p>
+          <p className="text-sm text-muted">No coins earned yet this month.</p>
         ) : (
           <div className="divide-y divide-card-border/60">
             {entries.map((entry, index) => (

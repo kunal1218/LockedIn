@@ -1420,6 +1420,12 @@ const awardDailyWin = async (winnerId: string) => {
   const result = await db.query(
     `UPDATE users
      SET coins = COALESCE(coins, 0) + $2,
+         monthly_coins = CASE
+           WHEN monthly_coins_month = date_trunc('month', now())::date
+             THEN COALESCE(monthly_coins, 0) + $2
+           ELSE $2
+         END,
+         monthly_coins_month = date_trunc('month', now())::date,
          last_ranked_win_reward_at = now()
      WHERE id = $1
        AND (
@@ -2537,7 +2543,15 @@ export const getRankedLeaderboard = async (
   const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 50) : 10;
   const result = await db.query(
     `
-    SELECT u.id, u.name, u.handle, COALESCE(u.coins, 0) AS coins
+    SELECT
+      u.id,
+      u.name,
+      u.handle,
+      CASE
+        WHEN u.monthly_coins_month = date_trunc('month', now())::date
+          THEN COALESCE(u.monthly_coins, 0)
+        ELSE 0
+      END AS coins
     FROM users u
     ORDER BY coins DESC, u.handle ASC
     LIMIT $1
