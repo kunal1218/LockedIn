@@ -121,6 +121,7 @@ export const MapCanvas = () => {
   const pressTimerRef = useRef<number | null>(null);
   const tempMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const didAutoCenterRef = useRef(false);
 
   const normalizeFriend = useCallback(
     (raw: FriendLocation & {
@@ -954,6 +955,20 @@ export const MapCanvas = () => {
       );
     }
   }, [requestPosition, settings.ghostMode, settings.shareLocation, token]);
+
+  useEffect(() => {
+    didAutoCenterRef.current = false;
+  }, [mapInstanceKey]);
+
+  useEffect(() => {
+    if (!mapRef.current || !isMapReady || didAutoCenterRef.current) {
+      return;
+    }
+    didAutoCenterRef.current = true;
+    centerOnUser().catch(() => {
+      // Error surfaced via setError.
+    });
+  }, [centerOnUser, isMapReady, mapInstanceKey]);
 
   const zoomToCampus = useCallback(() => {
     mapRef.current?.easeTo({
