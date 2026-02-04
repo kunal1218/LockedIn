@@ -106,7 +106,7 @@ export const EventDetailCard = ({
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="text-2xl font-semibold text-ink">{event.title}</h2>
               {distanceLabel && (
-                <span className="text-sm text-muted whitespace-nowrap">
+                <span className="text-sm text-muted whitespace-nowrap translate-y-px">
                   🚶 {distanceLabel}
                 </span>
               )}
