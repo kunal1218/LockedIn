@@ -182,3 +182,41 @@ export const fetchChallengeAttempts = async (): Promise<ChallengeAttempt[]> => {
     },
   }));
 };
+
+export const fetchChallengeAttemptsByChallengeId = async (
+  challengeId: string
+): Promise<ChallengeAttempt[]> => {
+  await ensureChallengeAttemptTable();
+
+  const result = await db.query(
+    `SELECT attempts.id,
+            attempts.challenge_id,
+            attempts.challenge_title,
+            attempts.image_data,
+            attempts.created_at,
+            users.id AS user_id,
+            users.name AS user_name,
+            users.handle AS user_handle,
+            users.email AS user_email
+     FROM challenge_attempts attempts
+     JOIN users ON users.id = attempts.user_id
+     WHERE attempts.challenge_id = $1
+     ORDER BY attempts.created_at DESC`,
+    [challengeId]
+  );
+
+  return (result.rows as ChallengeAttemptRow[]).map((row) => ({
+    id: row.id,
+    type: "daily-challenge",
+    challengeId: row.challenge_id,
+    challengeTitle: row.challenge_title,
+    imageData: row.image_data,
+    createdAt: toIsoString(row.created_at),
+    user: {
+      id: row.user_id,
+      name: row.user_name,
+      handle: row.user_handle,
+      email: row.user_email,
+    },
+  }));
+};

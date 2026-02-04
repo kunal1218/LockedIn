@@ -3,6 +3,7 @@ import { AuthError, getUserFromToken } from "../services/authService";
 import {
   ChallengeAttemptError,
   createChallengeAttempt,
+  fetchChallengeAttemptsByChallengeId,
 } from "../services/challengeAttemptService";
 import { fetchDailyChallenge } from "../services/challengeService";
 
@@ -36,6 +37,22 @@ const requireUser = async (req: Request) => {
   return user;
 };
 
+const getOptionalUser = async (req: Request) => {
+  const token = getToken(req);
+  if (!token) {
+    return null;
+  }
+
+  try {
+    return await getUserFromToken(token);
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return null;
+    }
+    throw error;
+  }
+};
+
 const handleError = (res: Response, error: unknown) => {
   if (error instanceof AuthError || error instanceof ChallengeAttemptError) {
     res.status(error.status).json({ error: error.message });
@@ -65,6 +82,27 @@ export const postChallengeAttempt = async (req: Request, res: Response) => {
     });
 
     res.status(201).json(attempt);
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const getChallengeAttempts = async (req: Request, res: Response) => {
+  const challengeId = asString(req.query?.challengeId).trim();
+  if (!challengeId) {
+    res.status(400).json({ error: "Challenge ID is required" });
+    return;
+  }
+
+  try {
+    const viewer = await getOptionalUser(req);
+    const submissions = await fetchChallengeAttemptsByChallengeId(challengeId);
+    if (!viewer?.isAdmin) {
+      submissions.forEach((submission) => {
+        submission.user.email = "";
+      });
+    }
+    res.json({ submissions });
   } catch (error) {
     handleError(res, error);
   }
