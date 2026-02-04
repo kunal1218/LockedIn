@@ -5,6 +5,11 @@ import { getUserFromToken } from "./authService";
 let io: Server | null = null;
 const userSocketMap = new Map<string, string>();
 
+const allowedOrigins = (process.env.FRONTEND_URLS ?? process.env.FRONTEND_URL ?? "http://localhost:3000")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+
 export const initializeSocketServer = (httpServer: HttpServer) => {
   if (io) {
     return io;
@@ -12,7 +17,13 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
 
   io = new Server(httpServer, {
     cors: {
-      origin: process.env.FRONTEND_URL ?? "http://localhost:3000",
+      origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+        callback(new Error("Not allowed by CORS"));
+      },
       credentials: true,
     },
   });

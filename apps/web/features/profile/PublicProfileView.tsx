@@ -380,6 +380,22 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
     () => buildMadlibAnswer(profile?.answers ?? null),
     [profile?.answers]
   );
+  const formattedBanUntil = useMemo(() => {
+    if (!banStatus?.isActive) {
+      return null;
+    }
+    if (banStatus.isIndefinite) {
+      return "Banned indefinitely";
+    }
+    if (!banStatus.until) {
+      return "Banned";
+    }
+    const date = new Date(banStatus.until);
+    if (Number.isNaN(date.getTime())) {
+      return "Banned";
+    }
+    return `Banned until ${date.toLocaleDateString()}`;
+  }, [banStatus?.isActive, banStatus?.isIndefinite, banStatus?.until]);
 
   if (isLoading) {
     return (
@@ -407,23 +423,6 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
     deriveCollegeFromDomain(user.collegeDomain ?? "");
   const isSelf = viewer?.id === user.id;
   const showAdminControls = Boolean(viewer?.isAdmin && !isSelf);
-
-  const formattedBanUntil = useMemo(() => {
-    if (!banStatus?.isActive) {
-      return null;
-    }
-    if (banStatus.isIndefinite) {
-      return "Banned indefinitely";
-    }
-    if (!banStatus.until) {
-      return "Banned";
-    }
-    const date = new Date(banStatus.until);
-    if (Number.isNaN(date.getTime())) {
-      return "Banned";
-    }
-    return `Banned until ${date.toLocaleDateString()}`;
-  }, [banStatus?.isActive, banStatus?.isIndefinite, banStatus?.until]);
 
   const runRelationshipAction = async (
     action: () => Promise<void>,
