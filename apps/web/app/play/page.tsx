@@ -1726,15 +1726,15 @@ export default function RankedPlayPage() {
 
   return (
     <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-6 flex flex-col">
-      <div className="relative flex-1">
-        <div className="absolute left-6 -top-5 z-20 inline-flex overflow-hidden rounded-t-2xl border border-card-border/70 bg-white/80 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="inline-flex overflow-hidden rounded-2xl border border-card-border/70 bg-white/70 shadow-sm">
           <button
             type="button"
             onClick={() => setActiveGame("covo")}
-            className={`rounded-tl-2xl border-b border-card-border/70 px-5 py-2.5 text-xs font-semibold transition ${
+            className={`px-5 py-2 text-xs font-semibold transition ${
               activeGame === "covo"
-                ? "bg-white text-ink border-b-white shadow-[0_6px_16px_rgba(15,23,42,0.12)]"
-                : "bg-card-border/30 text-muted hover:bg-white/80 hover:text-ink"
+                ? "bg-white text-ink shadow-[0_6px_16px_rgba(15,23,42,0.12)]"
+                : "bg-card-border/20 text-muted hover:bg-white/80 hover:text-ink"
             }`}
           >
             Covo Game
@@ -1743,17 +1743,18 @@ export default function RankedPlayPage() {
           <button
             type="button"
             onClick={() => setActiveGame("poker")}
-            className={`rounded-tr-2xl border-b border-card-border/70 px-5 py-2.5 text-xs font-semibold transition ${
+            className={`px-5 py-2 text-xs font-semibold transition ${
               activeGame === "poker"
-                ? "bg-white text-ink border-b-white shadow-[0_6px_16px_rgba(15,23,42,0.12)]"
-                : "bg-card-border/30 text-muted hover:bg-white/80 hover:text-ink"
+                ? "bg-white text-ink shadow-[0_6px_16px_rgba(15,23,42,0.12)]"
+                : "bg-card-border/20 text-muted hover:bg-white/80 hover:text-ink"
             }`}
           >
             Poker
           </button>
         </div>
+      </div>
       {activeGame === "covo" ? (
-        <Card className="relative grid flex-1 min-h-[520px] grid-rows-[auto_1fr_auto] gap-3 overflow-hidden border border-card-border/70 bg-white/85 pt-10 shadow-sm">
+        <Card className="relative grid flex-1 min-h-[520px] grid-rows-[auto_1fr_auto] gap-3 overflow-hidden border border-card-border/70 bg-white/85 shadow-sm">
         <div className="flex flex-col gap-4">
           <div className="grid gap-6 md:grid-cols-[1fr_auto_1fr]">
             <div className="flex min-w-[240px] items-center gap-3 md:justify-self-start">
@@ -2262,7 +2263,7 @@ export default function RankedPlayPage() {
       {/* Center panel replaces modal for idle/waiting/match-end states */}
         </Card>
       ) : (
-        <Card className="relative flex flex-1 flex-col gap-6 overflow-hidden border border-card-border/70 bg-white/85 pt-10 shadow-sm">
+        <Card className="relative flex flex-1 flex-col gap-6 overflow-hidden border border-card-border/70 bg-white/85 p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted">
@@ -2506,7 +2507,6 @@ export default function RankedPlayPage() {
           )}
         </Card>
       )}
-      </div>
     </div>
   );
 }
