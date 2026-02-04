@@ -1426,6 +1426,7 @@ const awardDailyWin = async (winnerId: string) => {
            ELSE $2
          END,
          monthly_coins_month = date_trunc('month', now())::date,
+         monthly_coins_seeded = true,
          last_ranked_win_reward_at = now()
      WHERE id = $1
        AND (

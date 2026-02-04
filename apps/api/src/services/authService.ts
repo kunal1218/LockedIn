@@ -79,6 +79,7 @@ export const ensureUsersTable = async () => {
       coins integer NOT NULL DEFAULT 0,
       monthly_coins integer NOT NULL DEFAULT 0,
       monthly_coins_month date NOT NULL DEFAULT (date_trunc('month', now())::date),
+      monthly_coins_seeded boolean NOT NULL DEFAULT false,
       last_ranked_win_reward_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now()
     );
@@ -93,7 +94,19 @@ export const ensureUsersTable = async () => {
     ADD COLUMN IF NOT EXISTS coins integer NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS monthly_coins integer NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS monthly_coins_month date NOT NULL DEFAULT (date_trunc('month', now())::date),
+    ADD COLUMN IF NOT EXISTS monthly_coins_seeded boolean NOT NULL DEFAULT false,
     ADD COLUMN IF NOT EXISTS last_ranked_win_reward_at timestamptz;
+  `);
+
+  await db.query(`
+    UPDATE users
+    SET monthly_coins = coins,
+        monthly_coins_month = date_trunc('month', now())::date,
+        monthly_coins_seeded = true
+    WHERE monthly_coins_seeded = false
+      AND monthly_coins = 0
+      AND coins > 0
+      AND monthly_coins_month = date_trunc('month', now())::date;
   `);
 
   await db.query(`
