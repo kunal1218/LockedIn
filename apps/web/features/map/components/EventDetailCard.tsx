@@ -99,10 +99,15 @@ export const EventDetailCard = ({
           <div className="space-y-3">
             <div className="flex items-start gap-3">
               <span className="text-xl">📅</span>
-              <div>
-                <p className="font-medium text-ink">
-                  Starts: {formatTime(event.start_time)}
-                </p>
+              <div className="flex-1">
+                <div className="flex items-start justify-between gap-4">
+                  <p className="font-medium text-ink">
+                    Starts: {formatTime(event.start_time)}
+                  </p>
+                  <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                    Hosted by
+                  </span>
+                </div>
                 <p className="text-sm text-muted">
                   Ends: {formatTime(event.end_time)}
                 </p>
@@ -130,7 +135,6 @@ export const EventDetailCard = ({
           )}
 
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-ink">Hosted by</h3>
             <div className="flex items-center gap-3">
               {event.creator.profile_picture_url ? (
                 <img
