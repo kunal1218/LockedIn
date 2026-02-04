@@ -164,9 +164,11 @@ export default function RankedPlayPage() {
   const [pokerError, setPokerError] = useState<string | null>(null);
   const [isBuyingIn, setIsBuyingIn] = useState(false);
   const [pokerState, setPokerState] = useState<PokerClientState | null>(null);
+  const [pokerQueuePosition, setPokerQueuePosition] = useState<number | null>(null);
   const [isPokerLoading, setIsPokerLoading] = useState(false);
   const [isPokerActing, setIsPokerActing] = useState(false);
   const [pokerRaiseAmount, setPokerRaiseAmount] = useState("");
+  const [isLeavingPoker, setIsLeavingPoker] = useState(false);
   const lives =
     rankedStatus.status === "matched"
       ? rankedStatus.lives ?? { me: 3, opponents: [3, 3] }
@@ -424,6 +426,7 @@ export default function RankedPlayPage() {
     pokerSeats.length > 0
       ? pokerSeats
       : Array.from({ length: 8 }, () => null);
+  const pokerIsQueued = pokerQueuePosition !== null;
   const chatOpponent =
     !displayIsJudge
       ? displayOpponents.find((opponent) => opponent.id !== displayJudgeUserId) ??
@@ -1309,11 +1312,15 @@ export default function RankedPlayPage() {
     }
     setIsPokerLoading(true);
     try {
-      const response = await apiGet<{ state: PokerClientState | null }>(
-        "/poker/state",
-        token
-      );
+      const response = await apiGet<{
+        state: PokerClientState | null;
+        queued?: boolean;
+        queuePosition?: number | null;
+      }>("/poker/state", token);
       setPokerState(response.state);
+      setPokerQueuePosition(
+        response.queued ? response.queuePosition ?? 1 : null
+      );
       setPokerError(null);
     } catch (error) {
       setPokerError(
@@ -1339,14 +1346,23 @@ export default function RankedPlayPage() {
     setIsBuyingIn(true);
     try {
       if (socket.connected) {
-        socket.emit("poker:queue", { amount: Number.isFinite(amount) ? amount : undefined });
+        socket.emit("poker:queue", {
+          amount: Number.isFinite(amount) ? amount : undefined,
+        });
       } else {
-        const response = await apiPost<{ state: PokerClientState }>(
+        const response = await apiPost<{
+          state: PokerClientState | null;
+          queued?: boolean;
+          queuePosition?: number | null;
+        }>(
           "/poker/queue",
           { amount: Number.isFinite(amount) ? amount : undefined },
           token
         );
         setPokerState(response.state);
+        setPokerQueuePosition(
+          response.queued ? response.queuePosition ?? 1 : null
+        );
       }
       setPokerBuyIn("");
       setPokerRaiseAmount("");
@@ -1392,6 +1408,30 @@ export default function RankedPlayPage() {
       );
     } finally {
       setIsBuyingIn(false);
+    }
+  };
+
+  const handlePokerLeave = async () => {
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    setIsLeavingPoker(true);
+    setPokerError(null);
+    try {
+      if (socket.connected) {
+        socket.emit("poker:leave");
+      } else {
+        await apiPost("/poker/leave", {}, token);
+        setPokerState(null);
+        setPokerQueuePosition(null);
+      }
+    } catch (error) {
+      setPokerError(
+        error instanceof Error ? error.message : "Unable to leave the table."
+      );
+    } finally {
+      setIsLeavingPoker(false);
     }
   };
 
@@ -1770,19 +1810,29 @@ export default function RankedPlayPage() {
     const handleState = (payload: { state?: PokerClientState | null }) => {
       if (payload && "state" in payload) {
         setPokerState(payload.state ?? null);
+        setPokerQueuePosition(null);
         setPokerError(null);
+      }
+    };
+    const handleQueued = (payload: { queuePosition?: number | null }) => {
+      const position = payload?.queuePosition ?? null;
+      setPokerQueuePosition(position);
+      if (position) {
+        setPokerState(null);
       }
     };
     const handleError = (payload: { error?: string }) => {
       setPokerError(payload?.error ?? "Unable to update poker table.");
     };
     socket.on("poker:state", handleState);
+    socket.on("poker:queued", handleQueued);
     socket.on("poker:error", handleError);
     socket.emit("poker:state");
     void loadPokerState();
 
     return () => {
       socket.off("poker:state", handleState);
+      socket.off("poker:queued", handleQueued);
       socket.off("poker:error", handleError);
     };
   }, [activeGame, loadPokerState, token]);
@@ -2364,7 +2414,12 @@ export default function RankedPlayPage() {
               <div className="rounded-3xl border border-card-border/70 bg-white/80 p-6">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
                   <span>
-                    Table: {pokerState?.tableId ? pokerState.tableId.slice(0, 6) : "--"}
+                    Table:{" "}
+                    {pokerState?.tableId
+                      ? pokerState.tableId.slice(0, 6)
+                      : pokerIsQueued
+                        ? "Queue"
+                        : "--"}
                   </span>
                   <span>Pot: {pokerState?.pot ?? 0}</span>
                   <span>
@@ -2471,6 +2526,16 @@ export default function RankedPlayPage() {
                       Rebuy
                     </Button>
                   )}
+                  {(pokerYouSeat || pokerIsQueued) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handlePokerLeave}
+                      disabled={isLeavingPoker}
+                    >
+                      {isLeavingPoker ? "Leaving..." : "Leave table"}
+                    </Button>
+                  )}
                 </form>
 
                 {pokerError && (
@@ -2549,6 +2614,15 @@ export default function RankedPlayPage() {
                         )}
                       </div>
                     )}
+                  </div>
+                ) : pokerIsQueued ? (
+                  <div className="rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-ink">
+                    <p className="text-sm font-semibold text-ink">
+                      You&#39;re in the queue.
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      Position {pokerQueuePosition}.
+                    </p>
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-muted">

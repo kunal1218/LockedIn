@@ -4,6 +4,7 @@ import {
   PokerError,
   applyPokerAction,
   getPokerStateForUser,
+  leavePokerTable,
   queuePokerPlayer,
   rebuyPoker,
 } from "../services/pokerService";
@@ -56,7 +57,12 @@ export const postPokerQueue = async (req: Request, res: Response) => {
       handle: user.handle,
       amount: Number.isFinite(amount) ? amount : undefined,
     });
-    res.json({ state: result.state, tableId: result.tableId });
+    res.json({
+      state: result.state,
+      tableId: result.tableId,
+      queued: result.queued,
+      queuePosition: result.queuePosition,
+    });
   } catch (error) {
     handleError(res, error);
   }
@@ -66,7 +72,11 @@ export const getPokerState = async (req: Request, res: Response) => {
   try {
     const user = await requireUser(req);
     const result = await getPokerStateForUser(user.id);
-    res.json({ state: result.state });
+    res.json({
+      state: result.state,
+      queued: result.queued,
+      queuePosition: result.queuePosition,
+    });
   } catch (error) {
     handleError(res, error);
   }
@@ -102,6 +112,21 @@ export const postPokerRebuy = async (req: Request, res: Response) => {
     }
     const result = await rebuyPoker({ userId: user.id, amount });
     res.json({ state: result.state, tableId: result.tableId });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const postPokerLeave = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const result = await leavePokerTable(user.id);
+    res.json({
+      state: result.state,
+      tableId: result.tableId,
+      queued: result.queued,
+      queuePosition: result.queuePosition,
+    });
   } catch (error) {
     handleError(res, error);
   }

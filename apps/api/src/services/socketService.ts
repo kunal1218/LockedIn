@@ -4,6 +4,9 @@ import { getUserFromToken } from "./authService";
 import {
   applyPokerAction,
   getPokerStateForUser,
+  getPokerStatesForTable,
+  leavePokerTable,
+  type PokerAction,
   queuePokerPlayer,
   rebuyPoker,
 } from "./pokerService";
@@ -101,8 +104,23 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
 
     const pokerRoomForTable = (tableId: string) => `poker:table:${tableId}`;
 
-    const emitPokerState = (tableId: string, state: unknown) => {
-      io?.to(pokerRoomForTable(tableId)).emit("poker:state", { state });
+    const emitPokerStatesForTable = async (tableId: string) => {
+      const states = await getPokerStatesForTable(tableId);
+      states.forEach(({ userId: targetUserId, state }) => {
+        const socketId = userSocketMap.get(targetUserId);
+        if (socketId) {
+          io?.to(socketId).emit("poker:state", { state });
+        }
+      });
+    };
+
+    const emitPokerErrorsForUsers = (userIds: readonly string[], message: string) => {
+      userIds.forEach((targetUserId) => {
+        const socketId = userSocketMap.get(targetUserId);
+        if (socketId) {
+          io?.to(socketId).emit("poker:error", { error: message });
+        }
+      });
     };
 
     const emitPokerError = (message: string) => {
@@ -115,6 +133,9 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
         socket.join(pokerRoomForTable(result.tableId));
       }
       socket.emit("poker:state", { state: result.state });
+      if (result.queued) {
+        socket.emit("poker:queued", { queuePosition: result.queuePosition });
+      }
     };
 
     socket.on("poker:state", async () => {
@@ -138,8 +159,18 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
           handle: userProfile.handle,
           amount: payload?.amount,
         });
-        socket.join(pokerRoomForTable(result.tableId));
-        emitPokerState(result.tableId, result.state);
+        if (result.tableId) {
+          socket.join(pokerRoomForTable(result.tableId));
+        }
+        if (result.queued) {
+          socket.emit("poker:queued", { queuePosition: result.queuePosition });
+        }
+        const tableIds = result.updatedTableIds?.length
+          ? result.updatedTableIds
+          : result.tableId
+            ? [result.tableId]
+            : [];
+        await Promise.all(tableIds.map((tableId) => emitPokerStatesForTable(tableId)));
       } catch (error) {
         emitPokerError(
           error instanceof Error ? error.message : "Unable to join poker table."
@@ -155,15 +186,25 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
             typeof payload?.action === "string"
               ? payload.action.toLowerCase()
               : "";
-          if (!\"fold check call bet raise\".split(\" \").includes(actionType)) {
+          if (!"fold check call bet raise".split(" ").includes(actionType)) {
             throw new Error("Invalid poker action.");
           }
-          const action =
-            actionType === "bet" || actionType === "raise"
-              ? { action: actionType, amount: payload?.amount ?? 0 }
-              : { action: actionType };
+          const normalizedAction = actionType as PokerAction["action"];
+          const action: PokerAction =
+            normalizedAction === "bet" || normalizedAction === "raise"
+              ? { action: normalizedAction, amount: Number(payload?.amount ?? 0) }
+              : { action: normalizedAction };
           const result = await applyPokerAction({ userId, action });
-          emitPokerState(result.tableId, result.state);
+          const tableIds = result.updatedTableIds?.length
+            ? result.updatedTableIds
+            : [result.tableId];
+          await Promise.all(tableIds.map((tableId) => emitPokerStatesForTable(tableId)));
+          if (result.failedUserIds?.length) {
+            emitPokerErrorsForUsers(
+              result.failedUserIds,
+              "Not enough coins for that buy-in."
+            );
+          }
         } catch (error) {
           emitPokerError(
             error instanceof Error ? error.message : "Unable to act in poker."
@@ -179,10 +220,34 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
             ? payload.amount
             : Number(payload?.amount);
         const result = await rebuyPoker({ userId, amount });
-        emitPokerState(result.tableId, result.state);
+        await emitPokerStatesForTable(result.tableId);
       } catch (error) {
         emitPokerError(
           error instanceof Error ? error.message : "Unable to rebuy."
+        );
+      }
+    });
+
+    socket.on("poker:leave", async () => {
+      try {
+        const result = await leavePokerTable(userId);
+        socket.emit("poker:state", { state: null });
+        if (result.queued) {
+          socket.emit("poker:queued", { queuePosition: result.queuePosition });
+        }
+        const tableIds = result.updatedTableIds?.length
+          ? result.updatedTableIds
+          : [];
+        await Promise.all(tableIds.map((tableId) => emitPokerStatesForTable(tableId)));
+        if (result.failedUserIds?.length) {
+          emitPokerErrorsForUsers(
+            result.failedUserIds,
+            "Not enough coins for that buy-in."
+          );
+        }
+      } catch (error) {
+        emitPokerError(
+          error instanceof Error ? error.message : "Unable to leave the table."
         );
       }
     });
