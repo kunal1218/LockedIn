@@ -1,4 +1,5 @@
 import type { Server as HttpServer } from "http";
+import { randomUUID } from "crypto";
 import { Server, type Socket } from "socket.io";
 import { getUserFromToken } from "./authService";
 import {
@@ -13,6 +14,27 @@ import {
 
 let io: Server | null = null;
 const userSocketMap = new Map<string, string>();
+
+type EventChatMessage = {
+  id: string;
+  eventId: number;
+  message: string;
+  createdAt: string;
+  sender: { id: string; name: string; handle?: string | null };
+};
+
+const MAX_EVENT_CHAT_MESSAGES = 50;
+const eventChatHistory = new Map<number, EventChatMessage[]>();
+
+const addEventChatMessage = (eventId: number, message: EventChatMessage) => {
+  const current = eventChatHistory.get(eventId) ?? [];
+  const next = [...current, message].slice(-MAX_EVENT_CHAT_MESSAGES);
+  eventChatHistory.set(eventId, next);
+  return next;
+};
+
+const getEventChatHistory = (eventId: number) =>
+  eventChatHistory.get(eventId) ?? [];
 
 const normalizeOrigin = (value: string) => value.replace(/\/$/, "");
 const allowedOrigins = (process.env.FRONTEND_URLS ??
@@ -283,6 +305,50 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
       }
       socket.leave(`event-${parsed}`);
     });
+
+    socket.on(
+      "event:chat",
+      (payload?: { eventId?: number | string; message?: string }) => {
+        const parsedId = Number(payload?.eventId);
+        const message = payload?.message?.trim() ?? "";
+        if (!Number.isFinite(parsedId) || !message) {
+          return;
+        }
+        if (!userProfile) {
+          return;
+        }
+        const chatMessage: EventChatMessage = {
+          id: randomUUID(),
+          eventId: parsedId,
+          message: message.slice(0, 500),
+          createdAt: new Date().toISOString(),
+          sender: {
+            id: userProfile.id,
+            name: userProfile.name,
+            handle: userProfile.handle,
+          },
+        };
+        addEventChatMessage(parsedId, chatMessage);
+        io?.to(`event-${parsedId}`).emit("event:chat", {
+          eventId: parsedId,
+          message: chatMessage,
+        });
+      }
+    );
+
+    socket.on(
+      "event:chat:history",
+      (payload?: { eventId?: number | string }) => {
+        const parsedId = Number(payload?.eventId);
+        if (!Number.isFinite(parsedId)) {
+          return;
+        }
+        socket.emit("event:chat:history", {
+          eventId: parsedId,
+          messages: getEventChatHistory(parsedId),
+        });
+      }
+    );
 
     socket.on("disconnect", () => {
       if (userSocketMap.get(userId) === socket.id) {

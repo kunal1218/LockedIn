@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import type { EventWithDetails } from "@lockedin/shared";
 import { rsvpToEvent } from "@/lib/api/events";
+import { useAuth } from "@/features/auth";
+import { connectSocket, socket } from "@/lib/socket";
 
 const CATEGORY_ICONS: Record<string, string> = {
   study: "🎓",
@@ -38,8 +41,23 @@ export const EventDetailCard = ({
   onRSVP,
 }: EventDetailCardProps) => {
   const router = useRouter();
+  const { isAuthenticated, token, user, openAuthModal } = useAuth();
   const [loading, setLoading] = useState(false);
   const [userStatus, setUserStatus] = useState(event.user_status ?? null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<
+    Array<{
+      id: string;
+      eventId: number;
+      message: string;
+      createdAt: string;
+      sender: { id: string; name: string; handle?: string | null };
+    }>
+  >([]);
+  const [chatDraft, setChatDraft] = useState("");
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [isSendingChat, setIsSendingChat] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   const attendees = event.attendees ?? [];
   const isAtCapacity =
@@ -56,6 +74,67 @@ export const EventDetailCard = ({
     setUserStatus(event.user_status ?? null);
   }, [event.id, event.user_status]);
 
+  useEffect(() => {
+    setChatMessages([]);
+    setChatDraft("");
+    setChatError(null);
+  }, [event.id]);
+
+  useEffect(() => {
+    if (!isChatOpen) {
+      return;
+    }
+    if (!token) {
+      return;
+    }
+    connectSocket(token);
+    const handleChat = (payload: {
+      eventId?: number;
+      message?: {
+        id: string;
+        eventId: number;
+        message: string;
+        createdAt: string;
+        sender: { id: string; name: string; handle?: string | null };
+      };
+    }) => {
+      if (!payload?.message || payload.eventId !== event.id) {
+        return;
+      }
+      setChatMessages((prev) => [...prev, payload.message!]);
+    };
+    const handleHistory = (payload: {
+      eventId?: number;
+      messages?: Array<{
+        id: string;
+        eventId: number;
+        message: string;
+        createdAt: string;
+        sender: { id: string; name: string; handle?: string | null };
+      }>;
+    }) => {
+      if (payload?.eventId !== event.id) {
+        return;
+      }
+      setChatMessages(payload.messages ?? []);
+    };
+    socket.on("event:chat", handleChat);
+    socket.on("event:chat:history", handleHistory);
+    socket.emit("event:chat:history", { eventId: event.id });
+
+    return () => {
+      socket.off("event:chat", handleChat);
+      socket.off("event:chat:history", handleHistory);
+    };
+  }, [event.id, isChatOpen, token]);
+
+  useEffect(() => {
+    if (!isChatOpen) {
+      return;
+    }
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, isChatOpen]);
+
   const handleRSVP = async (status: "going" | "maybe" | "declined") => {
     setLoading(true);
     try {
@@ -69,6 +148,41 @@ export const EventDetailCard = ({
       window.alert("Failed to RSVP. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleChat = () => {
+    if (!isAuthenticated) {
+      openAuthModal("login");
+      return;
+    }
+    setIsChatOpen((prev) => !prev);
+  };
+
+  const handleChatSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isAuthenticated) {
+      openAuthModal("login");
+      return;
+    }
+    const message = chatDraft.trim();
+    if (!message) {
+      return;
+    }
+    setIsSendingChat(true);
+    setChatError(null);
+    try {
+      if (token) {
+        connectSocket(token);
+      }
+      socket.emit("event:chat", { eventId: event.id, message });
+      setChatDraft("");
+    } catch (error) {
+      setChatError(
+        error instanceof Error ? error.message : "Unable to send message."
+      );
+    } finally {
+      setIsSendingChat(false);
     }
   };
 
@@ -228,10 +342,89 @@ export const EventDetailCard = ({
               This event is at capacity ({event.max_attendees} attendees)
             </div>
           )}
+
+          {isChatOpen && (
+            <div className="rounded-2xl border border-card-border/70 bg-white/80 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                  Event Chat
+                </p>
+                <button
+                  type="button"
+                  onClick={handleToggleChat}
+                  className="text-xs font-semibold text-ink/70 transition hover:text-ink"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
+                {chatMessages.length ? (
+                  chatMessages.map((message) => {
+                    const isMine = message.sender.id === user?.id;
+                    return (
+                      <div
+                        key={message.id}
+                        className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`max-w-[80%] rounded-2xl px-3 py-2 text-xs ${
+                            isMine
+                              ? "bg-accent text-white"
+                              : "bg-ink/5 text-ink"
+                          }`}
+                        >
+                          <p className="font-semibold">
+                            {message.sender.name}
+                          </p>
+                          <p className="mt-1">{message.message}</p>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-xs text-muted">No messages yet.</p>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+              <form className="mt-3 flex gap-2" onSubmit={handleChatSubmit}>
+                <input
+                  type="text"
+                  value={chatDraft}
+                  onChange={(event) => setChatDraft(event.target.value)}
+                  placeholder="Send a message..."
+                  className="flex-1 rounded-xl border border-card-border/70 bg-white px-3 py-2 text-xs text-ink outline-none focus:border-accent/60"
+                />
+                <button
+                  type="submit"
+                  disabled={isSendingChat}
+                  className="rounded-xl bg-ink px-4 py-2 text-xs font-semibold text-white transition hover:bg-ink/90 disabled:opacity-70"
+                >
+                  {isSendingChat ? "Sending" : "Send"}
+                </button>
+              </form>
+              {chatError && (
+                <p className="mt-2 text-xs font-semibold text-rose-500">
+                  {chatError}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="sticky bottom-0 border-t border-card-border/60 bg-white px-6 py-4">
           <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={handleToggleChat}
+                className="text-sm font-semibold text-ink/70 transition hover:text-ink"
+              >
+                {isChatOpen ? "Hide chat" : "Open chat"}
+              </button>
+              <span className="text-xs text-muted">
+                Chat is event-only
+              </span>
+            </div>
             {userStatus && (
               <p className="text-center text-xs text-muted">
                 You&#39;re {userStatus === "going"
