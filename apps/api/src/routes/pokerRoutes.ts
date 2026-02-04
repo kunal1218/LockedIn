@@ -1,16 +1,16 @@
 import { Router } from "express";
 import {
-  postPokerBuyIn,
-  getPokerSession,
-  postPokerStartHand,
+  postPokerQueue,
+  getPokerState,
   postPokerAction,
+  postPokerRebuy,
 } from "../controllers/pokerController";
 
 const router = Router();
 
-router.post("/buy-in", postPokerBuyIn);
-router.get("/state", getPokerSession);
-router.post("/start-hand", postPokerStartHand);
+router.post("/queue", postPokerQueue);
+router.get("/state", getPokerState);
 router.post("/action", postPokerAction);
+router.post("/rebuy", postPokerRebuy);
 
 export default router;

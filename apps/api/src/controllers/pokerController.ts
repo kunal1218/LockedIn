@@ -2,10 +2,10 @@ import type { Request, Response } from "express";
 import { AuthError, getUserFromToken } from "../services/authService";
 import {
   PokerError,
-  buyInToPoker,
   applyPokerAction,
-  getPokerState,
-  startPokerHand,
+  getPokerStateForUser,
+  queuePokerPlayer,
+  rebuyPoker,
 } from "../services/pokerService";
 
 const getToken = (req: Request) => {
@@ -36,17 +36,6 @@ const requireUser = async (req: Request) => {
   return user;
 };
 
-const parseBuyInAmount = (value: unknown) => {
-  const amount = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    throw new PokerError("Enter a valid buy-in amount.", 400);
-  }
-  if (!Number.isInteger(amount)) {
-    throw new PokerError("Buy-in must be a whole number.", 400);
-  }
-  return amount;
-};
-
 const handleError = (res: Response, error: unknown) => {
   if (error instanceof AuthError || error instanceof PokerError) {
     res.status(error.status).json({ error: error.message });
@@ -57,32 +46,27 @@ const handleError = (res: Response, error: unknown) => {
   res.status(500).json({ error: "Unable to process poker request" });
 };
 
-export const postPokerBuyIn = async (req: Request, res: Response) => {
+export const postPokerQueue = async (req: Request, res: Response) => {
   try {
     const user = await requireUser(req);
-    const amount = parseBuyInAmount(req.body?.amount);
-    const result = await buyInToPoker({ userId: user.id, amount });
-    res.json(result);
+    const amount = typeof req.body?.amount === "number" ? req.body.amount : Number(req.body?.amount);
+    const result = await queuePokerPlayer({
+      userId: user.id,
+      name: user.name,
+      handle: user.handle,
+      amount: Number.isFinite(amount) ? amount : undefined,
+    });
+    res.json({ state: result.state, tableId: result.tableId });
   } catch (error) {
     handleError(res, error);
   }
 };
 
-export const getPokerSession = async (req: Request, res: Response) => {
+export const getPokerState = async (req: Request, res: Response) => {
   try {
     const user = await requireUser(req);
-    const state = await getPokerState(user.id);
-    res.json({ state });
-  } catch (error) {
-    handleError(res, error);
-  }
-};
-
-export const postPokerStartHand = async (req: Request, res: Response) => {
-  try {
-    const user = await requireUser(req);
-    const state = await startPokerHand(user.id);
-    res.json({ state });
+    const result = await getPokerStateForUser(user.id);
+    res.json({ state: result.state });
   } catch (error) {
     handleError(res, error);
   }
@@ -94,17 +78,30 @@ export const postPokerAction = async (req: Request, res: Response) => {
     const raw = req.body ?? {};
     const actionType =
       typeof raw.action === "string" ? raw.action.toLowerCase() : "";
-    if (!["fold", "check", "call", "bet", "raise"].includes(actionType)) {
+    if (!"fold check call bet raise".split(" ").includes(actionType)) {
       throw new PokerError("Invalid poker action.", 400);
     }
-    const amount =
-      typeof raw.amount === "number" ? raw.amount : Number(raw.amount);
+    const amount = typeof raw.amount === "number" ? raw.amount : Number(raw.amount);
     const action =
       actionType === "bet" || actionType === "raise"
         ? { action: actionType, amount }
         : { action: actionType };
-    const state = await applyPokerAction(user.id, action);
-    res.json({ state });
+    const result = await applyPokerAction({ userId: user.id, action });
+    res.json({ state: result.state, tableId: result.tableId });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const postPokerRebuy = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const amount = typeof req.body?.amount === "number" ? req.body.amount : Number(req.body?.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new PokerError("Enter a valid rebuy amount.", 400);
+    }
+    const result = await rebuyPoker({ userId: user.id, amount });
+    res.json({ state: result.state, tableId: result.tableId });
   } catch (error) {
     handleError(res, error);
   }
