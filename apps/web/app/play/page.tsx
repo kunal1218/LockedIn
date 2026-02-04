@@ -2428,45 +2428,73 @@ export default function RankedPlayPage() {
                 </div>
 
                 <div className="mt-6 flex flex-col gap-6">
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {Array.from({ length: 5 }).map((_, index) => (
-                      <div key={`community-${index}`}>
-                        {renderPokerCard(pokerState?.community?.[index])}
-                      </div>
-                    ))}
-                  </div>
+                  <div className="relative h-[320px] w-full sm:h-[360px] lg:h-[420px]">
+                    <div className="absolute inset-0">
+                      <div className="absolute inset-6 rounded-[999px] border border-emerald-200/70 bg-emerald-100/60 shadow-[inset_0_0_40px_rgba(16,185,129,0.18)]" />
+                      <div className="absolute inset-12 rounded-[999px] border border-emerald-200/40 bg-emerald-50/80" />
+                    </div>
 
-                  <div className="grid gap-3 md:grid-cols-4">
-                    {pokerSeatSlots.map((seat, index) => {
-                      const isCurrent = pokerState?.currentPlayerIndex === index;
+                    <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3">
+                      <div className="rounded-full bg-white/90 px-4 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-muted shadow-sm">
+                        Pot
+                      </div>
+                      <div className="text-xl font-semibold text-ink">
+                        {pokerState?.pot ?? 0}
+                      </div>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {Array.from({ length: 5 }).map((_, index) => (
+                          <div key={`community-${index}`}>
+                            {renderPokerCard(pokerState?.community?.[index])}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {[
+                      { seatIndex: 0, className: "left-1/2 -translate-x-1/2 -top-4" },
+                      { seatIndex: 1, className: "right-6 top-4" },
+                      { seatIndex: 2, className: "right-0 top-1/2 -translate-y-1/2" },
+                      { seatIndex: 3, className: "right-6 bottom-4" },
+                      { seatIndex: 4, className: "left-1/2 -translate-x-1/2 bottom-0" },
+                      { seatIndex: 5, className: "left-6 bottom-4" },
+                      { seatIndex: 6, className: "left-0 top-1/2 -translate-y-1/2" },
+                      { seatIndex: 7, className: "left-6 top-4" },
+                    ].map((position) => {
+                      const seat = pokerSeatSlots[position.seatIndex];
+                      const isCurrent =
+                        pokerState?.currentPlayerIndex === position.seatIndex;
                       return (
                         <div
-                          key={`seat-${index}`}
-                          className={`rounded-2xl border px-3 py-3 text-sm ${
-                            isCurrent
-                              ? "border-accent/60 bg-accent/10"
-                              : "border-card-border/70 bg-white"
-                          }`}
+                          key={`seat-${position.seatIndex}`}
+                          className={`absolute ${position.className} flex flex-col items-center gap-1`}
                         >
                           {seat ? (
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between text-xs font-semibold text-muted">
-                                <span>Seat {index + 1}</span>
-                                {seat.isDealer && <span>D</span>}
+                            <>
+                              <div
+                                className={`relative rounded-full p-[3px] ${
+                                  isCurrent
+                                    ? "bg-accent/30 ring-2 ring-accent/60"
+                                    : "bg-white/80"
+                                }`}
+                              >
+                                <Avatar name={seat.name} size={48} />
+                                {seat.isDealer && (
+                                  <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-300 text-[10px] font-bold text-amber-900 shadow-sm">
+                                    D
+                                  </span>
+                                )}
                               </div>
-                              <p className="text-sm font-semibold text-ink">{seat.name}</p>
-                              {seat.handle && (
-                                <p className="text-xs text-muted">@{seat.handle}</p>
-                              )}
-                              <p className="text-xs text-muted">
-                                Chips: {seat.chips} · Bet: {seat.bet}
-                              </p>
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted">
-                                {seat.status.replace("_", " ")}
-                              </p>
-                            </div>
+                              <div className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold text-ink shadow-sm">
+                                {seat.name}
+                              </div>
+                              <div className="text-[11px] text-muted">
+                                {seat.chips} chips
+                              </div>
+                            </>
                           ) : (
-                            <div className="text-xs text-muted">Empty seat</div>
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-dashed border-card-border/70 bg-white/70 text-[10px] text-muted">
+                              Empty
+                            </div>
                           )}
                         </div>
                       );
