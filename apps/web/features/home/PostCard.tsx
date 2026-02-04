@@ -1,6 +1,6 @@
 "use client";
 
-import type { KeyboardEvent, MouseEvent } from "react";
+import type { MouseEvent } from "react";
 import type { FeedPost } from "@lockedin/shared";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
@@ -31,7 +31,6 @@ export const PostCard = ({
 }: PostCardProps) => {
   const { user, isAuthenticated, openAuthModal } = useAuth();
   const router = useRouter();
-  const isClickable = Boolean(onOpen);
   const likeCount = post.likeCount ?? 0;
   const commentCount = post.commentCount ?? 0;
   const fallbackCollege =
@@ -47,25 +46,6 @@ export const PostCard = ({
       ? post.author.handle.replace(/^@/, "").trim()
       : "";
   const profileIdentifier = profileSlug || post.author.id;
-
-  const handleCardClick = (event: MouseEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement | null;
-    if (target?.closest("[data-profile-link]")) {
-      return;
-    }
-    onOpen?.(post);
-  };
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!isClickable) {
-      return;
-    }
-
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      onOpen?.(post);
-    }
-  };
 
   const handleActionClick =
     (action?: (post: FeedPost) => void) => (event: MouseEvent<HTMLButtonElement>) => {
@@ -92,17 +72,7 @@ export const PostCard = ({
   };
 
   return (
-    <Card
-      className={`space-y-4 ${
-        isClickable
-          ? "cursor-pointer transition hover:-translate-y-0.5 hover:shadow-[0_24px_50px_rgba(30,26,22,0.12)]"
-          : ""
-      }`}
-      onClick={isClickable ? handleCardClick : undefined}
-      onKeyDown={isClickable ? handleKeyDown : undefined}
-      role={isClickable ? "button" : undefined}
-      tabIndex={isClickable ? 0 : undefined}
-    >
+    <Card className="space-y-4">
       <div className="flex items-center gap-3">
         <button
           type="button"
