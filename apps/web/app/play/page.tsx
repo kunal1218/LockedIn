@@ -68,8 +68,11 @@ const CHAT_ROUND_SECONDS = 60;
 const ROLE_MODAL_SECONDS = 5;
 const TYPING_TEST_SECONDS = 60;
 
+type ActiveGame = "covo" | "poker";
+
 export default function RankedPlayPage() {
-  const { isAuthenticated, token, user, openAuthModal } = useAuth();
+  const { isAuthenticated, token, user, openAuthModal, refreshUser } = useAuth();
+  const [activeGame, setActiveGame] = useState<ActiveGame>("covo");
   const [rankedStatus, setRankedStatus] = useState<RankedStatus>({ status: "idle" });
   const [queueError, setQueueError] = useState<string | null>(null);
   const [isQueuing, setIsQueuing] = useState(false);
@@ -120,6 +123,10 @@ export default function RankedPlayPage() {
   const lastTypingSentRef = useRef<string>("");
   const typingRoundRef = useRef<number | null>(null);
   const typingWordsKeyRef = useRef<string>("");
+  const [pokerBuyIn, setPokerBuyIn] = useState("");
+  const [pokerChips, setPokerChips] = useState<number | null>(null);
+  const [pokerError, setPokerError] = useState<string | null>(null);
+  const [isBuyingIn, setIsBuyingIn] = useState(false);
   const lives =
     rankedStatus.status === "matched"
       ? rankedStatus.lives ?? { me: 3, opponents: [3, 3] }
@@ -1219,6 +1226,37 @@ export default function RankedPlayPage() {
     }
   };
 
+  const handlePokerBuyIn = async (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    const amount = Number(pokerBuyIn);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setPokerError("Enter a valid buy-in amount.");
+      return;
+    }
+    setPokerError(null);
+    setIsBuyingIn(true);
+    try {
+      const response = await apiPost<{ coins: number; chips: number }>(
+        "/poker/buy-in",
+        { amount },
+        token
+      );
+      setPokerChips(response.chips);
+      setPokerBuyIn("");
+      await refreshUser();
+    } catch (error) {
+      setPokerError(
+        error instanceof Error ? error.message : "Unable to buy in right now."
+      );
+    } finally {
+      setIsBuyingIn(false);
+    }
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!token) {
@@ -1546,8 +1584,33 @@ export default function RankedPlayPage() {
   ]);
 
   return (
-    <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-6">
-      <Card className="relative grid h-full min-h-[520px] grid-rows-[auto_1fr_auto] gap-3 overflow-hidden border border-card-border/70 bg-white/85 shadow-sm">
+    <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-6 flex flex-col">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setActiveGame("covo")}
+          className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+            activeGame === "covo"
+              ? "bg-accent text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)]"
+              : "border border-card-border/70 bg-white/80 text-ink/80 hover:border-accent/40 hover:text-ink"
+          }`}
+        >
+          Covo Game
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveGame("poker")}
+          className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+            activeGame === "poker"
+              ? "bg-accent text-white shadow-[0_10px_24px_rgba(255,134,88,0.25)]"
+              : "border border-card-border/70 bg-white/80 text-ink/80 hover:border-accent/40 hover:text-ink"
+          }`}
+        >
+          Poker
+        </button>
+      </div>
+      {activeGame === "covo" ? (
+        <Card className="relative grid flex-1 min-h-[520px] grid-rows-[auto_1fr_auto] gap-3 overflow-hidden border border-card-border/70 bg-white/85 shadow-sm">
         <div className="flex flex-col gap-4">
           <div className="grid gap-6 md:grid-cols-[1fr_auto_1fr]">
             <div className="flex min-w-[240px] items-center gap-3 md:justify-self-start">
@@ -2054,7 +2117,82 @@ export default function RankedPlayPage() {
           </div>
         )}
       {/* Center panel replaces modal for idle/waiting/match-end states */}
-      </Card>
+        </Card>
+      ) : (
+        <Card className="relative flex flex-1 flex-col gap-6 overflow-hidden border border-card-border/70 bg-white/85 p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted">
+                Poker Lounge
+              </p>
+              <h1 className="mt-2 font-display text-2xl font-semibold text-ink">
+                Texas Hold&#39;em
+              </h1>
+              <p className="mt-2 text-sm text-muted">
+                Buy in with your coins to take a seat at the table.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-card-border/70 bg-white/80 px-4 py-2 text-sm font-semibold text-ink/80">
+              Balance: {user?.coins ?? 0} coins
+            </div>
+          </div>
+
+          {!isAuthenticated ? (
+            <div className="rounded-2xl border border-card-border/70 bg-white/80 p-6 text-center">
+              <p className="text-sm font-semibold text-ink">
+                Log in to join the poker table.
+              </p>
+              <p className="mt-2 text-sm text-muted">
+                We&#39;ll use your coins to buy in.
+              </p>
+              <Button
+                className="mt-4"
+                requiresAuth={false}
+                onClick={() => openAuthModal("login")}
+              >
+                Log in
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <form className="flex flex-wrap items-end gap-3" onSubmit={handlePokerBuyIn}>
+                <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                  Buy-in
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={pokerBuyIn}
+                    onChange={(event) => setPokerBuyIn(event.target.value)}
+                    className={inputClasses}
+                    placeholder="Enter coins"
+                  />
+                </label>
+                <Button type="submit" disabled={isBuyingIn}>
+                  {isBuyingIn ? "Buying in..." : "Buy in"}
+                </Button>
+              </form>
+              {pokerError && (
+                <div className="rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm font-semibold text-accent">
+                  {pokerError}
+                </div>
+              )}
+              {pokerChips !== null && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                  You&#39;re seated with {pokerChips} chips.
+                </div>
+              )}
+              <div className="rounded-2xl border border-card-border/70 bg-white/80 p-5">
+                <p className="text-sm font-semibold text-ink">Table status</p>
+                <p className="mt-2 text-sm text-muted">
+                  Poker matches are coming next. For now, buy in to reserve your
+                  seat and flex those coins.
+                </p>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 }

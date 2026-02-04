@@ -39,6 +39,7 @@ type AuthContextValue = {
   openAuthModal: (mode?: AuthModalMode) => void;
   closeAuthModal: () => void;
   setAuthModalMode: (mode: AuthModalMode) => void;
+  refreshUser: () => Promise<void>;
   login: (params: { email: string; password: string }) => Promise<void>;
   signup: (params: {
     name: string;
@@ -167,6 +168,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [updateAuth]
   );
 
+  const refreshUser = useCallback(async () => {
+    if (!auth?.token) {
+      return;
+    }
+    const payload = await apiGet<{ user: AuthUser }>("/auth/me", auth.token);
+    updateAuth({ user: payload.user, token: auth.token });
+  }, [auth, updateAuth]);
+
   const signup = useCallback(
     async ({
       name,
@@ -204,6 +213,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       openAuthModal,
       closeAuthModal,
       setAuthModalMode,
+      refreshUser,
       login,
       signup,
       logout,
@@ -216,6 +226,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       login,
       logout,
       openAuthModal,
+      refreshUser,
       signup,
     ]
   );
