@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import type { EventWithDetails } from "@lockedin/shared";
 import { rsvpToEvent } from "@/lib/api/events";
 
@@ -74,6 +75,7 @@ export const EventDetailCard = ({
   const handleHostClick = () => {
     const rawHandle = event.creator.handle ?? "";
     const handleSlug = rawHandle.replace(/^@/, "").trim();
+    onClose();
     if (handleSlug) {
       router.push(`/profile/${encodeURIComponent(handleSlug)}`);
       return;
@@ -83,8 +85,12 @@ export const EventDetailCard = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
@@ -291,6 +297,7 @@ export const EventDetailCard = ({
           animation: scale-in 0.2s ease-out;
         }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 };
