@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { EventWithDetails } from "@lockedin/shared";
 import { rsvpToEvent } from "@/lib/api/events";
 
@@ -35,6 +36,7 @@ export const EventDetailCard = ({
   onClose,
   onRSVP,
 }: EventDetailCardProps) => {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [userStatus, setUserStatus] = useState(event.user_status ?? null);
 
@@ -66,6 +68,18 @@ export const EventDetailCard = ({
       window.alert("Failed to RSVP. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleHostClick = () => {
+    const rawHandle = event.creator.handle ?? "";
+    const handleSlug = rawHandle.replace(/^@/, "").trim();
+    if (handleSlug) {
+      router.push(`/profile/${encodeURIComponent(handleSlug)}`);
+      return;
+    }
+    if (event.creator.id) {
+      router.push(`/profile/${encodeURIComponent(event.creator.id)}`);
     }
   };
 
@@ -121,15 +135,27 @@ export const EventDetailCard = ({
                   </span>
                   <div className="flex items-center gap-3">
                     {event.creator.profile_picture_url ? (
-                      <img
-                        src={event.creator.profile_picture_url}
-                        alt={event.creator.name}
-                        className="h-10 w-10 rounded-full object-cover"
-                      />
+                      <button
+                        type="button"
+                        onClick={handleHostClick}
+                        className="flex h-10 w-10 items-center justify-center rounded-full"
+                        aria-label={`View ${event.creator.handle ?? event.creator.name} profile`}
+                      >
+                        <img
+                          src={event.creator.profile_picture_url}
+                          alt={event.creator.name}
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                      </button>
                     ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white">
+                      <button
+                        type="button"
+                        onClick={handleHostClick}
+                        className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white"
+                        aria-label={`View ${event.creator.handle ?? event.creator.name} profile`}
+                      >
                         {event.creator.name?.charAt(0).toUpperCase() ?? "?"}
-                      </div>
+                      </button>
                     )}
                     <div>
                       <p className="text-sm font-semibold text-ink">
