@@ -230,10 +230,14 @@ const assertNotBanned = (row: Pick<UserRow, "banned_until" | "banned_indefinitel
   if (row.banned_indefinitely) {
     throw new AuthError("Account is banned.", 403);
   }
+  const bannedUntil = row.banned_until;
+  if (!bannedUntil) {
+    throw new AuthError("Account is banned.", 403);
+  }
   const until =
-    row.banned_until instanceof Date
-      ? row.banned_until.toISOString()
-      : new Date(row.banned_until).toISOString();
+    bannedUntil instanceof Date
+      ? bannedUntil.toISOString()
+      : new Date(bannedUntil).toISOString();
   throw new AuthError(`Account is banned until ${until}`, 403);
 };
 
