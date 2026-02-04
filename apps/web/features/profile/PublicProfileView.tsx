@@ -37,6 +37,11 @@ type PublicProfilePayload = {
     mode: LayoutMode;
     positions: Record<string, BlockPosition>;
   } | null;
+  ban?: {
+    isActive: boolean;
+    until: string | null;
+    isIndefinite: boolean;
+  };
 };
 
 type RelationshipStatus =
@@ -48,6 +53,8 @@ type RelationshipStatus =
   | "blocked_by";
 
 type LayoutMode = "default" | "compact";
+
+type BanDuration = "day" | "week" | "month" | "forever";
 
 type BlockTemplate = {
   id: string;
@@ -150,6 +157,10 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
   const [relationship, setRelationship] = useState<RelationshipStatus>("none");
   const [isRelationshipLoading, setRelationshipLoading] = useState(false);
   const [relationshipError, setRelationshipError] = useState<string | null>(null);
+  const [banDuration, setBanDuration] = useState<BanDuration>("week");
+  const [banStatus, setBanStatus] = useState<PublicProfilePayload["ban"] | null>(null);
+  const [isBanLoading, setBanLoading] = useState(false);
+  const [banError, setBanError] = useState<string | null>(null);
   const params = useParams();
   const pathname = usePathname();
   const rawHandle = typeof handle === "string" ? handle : "";
@@ -261,7 +272,8 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
 
       try {
         const response = await apiGet<PublicProfilePayload>(
-          `/profile/public/${encodeURIComponent(sanitizedHandle)}?mode=${layoutMode}`
+          `/profile/public/${encodeURIComponent(sanitizedHandle)}?mode=${layoutMode}`,
+          token ?? undefined
         );
 
         if (!isActive) {
@@ -290,7 +302,11 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
     return () => {
       isActive = false;
     };
-  }, [layoutMode, sanitizedHandle]);
+  }, [layoutMode, sanitizedHandle, token]);
+
+  useEffect(() => {
+    setBanStatus(profile?.ban ?? null);
+  }, [profile?.ban?.isActive, profile?.ban?.isIndefinite, profile?.ban?.until]);
 
   useEffect(() => {
     if (!token || !profile?.user?.handle) {
@@ -390,6 +406,24 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
     user.collegeName ??
     deriveCollegeFromDomain(user.collegeDomain ?? "");
   const isSelf = viewer?.id === user.id;
+  const showAdminControls = Boolean(viewer?.isAdmin && !isSelf);
+
+  const formattedBanUntil = useMemo(() => {
+    if (!banStatus?.isActive) {
+      return null;
+    }
+    if (banStatus.isIndefinite) {
+      return "Banned indefinitely";
+    }
+    if (!banStatus.until) {
+      return "Banned";
+    }
+    const date = new Date(banStatus.until);
+    if (Number.isNaN(date.getTime())) {
+      return "Banned";
+    }
+    return `Banned until ${date.toLocaleDateString()}`;
+  }, [banStatus?.isActive, banStatus?.isIndefinite, banStatus?.until]);
 
   const runRelationshipAction = async (
     action: () => Promise<void>,
@@ -505,6 +539,35 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
     );
   };
 
+  const handleBanToggle = async () => {
+    if (!showAdminControls) {
+      return;
+    }
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    setBanError(null);
+    setBanLoading(true);
+    try {
+      const duration = banStatus?.isActive ? "unban" : banDuration;
+      const response = await apiPost<{ ban: PublicProfilePayload["ban"] }>(
+        `/admin/users/${encodeURIComponent(user.id)}/ban`,
+        { duration },
+        token
+      );
+      setBanStatus(response.ban ?? null);
+    } catch (banUpdateError) {
+      setBanError(
+        banUpdateError instanceof Error
+          ? banUpdateError.message
+          : "Unable to update ban."
+      );
+    } finally {
+      setBanLoading(false);
+    }
+  };
+
   const renderHeader = () => (
     <Card className="relative overflow-hidden">
       <div className="absolute -right-16 -top-12 h-32 w-32 rounded-full bg-accent/20 blur-2xl" />
@@ -531,6 +594,38 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
         </div>
         {!isSelf && (
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            {showAdminControls && (
+              <div className="flex flex-wrap items-center gap-2">
+                {!banStatus?.isActive && (
+                  <select
+                    className="rounded-full border border-card-border/70 bg-white/90 px-3 py-1 text-xs font-semibold text-ink/70 shadow-sm transition hover:border-accent/40 focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    value={banDuration}
+                    onChange={(event) =>
+                      setBanDuration(event.target.value as BanDuration)
+                    }
+                    disabled={isBanLoading}
+                  >
+                    <option value="day">Ban 1 day</option>
+                    <option value="week">Ban 1 week</option>
+                    <option value="month">Ban 1 month</option>
+                    <option value="forever">Ban forever</option>
+                  </select>
+                )}
+                <Button
+                  variant={banStatus?.isActive ? "outline" : "primary"}
+                  requiresAuth={true}
+                  onClick={handleBanToggle}
+                  disabled={isBanLoading}
+                >
+                  {banStatus?.isActive ? "Unban" : "Ban"}
+                </Button>
+                {formattedBanUntil && (
+                  <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600">
+                    {formattedBanUntil}
+                  </span>
+                )}
+              </div>
+            )}
             {relationship === "blocked" ? (
               <Button
                 variant="outline"
@@ -621,6 +716,9 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
         <p className="mt-3 text-xs font-semibold text-accent">
           {relationshipError}
         </p>
+      )}
+      {banError && (
+        <p className="mt-2 text-xs font-semibold text-rose-600">{banError}</p>
       )}
     </Card>
   );

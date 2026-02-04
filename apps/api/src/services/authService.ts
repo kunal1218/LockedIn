@@ -15,6 +15,8 @@ type UserRow = {
   college_domain?: string | null;
   coins?: number | null;
   last_ranked_win_reward_at?: string | Date | null;
+  banned_until?: string | Date | null;
+  banned_indefinitely?: boolean | null;
 };
 
 export type AuthUser = {
@@ -80,6 +82,8 @@ export const ensureUsersTable = async () => {
       monthly_coins integer NOT NULL DEFAULT 0,
       monthly_coins_month date NOT NULL DEFAULT (date_trunc('month', now())::date),
       monthly_coins_seeded boolean NOT NULL DEFAULT false,
+      banned_until timestamptz,
+      banned_indefinitely boolean NOT NULL DEFAULT false,
       last_ranked_win_reward_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now()
     );
@@ -95,6 +99,8 @@ export const ensureUsersTable = async () => {
     ADD COLUMN IF NOT EXISTS monthly_coins integer NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS monthly_coins_month date NOT NULL DEFAULT (date_trunc('month', now())::date),
     ADD COLUMN IF NOT EXISTS monthly_coins_seeded boolean NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS banned_until timestamptz,
+    ADD COLUMN IF NOT EXISTS banned_indefinitely boolean NOT NULL DEFAULT false,
     ADD COLUMN IF NOT EXISTS last_ranked_win_reward_at timestamptz;
   `);
 
@@ -205,6 +211,30 @@ const isHandleAvailable = async (handle: string, userId: string) => {
     [handle, userId]
   );
   return (result.rowCount ?? 0) === 0;
+};
+
+const isUserBanned = (row: Pick<UserRow, "banned_until" | "banned_indefinitely">) => {
+  if (row.banned_indefinitely) {
+    return true;
+  }
+  if (!row.banned_until) {
+    return false;
+  }
+  return new Date(row.banned_until).getTime() > Date.now();
+};
+
+const assertNotBanned = (row: Pick<UserRow, "banned_until" | "banned_indefinitely">) => {
+  if (!isUserBanned(row)) {
+    return;
+  }
+  if (row.banned_indefinitely) {
+    throw new AuthError("Account is banned.", 403);
+  }
+  const until =
+    row.banned_until instanceof Date
+      ? row.banned_until.toISOString()
+      : new Date(row.banned_until).toISOString();
+  throw new AuthError(`Account is banned until ${until}`, 403);
 };
 
 const mapUser = (
@@ -561,7 +591,7 @@ export const signInUser = async (params: {
   }
 
   const result = await db.query(
-    "SELECT id, name, handle, email, password_hash, college_name, college_domain, coins FROM users WHERE email = $1",
+    "SELECT id, name, handle, email, password_hash, college_name, college_domain, coins, banned_until, banned_indefinitely FROM users WHERE email = $1",
     [email]
   );
   const row = result.rows[0] as UserRow | undefined;
@@ -575,6 +605,8 @@ export const signInUser = async (params: {
     throw new AuthError("Invalid email or password", 401);
   }
 
+  assertNotBanned(row);
+
   if (!row.college_domain || !row.college_name) {
     const college = deriveCollegeFromEmail(row.email);
     if (college) {
@@ -582,7 +614,7 @@ export const signInUser = async (params: {
         `UPDATE users
          SET college_name = $2, college_domain = $3
          WHERE id = $1
-         RETURNING id, name, handle, email, college_name, college_domain, coins`,
+         RETURNING id, name, handle, email, college_name, college_domain, coins, banned_until, banned_indefinitely`,
         [row.id, college.name, college.domain]
       );
       const updated = refreshed.rows[0] as UserRow | undefined;
@@ -615,13 +647,15 @@ export const getUserFromToken = async (
 
   const { userId } = JSON.parse(session) as { userId: string };
   const result = await db.query(
-    "SELECT id, name, handle, email, college_name, college_domain, coins FROM users WHERE id = $1",
+    "SELECT id, name, handle, email, college_name, college_domain, coins, banned_until, banned_indefinitely FROM users WHERE id = $1",
     [userId]
   );
   const row = result.rows[0] as UserRow | undefined;
   if (!row) {
     return null;
   }
+
+  assertNotBanned(row);
 
   if (!row.college_domain || !row.college_name) {
     const college = deriveCollegeFromEmail(row.email);
@@ -630,7 +664,7 @@ export const getUserFromToken = async (
         `UPDATE users
          SET college_name = $2, college_domain = $3
          WHERE id = $1
-         RETURNING id, name, handle, email, college_name, college_domain, coins`,
+         RETURNING id, name, handle, email, college_name, college_domain, coins, banned_until, banned_indefinitely`,
         [row.id, college.name, college.domain]
       );
       const updated = refreshed.rows[0] as UserRow | undefined;

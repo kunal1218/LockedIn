@@ -129,7 +129,7 @@ export const PollCard = ({
               Edit
             </button>
           )}
-          {isOwnPost && onDelete && (
+          {(isOwnPost || user?.isAdmin) && onDelete && (
             <button
               type="button"
               className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"

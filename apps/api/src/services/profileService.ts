@@ -13,6 +13,18 @@ type PublicProfileUserRow = {
   handle: string;
   college_name?: string | null;
   college_domain?: string | null;
+  banned_until?: string | Date | null;
+  banned_indefinitely?: boolean | null;
+};
+
+const toIsoString = (value: string | Date) =>
+  value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+
+const getBanInfo = (row: PublicProfileUserRow) => {
+  const isIndefinite = Boolean(row.banned_indefinitely);
+  const until = row.banned_until ? toIsoString(row.banned_until) : null;
+  const isActive = isIndefinite || (until ? new Date(until).getTime() > Date.now() : false);
+  return { isActive, until, isIndefinite };
 };
 
 const normalizeHandle = (value: string) => {
@@ -35,7 +47,8 @@ export const fetchProfile = async () => {
 
 export const fetchPublicProfileByHandle = async (
   handle: string,
-  mode?: LayoutMode
+  mode?: LayoutMode,
+  options?: { includeBanInfo?: boolean }
 ) => {
   await ensureUsersTable();
   const trimmed = handle.trim();
@@ -46,7 +59,7 @@ export const fetchPublicProfileByHandle = async (
   let result;
   if (isUuid(trimmed)) {
     result = await db.query(
-      "SELECT id, name, handle, college_name, college_domain FROM users WHERE id = $1",
+      "SELECT id, name, handle, college_name, college_domain, banned_until, banned_indefinitely FROM users WHERE id = $1",
       [trimmed]
     );
   } else {
@@ -55,7 +68,7 @@ export const fetchPublicProfileByHandle = async (
       return null;
     }
     result = await db.query(
-      "SELECT id, name, handle, college_name, college_domain FROM users WHERE handle = $1",
+      "SELECT id, name, handle, college_name, college_domain, banned_until, banned_indefinitely FROM users WHERE handle = $1",
       [normalized]
     );
   }
@@ -76,6 +89,8 @@ export const fetchPublicProfileByHandle = async (
 
   const layout = primaryLayout ?? fallbackLayout;
 
+  const ban = options?.includeBanInfo ? getBanInfo(row) : undefined;
+
   return {
     user: {
       id: row.id,
@@ -86,5 +101,6 @@ export const fetchPublicProfileByHandle = async (
     },
     answers,
     layout,
+    ban,
   };
 };

@@ -38,6 +38,22 @@ const requireUser = async (req: Request) => {
   return user;
 };
 
+const getOptionalUser = async (req: Request) => {
+  const token = getToken(req);
+  if (!token) {
+    return null;
+  }
+
+  try {
+    return await getUserFromToken(token);
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return null;
+    }
+    throw error;
+  }
+};
+
 const handleError = (res: Response, error: unknown) => {
   if (error instanceof AuthError || error instanceof ProfileLayoutError) {
     res.status(error.status).json({ error: error.message });
@@ -61,9 +77,14 @@ export const getPublicProfile = async (req: Request, res: Response) => {
   }
 
   try {
+    const viewer = await getOptionalUser(req);
     const mode =
       typeof req.query?.mode === "string" ? req.query.mode : undefined;
-    const profile = await fetchPublicProfileByHandle(handle, mode === "compact" ? "compact" : "default");
+    const profile = await fetchPublicProfileByHandle(
+      handle,
+      mode === "compact" ? "compact" : "default",
+      { includeBanInfo: Boolean(viewer?.isAdmin) }
+    );
     if (!profile) {
       res.status(404).json({ error: "Profile not found" });
       return;

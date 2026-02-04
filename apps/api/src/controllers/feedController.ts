@@ -257,7 +257,7 @@ export const deleteFeedPost = async (req: Request, res: Response) => {
   try {
     const user = await requireUser(req);
     const postId = requirePostId(req.params?.postId);
-    await deletePost({ userId: user.id, postId });
+    await deletePost({ userId: user.id, postId, isAdmin: user.isAdmin });
     res.status(204).send();
   } catch (error) {
     handleError(res, error);

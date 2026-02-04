@@ -510,7 +510,11 @@ export const updatePost = async (params: {
   return post;
 };
 
-export const deletePost = async (params: { userId: string; postId: string }) => {
+export const deletePost = async (params: {
+  userId: string;
+  postId: string;
+  isAdmin?: boolean;
+}) => {
   await ensureFeedTables();
 
   const current = await db.query(
@@ -523,7 +527,7 @@ export const deletePost = async (params: { userId: string; postId: string }) => 
   }
 
   const { author_id: authorId } = current.rows[0] as { author_id: string };
-  if (authorId !== params.userId) {
+  if (authorId !== params.userId && !params.isAdmin) {
     throw new FeedError("You can only delete your own posts", 403);
   }
 
