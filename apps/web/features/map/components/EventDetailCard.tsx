@@ -83,7 +83,7 @@ export const EventDetailCard = ({
               <span className="text-3xl">{categoryIcon}</span>
               <span className="capitalize">{event.category}</span>
             </div>
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
               <h2 className="text-2xl font-semibold text-ink">{event.title}</h2>
               {distanceLabel && (
                 <span className="text-sm text-muted whitespace-nowrap">
@@ -145,12 +145,6 @@ export const EventDetailCard = ({
               <div className="flex items-start gap-3">
                 <span className="text-xl">📍</span>
                 <p className="font-medium text-ink">{event.venue_name}</p>
-              </div>
-            )}
-            {distanceLabel && (
-              <div className="flex items-start gap-3">
-                <span className="text-xl">🚶</span>
-                <p className="text-sm text-muted">{distanceLabel}</p>
               </div>
             )}
           </div>
