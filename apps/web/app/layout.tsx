@@ -31,7 +31,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${display.variable} ${body.variable} font-sans antialiased`}>
         <AuthProvider>
-          <div className="relative min-h-screen overflow-hidden">
+          <div className="relative min-h-screen overflow-x-hidden">
             <BackgroundDecor />
             <SiteHeader />
             <main className="relative z-0">{children}</main>
