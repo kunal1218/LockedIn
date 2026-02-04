@@ -59,6 +59,34 @@ type RankedStatus =
       characterRoleAssignedAt?: string | null;
     };
 
+type PokerClientState = {
+  status: "waiting" | "in_hand" | "hand_over" | "busted";
+  street: "preflop" | "flop" | "turn" | "river" | "showdown";
+  playerChips: number;
+  botChips: number;
+  pot: number;
+  community: string[];
+  playerCards: string[];
+  botCards: string[];
+  dealer: "player" | "bot";
+  turn: "player" | "bot";
+  currentBet: number;
+  playerBet: number;
+  botBet: number;
+  blinds: { small: number; big: number };
+  log: Array<{ id: string; text: string }>;
+  winner?: "player" | "bot" | "tie";
+  actions?: {
+    canCheck: boolean;
+    canCall: boolean;
+    canRaise: boolean;
+    canBet: boolean;
+    callAmount: number;
+    minRaise: number;
+    maxRaise: number;
+  };
+};
+
 const inputClasses =
   "w-full rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-ink outline-none transition focus:border-accent/60 focus:bg-white";
 
@@ -124,9 +152,12 @@ export default function RankedPlayPage() {
   const typingRoundRef = useRef<number | null>(null);
   const typingWordsKeyRef = useRef<string>("");
   const [pokerBuyIn, setPokerBuyIn] = useState("");
-  const [pokerChips, setPokerChips] = useState<number | null>(null);
   const [pokerError, setPokerError] = useState<string | null>(null);
   const [isBuyingIn, setIsBuyingIn] = useState(false);
+  const [pokerState, setPokerState] = useState<PokerClientState | null>(null);
+  const [isPokerLoading, setIsPokerLoading] = useState(false);
+  const [isPokerActing, setIsPokerActing] = useState(false);
+  const [pokerRaiseAmount, setPokerRaiseAmount] = useState("");
   const lives =
     rankedStatus.status === "matched"
       ? rankedStatus.lives ?? { me: 3, opponents: [3, 3] }
@@ -369,6 +400,11 @@ export default function RankedPlayPage() {
   const rightOpponentLivesCount = rightOpponent
     ? opponentLivesById.get(rightOpponent.id) ?? 3
     : 3;
+  const pokerActions = pokerState?.actions;
+  const pokerCallAmount = pokerActions?.callAmount ?? 0;
+  const pokerCanAct = Boolean(pokerActions);
+  const pokerIsPlayerTurn =
+    pokerState?.status === "in_hand" && pokerState?.turn === "player";
   const chatOpponent =
     !displayIsJudge
       ? displayOpponents.find((opponent) => opponent.id !== displayJudgeUserId) ??
@@ -411,6 +447,26 @@ export default function RankedPlayPage() {
       })}
     </div>
   );
+  const renderPokerCard = (card?: string, hidden = false) => {
+    const rank = card?.[0] ?? "";
+    const suit = card?.[1] ?? "";
+    const suitSymbol =
+      suit === "H" ? "♥" : suit === "D" ? "♦" : suit === "C" ? "♣" : suit === "S" ? "♠" : "";
+    const face = rank === "T" ? "10" : rank;
+    const content = hidden ? "🂠" : `${face}${suitSymbol}`.trim();
+    const isRed = suit === "H" || suit === "D";
+    return (
+      <div
+        className={`flex h-12 w-9 items-center justify-center rounded-xl border text-sm font-semibold shadow-sm ${
+          hidden
+            ? "border-ink/70 bg-ink text-white"
+            : `border-card-border/70 bg-white ${isRed ? "text-rose-500" : "text-ink"}`
+        }`}
+      >
+        {content}
+      </div>
+    );
+  };
   const getTimerBarClass = (active: boolean, seconds: number) => {
     if (!active) {
       return "bg-slate-300";
@@ -1226,6 +1282,29 @@ export default function RankedPlayPage() {
     }
   };
 
+  const loadPokerState = useCallback(async () => {
+    if (!token) {
+      setPokerState(null);
+      setIsPokerLoading(false);
+      return;
+    }
+    setIsPokerLoading(true);
+    try {
+      const response = await apiGet<{ state: PokerClientState | null }>(
+        "/poker/state",
+        token
+      );
+      setPokerState(response.state);
+      setPokerError(null);
+    } catch (error) {
+      setPokerError(
+        error instanceof Error ? error.message : "Unable to load poker table."
+      );
+    } finally {
+      setIsPokerLoading(false);
+    }
+  }, [token]);
+
   const handlePokerBuyIn = async (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
     if (!token) {
@@ -1245,8 +1324,9 @@ export default function RankedPlayPage() {
         { amount },
         token
       );
-      setPokerChips(response.chips);
       setPokerBuyIn("");
+      setPokerRaiseAmount("");
+      await loadPokerState();
       await refreshUser();
     } catch (error) {
       setPokerError(
@@ -1254,6 +1334,60 @@ export default function RankedPlayPage() {
       );
     } finally {
       setIsBuyingIn(false);
+    }
+  };
+
+  const handlePokerStartHand = async () => {
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    setIsPokerActing(true);
+    setPokerError(null);
+    try {
+      const response = await apiPost<{ state: PokerClientState }>(
+        "/poker/start-hand",
+        {},
+        token
+      );
+      setPokerState(response.state);
+    } catch (error) {
+      setPokerError(
+        error instanceof Error ? error.message : "Unable to start a hand."
+      );
+    } finally {
+      setIsPokerActing(false);
+    }
+  };
+
+  const handlePokerAction = async (action: "fold" | "check" | "call" | "bet" | "raise") => {
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    setIsPokerActing(true);
+    setPokerError(null);
+    const amount =
+      action === "bet" || action === "raise" ? Number(pokerRaiseAmount) : undefined;
+    if ((action === "bet" || action === "raise") && (!amount || amount <= 0)) {
+      setPokerError("Enter a valid bet amount.");
+      setIsPokerActing(false);
+      return;
+    }
+    try {
+      const response = await apiPost<{ state: PokerClientState }>(
+        "/poker/action",
+        { action, amount },
+        token
+      );
+      setPokerState(response.state);
+      setPokerRaiseAmount("");
+    } catch (error) {
+      setPokerError(
+        error instanceof Error ? error.message : "Unable to play that action."
+      );
+    } finally {
+      setIsPokerActing(false);
     }
   };
 
@@ -1582,6 +1716,13 @@ export default function RankedPlayPage() {
     rankedStatus.status,
     reportTurnTimeout,
   ]);
+
+  useEffect(() => {
+    if (activeGame !== "poker") {
+      return;
+    }
+    void loadPokerState();
+  }, [activeGame, loadPokerState]);
 
   return (
     <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-6 flex flex-col">
@@ -2154,40 +2295,210 @@ export default function RankedPlayPage() {
               </Button>
             </div>
           ) : (
-            <div className="space-y-4">
-              <form className="flex flex-wrap items-end gap-3" onSubmit={handlePokerBuyIn}>
-                <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-                  Buy-in
-                  <input
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={pokerBuyIn}
-                    onChange={(event) => setPokerBuyIn(event.target.value)}
-                    className={inputClasses}
-                    placeholder="Enter coins"
-                  />
-                </label>
-                <Button type="submit" disabled={isBuyingIn}>
-                  {isBuyingIn ? "Buying in..." : "Buy in"}
-                </Button>
-              </form>
-              {pokerError && (
-                <div className="rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm font-semibold text-accent">
-                  {pokerError}
+            <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+              <div className="rounded-3xl border border-card-border/70 bg-white/80 p-6">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                  <span>Pot: {pokerState?.pot ?? 0}</span>
+                  <span>
+                    Blinds: {pokerState?.blinds.small ?? 0}/
+                    {pokerState?.blinds.big ?? 0}
+                  </span>
+                  <span>
+                    {pokerState ? `Street: ${pokerState.street}` : "Waiting"}
+                  </span>
                 </div>
-              )}
-              {pokerChips !== null && (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-                  You&#39;re seated with {pokerChips} chips.
+                <div className="mt-6 flex flex-col gap-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-ink">
+                        Dealer Bot
+                        {pokerState?.dealer === "bot" ? " · D" : ""}
+                      </p>
+                      <p className="text-xs text-muted">
+                        Chips: {pokerState?.botChips ?? 0}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {pokerState?.botCards?.length
+                        ? pokerState.botCards.map((card, index) => (
+                            <div key={`bot-card-${index}`}>{renderPokerCard(card)}</div>
+                          ))
+                        : pokerState?.status === "in_hand"
+                          ? [0, 1].map((index) => (
+                              <div key={`bot-hidden-${index}`}>
+                                {renderPokerCard(undefined, true)}
+                              </div>
+                            ))
+                          : null}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {Array.from({ length: 5 }).map((_, index) => (
+                      <div key={`community-${index}`}>
+                        {renderPokerCard(pokerState?.community?.[index])}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-ink">
+                        {myName}
+                        {pokerState?.dealer === "player" ? " · D" : ""}
+                      </p>
+                      <p className="text-xs text-muted">
+                        Chips: {pokerState?.playerChips ?? 0}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {pokerState?.playerCards?.length
+                        ? pokerState.playerCards.map((card, index) => (
+                            <div key={`player-card-${index}`}>
+                              {renderPokerCard(card)}
+                            </div>
+                          ))
+                        : [0, 1].map((index) => (
+                            <div key={`player-empty-${index}`}>
+                              {renderPokerCard(undefined)}
+                            </div>
+                          ))}
+                    </div>
+                  </div>
                 </div>
-              )}
-              <div className="rounded-2xl border border-card-border/70 bg-white/80 p-5">
-                <p className="text-sm font-semibold text-ink">Table status</p>
-                <p className="mt-2 text-sm text-muted">
-                  Poker matches are coming next. For now, buy in to reserve your
-                  seat and flex those coins.
-                </p>
+              </div>
+
+              <div className="space-y-4">
+                <form className="flex flex-wrap items-end gap-3" onSubmit={handlePokerBuyIn}>
+                  <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                    Buy-in
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={pokerBuyIn}
+                      onChange={(event) => setPokerBuyIn(event.target.value)}
+                      className={inputClasses}
+                      placeholder="Enter coins"
+                    />
+                  </label>
+                  <Button type="submit" disabled={isBuyingIn}>
+                    {isBuyingIn ? "Buying in..." : "Buy in"}
+                  </Button>
+                </form>
+
+                {pokerError && (
+                  <div className="rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm font-semibold text-accent">
+                    {pokerError}
+                  </div>
+                )}
+
+                {isPokerLoading ? (
+                  <div className="rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-muted">
+                    Loading table...
+                  </div>
+                ) : pokerState ? (
+                  <div className="rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm">
+                    <p className="text-sm font-semibold text-ink">
+                      {pokerState.status === "busted"
+                        ? "You&#39;re out of chips."
+                        : pokerState.status === "hand_over"
+                          ? pokerState.winner === "player"
+                            ? "You won the last hand."
+                            : pokerState.winner === "bot"
+                              ? "Dealer bot took the pot."
+                              : "Split pot."
+                          : pokerIsPlayerTurn
+                            ? "Your turn to act."
+                            : "Dealer bot is thinking..."}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      Current bet: {pokerState.currentBet} · Your bet: {pokerState.playerBet}
+                    </p>
+                    {(pokerState.status === "waiting" ||
+                      pokerState.status === "hand_over" ||
+                      pokerState.status === "busted") && (
+                      <div className="mt-3">
+                        <Button onClick={handlePokerStartHand} disabled={isPokerActing}>
+                          {pokerState.status === "hand_over" ? "Deal next hand" : "Deal hand"}
+                        </Button>
+                      </div>
+                    )}
+                    {pokerState.status === "in_hand" && pokerCanAct && (
+                      <div className="mt-3 flex flex-col gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {pokerActions?.canCheck && (
+                            <Button
+                              variant="outline"
+                              onClick={() => handlePokerAction("check")}
+                              disabled={isPokerActing}
+                            >
+                              Check
+                            </Button>
+                          )}
+                          {pokerActions?.canCall && (
+                            <Button
+                              variant="outline"
+                              onClick={() => handlePokerAction("call")}
+                              disabled={isPokerActing}
+                            >
+                              Call {pokerCallAmount}
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            onClick={() => handlePokerAction("fold")}
+                            disabled={isPokerActing}
+                          >
+                            Fold
+                          </Button>
+                        </div>
+                        {(pokerActions?.canBet || pokerActions?.canRaise) && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <input
+                              type="number"
+                              min={pokerActions?.minRaise ?? 1}
+                              step={1}
+                              value={pokerRaiseAmount}
+                              onChange={(event) => setPokerRaiseAmount(event.target.value)}
+                              className={inputClasses}
+                              placeholder={`Min ${pokerActions?.minRaise ?? 1}`}
+                            />
+                            <Button
+                              onClick={() =>
+                                handlePokerAction(
+                                  pokerState.currentBet === 0 ? "bet" : "raise"
+                                )
+                              }
+                              disabled={isPokerActing}
+                            >
+                              {pokerState.currentBet === 0 ? "Bet" : "Raise"}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-muted">
+                    Buy in to start a table and deal your first hand.
+                  </div>
+                )}
+
+                <div className="rounded-2xl border border-card-border/70 bg-white/80 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                    Table Log
+                  </p>
+                  <div className="mt-3 space-y-2 text-sm text-muted">
+                    {pokerState?.log?.length ? (
+                      pokerState.log.map((entry) => (
+                        <div key={entry.id}>{entry.text}</div>
+                      ))
+                    ) : (
+                      <div>Deal a hand to start the action.</div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}
