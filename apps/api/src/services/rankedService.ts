@@ -98,14 +98,7 @@ const TYPING_TEST_RESULT_SECONDS = 3;
 const TYPING_TEST_MAX_SECONDS = 60;
 const TYPING_TEST_MIN_WORD_LENGTH = 3;
 const TYPING_TEST_MAX_WORD_LENGTH = 8;
-const DEBUG_RANKED = process.env.RANKED_DEBUG === "true";
-
-const logRanked = (...args: unknown[]) => {
-  if (!DEBUG_RANKED) {
-    return;
-  }
-  console.log("[ranked]", ...args);
-};
+const logRanked = (..._args: unknown[]) => {};
 
 const icebreakerCache: { value: string[] | null } = { value: null };
 const characterRoleCache: {

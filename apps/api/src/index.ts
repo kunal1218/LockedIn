@@ -23,8 +23,4 @@ const port = process.env.PORT ? Number(process.env.PORT) : 4001;
 
 initializeSocketServer(httpServer);
 
-httpServer.listen(port, () => {
-  console.log(`LockedIn API listening on ${port}`);
-  console.log("Deploy tag: backend-redeploy-2026-02-04");
-  console.log("API log: railway-redeploy-2026-02-04");
-});
+httpServer.listen(port);
