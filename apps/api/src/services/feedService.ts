@@ -22,6 +22,7 @@ type FeedPostRow = {
   created_at: string | Date;
   tags: string[] | null;
   like_count: number | string;
+  comment_count?: number | string | null;
   liked_by_user?: boolean;
 };
 
@@ -172,6 +173,7 @@ const mapPost = (
   pollOptions: pollOptionsByPostId.get(row.id),
   likeCount: Number(row.like_count ?? 0),
   likedByUser: Boolean(row.liked_by_user),
+  commentCount: Number(row.comment_count ?? 0),
 });
 
 const mapComment = (row: CommentRow): FeedComment => ({
@@ -249,6 +251,7 @@ export const fetchFeed = async (params: {
             posts.created_at,
             posts.tags,
             posts.like_count,
+            COALESCE(comments.comment_count, 0) AS comment_count,
             users.name AS author_name,
             users.handle AS author_handle,
             users.college_name AS author_college_name,
@@ -256,6 +259,11 @@ export const fetchFeed = async (params: {
             (likes.user_id IS NOT NULL) AS liked_by_user
      FROM feed_posts posts
      JOIN users ON users.id = posts.author_id
+     LEFT JOIN (
+       SELECT post_id, COUNT(*) AS comment_count
+       FROM feed_comments
+       GROUP BY post_id
+     ) comments ON comments.post_id = posts.id
      LEFT JOIN feed_post_likes likes
        ON likes.post_id = posts.id AND likes.user_id = $1
      ORDER BY ${orderBy}`,
@@ -283,6 +291,7 @@ export const fetchPostById = async (
             posts.created_at,
             posts.tags,
             posts.like_count,
+            COALESCE(comments.comment_count, 0) AS comment_count,
             users.name AS author_name,
             users.handle AS author_handle,
             users.college_name AS author_college_name,
@@ -290,6 +299,11 @@ export const fetchPostById = async (
             (likes.user_id IS NOT NULL) AS liked_by_user
      FROM feed_posts posts
      JOIN users ON users.id = posts.author_id
+     LEFT JOIN (
+       SELECT post_id, COUNT(*) AS comment_count
+       FROM feed_comments
+       GROUP BY post_id
+     ) comments ON comments.post_id = posts.id
      LEFT JOIN feed_post_likes likes
        ON likes.post_id = posts.id AND likes.user_id = $2
      WHERE posts.id = $1`,

@@ -33,6 +33,7 @@ export const PostCard = ({
   const router = useRouter();
   const isClickable = Boolean(onOpen);
   const likeCount = post.likeCount ?? 0;
+  const commentCount = post.commentCount ?? 0;
   const fallbackCollege =
     user?.id === post.author.id && user.email
       ? deriveCollegeFromEmail(user.email)
@@ -142,7 +143,7 @@ export const PostCard = ({
           )}
           <button
             type="button"
-            className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition ${
               post.likedByUser
                 ? "border-accent/40 bg-accent/15 text-accent"
                 : "border-card-border/70 bg-white/80 text-ink/80 hover:border-accent/40 hover:text-ink"
@@ -150,8 +151,32 @@ export const PostCard = ({
             onClick={handleActionClick(onLike)}
             disabled={!onLike || isLiking}
             aria-pressed={post.likedByUser}
+            aria-label={`Like post. ${likeCount} likes`}
           >
-            Like {likeCount}
+            <span className="text-sm leading-none">
+              {post.likedByUser ? "❤" : "♡"}
+            </span>
+            <span>{likeCount}</span>
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-full border border-card-border/70 bg-white/80 px-3 py-1 text-xs font-semibold text-ink/80 transition hover:border-accent/40 hover:text-ink"
+            onClick={handleActionClick(onOpen)}
+            disabled={!onOpen}
+            aria-label={`View replies. ${commentCount} replies`}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M4 6h16v9a3 3 0 0 1-3 3H9l-5 4V6a2 2 0 0 1 2-2z" />
+            </svg>
+            <span>{commentCount}</span>
           </button>
         </div>
       </div>

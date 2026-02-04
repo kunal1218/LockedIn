@@ -29,6 +29,7 @@ export type FeedPost = {
   pollOptions?: PollOption[];
   likeCount: number;
   likedByUser?: boolean;
+  commentCount?: number;
 };
 
 export type FeedComment = {
