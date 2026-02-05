@@ -1,7 +1,7 @@
 "use client";
 
 import mapboxgl from "mapbox-gl";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type {
   CreateEventRequest,
@@ -46,8 +46,8 @@ const getMarkerColor = (name: string) =>
 const getInitial = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
 
 const MAP_STYLE = "mapbox://styles/mapbox/streets-v12";
-const DEFAULT_CENTER: [number, number] = [-73.9857, 40.7484];
-const DEFAULT_ZOOM = 12;
+const DEFAULT_CENTER: [number, number] = [-89.4012, 43.0731];
+const DEFAULT_ZOOM = 14;
 const UPDATE_INTERVAL_MS = 60000;
 const RING_RECENT = "#10b981";
 const RING_ACTIVE = "#f59e0b";
@@ -100,6 +100,16 @@ export const MapCanvas = () => {
   const [selectedEvent, setSelectedEvent] = useState<EventWithDetails | null>(
     null
   );
+  const userLocation = useMemo(() => {
+    if (!user?.id) {
+      return null;
+    }
+    const self = friends.find((friend) => friend.id === user.id);
+    if (!self) {
+      return null;
+    }
+    return { latitude: self.latitude, longitude: self.longitude };
+  }, [friends, user?.id]);
   const [isPlacingPin, setIsPlacingPin] = useState(false);
   const [showEventsSidebar, setShowEventsSidebar] = useState(false);
   const [showEventForm, setShowEventForm] = useState(false);
@@ -934,47 +944,49 @@ export const MapCanvas = () => {
     }
   }, [requestPosition, token]);
 
-  const centerOnUser = useCallback(async () => {
-    const position = await requestPosition();
-
-    if (mapRef.current) {
-      mapRef.current.easeTo({
-        center: [position.coords.longitude, position.coords.latitude],
-        zoom: Math.max(mapRef.current.getZoom(), 14),
-      });
-    }
-
-    if (token && settings.shareLocation && !settings.ghostMode) {
-      await apiPost(
-        "/map/location",
-        {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        },
-        token
-      );
-    }
-  }, [requestPosition, settings.ghostMode, settings.shareLocation, token]);
-
-  useEffect(() => {
-    didAutoCenterRef.current = false;
-  }, [mapInstanceKey]);
-
-  useEffect(() => {
-    if (!mapRef.current || !isMapReady || didAutoCenterRef.current) {
+  const handleHomeClick = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) {
       return;
     }
-    didAutoCenterRef.current = true;
-    centerOnUser().catch(() => {
-      // Error surfaced via setError.
-    });
-  }, [centerOnUser, isMapReady, mapInstanceKey]);
+
+    if (userLocation) {
+      map.flyTo({
+        center: [userLocation.longitude, userLocation.latitude],
+        zoom: 15,
+        duration: 1500,
+      });
+      return;
+    }
+
+if (token && settings.shareLocation && !settings.ghostMode) {
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        await apiPost(
+          "/map/location",
+          {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          },
+          token
+        );
+      });
+    }
+  }, [settings.ghostMode, settings.shareLocation, token]);
+
+  useEffect(() => {
+    if (!mapRef.current || !isMapReady) {
+      return;
+    }
+  }, [isMapReady, mapInstanceKey]);
 
   const zoomToCampus = useCallback(() => {
-    mapRef.current?.easeTo({
-      center: DEFAULT_CENTER,
-      zoom: DEFAULT_ZOOM,
-    });
+    if (mapRef.current) {
+      mapRef.current.flyTo({
+        center: DEFAULT_CENTER,
+        zoom: DEFAULT_ZOOM,
+        duration: 1500,
+      });
+    }
   }, []);
 
   const zoomIn = useCallback(() => {
@@ -1394,32 +1406,9 @@ export const MapCanvas = () => {
         <div className="flex flex-col gap-2 pointer-events-auto">
           <button
             type="button"
-            aria-label="Zoom to my location"
+            aria-label={userLocation ? "Go to my location" : "Go to campus"}
             className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#F3F4F6]"
-            onClick={() => {
-              centerOnUser().catch(() => {
-                // Error surfaced via setError.
-              });
-            }}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            aria-label="Zoom to campus"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#F3F4F6]"
-            onClick={zoomToCampus}
+            onClick={handleHomeClick}
           >
             <svg
               viewBox="0 0 24 24"
