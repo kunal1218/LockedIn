@@ -83,6 +83,8 @@ type PokerClientState = {
   currentPlayerIndex: number | null;
   currentBet: number;
   minRaise: number;
+  smallBlindIndex: number | null;
+  bigBlindIndex: number | null;
   youSeatIndex: number | null;
   actions?: {
     canCheck: boolean;
@@ -2549,6 +2551,10 @@ export default function RankedPlayPage() {
                       const seat = pokerSeatSlots[position.seatIndex];
                       const isCurrent =
                         pokerState?.currentPlayerIndex === position.seatIndex;
+                      const isSmallBlind =
+                        pokerState?.smallBlindIndex === position.seatIndex;
+                      const isBigBlind =
+                        pokerState?.bigBlindIndex === position.seatIndex;
                       return (
                         <div
                           key={`seat-${position.seatIndex}`}
@@ -2567,6 +2573,11 @@ export default function RankedPlayPage() {
                                 {seat.isDealer && (
                                   <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-300 text-[10px] font-bold text-amber-900 shadow-sm">
                                     D
+                                  </span>
+                                )}
+                                {(isSmallBlind || isBigBlind) && (
+                                  <span className="absolute -right-2 -bottom-2 flex h-5 w-5 items-center justify-center rounded-full bg-ink/80 text-[9px] font-bold text-white shadow-sm">
+                                    {isSmallBlind ? "SB" : "BB"}
                                   </span>
                                 )}
                               </div>
@@ -2605,10 +2616,15 @@ export default function RankedPlayPage() {
                     {pokerYouSeat && (
                       <button
                         type="button"
-                        onClick={() => setShowPokerCards((prev) => !prev)}
+                        onMouseDown={() => setShowPokerCards(true)}
+                        onMouseUp={() => setShowPokerCards(false)}
+                        onMouseLeave={() => setShowPokerCards(false)}
+                        onTouchStart={() => setShowPokerCards(true)}
+                        onTouchEnd={() => setShowPokerCards(false)}
+                        onTouchCancel={() => setShowPokerCards(false)}
                         className="rounded-full border border-card-border/70 bg-white/80 px-3 py-1 text-xs font-semibold text-ink/70 transition hover:border-accent/40 hover:text-ink"
                       >
-                        {showPokerCards ? "Hide cards" : "See cards"}
+                        Hold to see
                       </button>
                     )}
                     <div className="flex items-center gap-2">

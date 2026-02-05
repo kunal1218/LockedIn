@@ -37,13 +37,14 @@ export const ProfileHeader = ({
   const { user, token, openAuthModal, refreshUser } = useAuth();
   const [isGrantingCoins, setGrantingCoins] = useState(false);
   const [coinGrantMessage, setCoinGrantMessage] = useState<string | null>(null);
+  const [coinGrantAmount, setCoinGrantAmount] = useState(100);
   const displayName = user?.name ?? profile.name;
   const displayHandle = user?.handle ?? profile.handle;
   const displayCollege =
     user?.collegeName ?? (user?.email ? deriveCollegeFromEmail(user.email) : null);
   const showGrantCoins = Boolean(user?.isAdmin);
 
-  const handleGrantCoins = async (amount: number) => {
+  const handleGrantCoins = async () => {
     if (!user?.id) {
       return;
     }
@@ -54,9 +55,13 @@ export const ProfileHeader = ({
     setGrantingCoins(true);
     setCoinGrantMessage(null);
     try {
-      await apiPost(`/admin/users/${encodeURIComponent(user.id)}/coins`, { amount }, token);
+      await apiPost(
+        `/admin/users/${encodeURIComponent(user.id)}/coins`,
+        { amount: coinGrantAmount },
+        token
+      );
       await refreshUser();
-      setCoinGrantMessage(`Added ${amount.toLocaleString()} coins.`);
+      setCoinGrantMessage(`Added ${coinGrantAmount.toLocaleString()} coins.`);
     } catch (error) {
       setCoinGrantMessage(
         error instanceof Error ? error.message : "Unable to grant coins."
@@ -106,17 +111,25 @@ export const ProfileHeader = ({
               <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted">
                 Grant coins
               </span>
-              {[100, 1000, 10000, 100000].map((amount) => (
-                <Button
-                  key={`grant-self-${amount}`}
-                  variant="outline"
-                  requiresAuth={true}
-                  onClick={() => handleGrantCoins(amount)}
-                  disabled={isGrantingCoins}
-                >
-                  +{amount.toLocaleString()}
-                </Button>
-              ))}
+              <select
+                className="rounded-full border border-card-border/70 bg-white/90 px-3 py-1 text-xs font-semibold text-ink/70 shadow-sm transition hover:border-accent/40 focus:outline-none focus:ring-2 focus:ring-accent/30"
+                value={coinGrantAmount}
+                onChange={(event) => setCoinGrantAmount(Number(event.target.value))}
+                disabled={isGrantingCoins}
+              >
+                <option value={100}>+100</option>
+                <option value={1000}>+1,000</option>
+                <option value={10000}>+10,000</option>
+                <option value={100000}>+100,000</option>
+              </select>
+              <Button
+                variant="outline"
+                requiresAuth={true}
+                onClick={handleGrantCoins}
+                disabled={isGrantingCoins}
+              >
+                Grant
+              </Button>
             </div>
           )}
           {isEditing ? (

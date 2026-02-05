@@ -40,6 +40,8 @@ type PokerTable = {
   maxSeats: number;
   seats: Array<PokerPlayer | null>;
   dealerIndex: number;
+  smallBlindIndex?: number | null;
+  bigBlindIndex?: number | null;
   smallBlind: number;
   bigBlind: number;
   deck: CardCode[];
@@ -78,6 +80,8 @@ export type PokerClientState = {
   currentPlayerIndex: number | null;
   currentBet: number;
   minRaise: number;
+  smallBlindIndex: number | null;
+  bigBlindIndex: number | null;
   youSeatIndex: number | null;
   actions?: {
     canCheck: boolean;
@@ -528,6 +532,8 @@ const createTable = (smallBlind: number, bigBlind: number): PokerTable => {
     maxSeats: MAX_SEATS,
     seats: Array.from({ length: MAX_SEATS }, () => null),
     dealerIndex: -1,
+    smallBlindIndex: null,
+    bigBlindIndex: null,
     smallBlind,
     bigBlind,
     deck: [],
@@ -662,6 +668,8 @@ const startHand = (table: PokerTable) => {
   const eligiblePlayers = getEligiblePlayers(table);
   if (eligiblePlayers.length < MIN_PLAYERS) {
     table.status = "waiting";
+    table.smallBlindIndex = null;
+    table.bigBlindIndex = null;
     return;
   }
 
@@ -691,8 +699,12 @@ const startHand = (table: PokerTable) => {
   const { smallBlindIndex, bigBlindIndex } = getBlindIndexes(table);
   if (smallBlindIndex === null || bigBlindIndex === null) {
     table.status = "waiting";
+    table.smallBlindIndex = null;
+    table.bigBlindIndex = null;
     return;
   }
+  table.smallBlindIndex = smallBlindIndex;
+  table.bigBlindIndex = bigBlindIndex;
 
   postBlind(table, smallBlindIndex, table.smallBlind);
   postBlind(table, bigBlindIndex, table.bigBlind);
@@ -859,6 +871,8 @@ const concludeHand = (table: PokerTable) => {
   table.pendingActionUserIds = [];
   table.currentBet = 0;
   table.minRaise = table.bigBlind;
+  table.smallBlindIndex = null;
+  table.bigBlindIndex = null;
 
   table.seats = table.seats.map((seat) => {
     if (!seat) {
@@ -1065,6 +1079,8 @@ const buildClientState = (table: PokerTable, userId: string): PokerClientState =
     currentPlayerIndex: table.currentPlayerIndex,
     currentBet: table.currentBet,
     minRaise: table.minRaise,
+    smallBlindIndex: table.smallBlindIndex ?? null,
+    bigBlindIndex: table.bigBlindIndex ?? null,
     youSeatIndex,
     actions,
     log: table.log.slice(-12),

@@ -164,6 +164,7 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
   const [isGrantingCoins, setGrantingCoins] = useState(false);
   const [coinGrantError, setCoinGrantError] = useState<string | null>(null);
   const [coinGrantSuccess, setCoinGrantSuccess] = useState<string | null>(null);
+  const [coinGrantAmount, setCoinGrantAmount] = useState(100);
   const params = useParams();
   const pathname = usePathname();
   const rawHandle = typeof handle === "string" ? handle : "";
@@ -571,7 +572,7 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
     }
   };
 
-  const handleGrantCoins = async (amount: number) => {
+  const handleGrantCoins = async () => {
     if (!showAdminTools) {
       return;
     }
@@ -585,13 +586,13 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
     try {
       await apiPost(
         `/admin/users/${encodeURIComponent(user.id)}/coins`,
-        { amount },
+        { amount: coinGrantAmount },
         token
       );
       if (viewer?.id === user.id) {
         await refreshUser();
       }
-      setCoinGrantSuccess(`Added ${amount.toLocaleString()} coins.`);
+      setCoinGrantSuccess(`Added ${coinGrantAmount.toLocaleString()} coins.`);
     } catch (coinError) {
       setCoinGrantError(
         coinError instanceof Error
@@ -633,17 +634,25 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
               <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted">
                 Grant coins
               </span>
-              {[100, 1000, 10000, 100000].map((amount) => (
-                <Button
-                  key={`grant-${amount}`}
-                  variant="outline"
-                  requiresAuth={true}
-                  onClick={() => handleGrantCoins(amount)}
-                  disabled={isGrantingCoins}
-                >
-                  +{amount.toLocaleString()}
-                </Button>
-              ))}
+              <select
+                className="rounded-full border border-card-border/70 bg-white/90 px-3 py-1 text-xs font-semibold text-ink/70 shadow-sm transition hover:border-accent/40 focus:outline-none focus:ring-2 focus:ring-accent/30"
+                value={coinGrantAmount}
+                onChange={(event) => setCoinGrantAmount(Number(event.target.value))}
+                disabled={isGrantingCoins}
+              >
+                <option value={100}>+100</option>
+                <option value={1000}>+1,000</option>
+                <option value={10000}>+10,000</option>
+                <option value={100000}>+100,000</option>
+              </select>
+              <Button
+                variant="outline"
+                requiresAuth={true}
+                onClick={handleGrantCoins}
+                disabled={isGrantingCoins}
+              >
+                Grant
+              </Button>
             </div>
           )}
           {!isSelf && showBanControls && (
