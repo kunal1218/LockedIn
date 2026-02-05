@@ -124,6 +124,8 @@ const pokerDockButtonBase =
   "h-11 rounded-2xl border px-5 text-[11px] font-semibold uppercase tracking-[0.2em] shadow-sm transition disabled:cursor-not-allowed disabled:opacity-40";
 const pokerDockButtonPrimary = `${pokerDockButtonBase} border-accent/80 bg-accent text-white hover:border-accent`;
 const pokerDockButtonGhost = `${pokerDockButtonBase} border-card-border/80 bg-white/90 text-ink hover:border-accent/40`;
+const pokerDockButtonSuccess = `${pokerDockButtonBase} border-emerald-400/70 bg-emerald-500 text-white hover:border-emerald-400`;
+const pokerDockButtonWarn = `${pokerDockButtonBase} border-amber-400/70 bg-amber-400 text-amber-950 hover:border-amber-400`;
 const pokerDockButtonDanger = `${pokerDockButtonBase} border-rose-500/80 bg-rose-500 text-white hover:border-rose-400`;
 
 const TURN_SECONDS = 15;
@@ -503,9 +505,7 @@ export default function RankedPlayPage() {
       .map((winner) => `${winner.name} +${winner.amount}`)
       .join(" · ")}`;
   }, [pokerWinnerBanner]);
-  const pokerStatusCopy = isPokerLoading
-    ? "Loading table..."
-    : pokerWinnerMessage
+  const pokerStatusCopy = pokerWinnerMessage
       ? `🏆 ${pokerWinnerMessage}`
       : pokerState?.status === "in_hand"
         ? pokerState?.log?.length
@@ -2932,7 +2932,11 @@ export default function RankedPlayPage() {
                               )
                             }
                             disabled={isPokerActing}
-                            className={pokerDockButtonPrimary}
+                            className={
+                              pokerState.currentBet === 0
+                                ? pokerDockButtonWarn
+                                : pokerDockButtonSuccess
+                            }
                           >
                             {pokerState.currentBet === 0 ? "Bet" : "Raise"}
                           </button>
