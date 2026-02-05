@@ -119,12 +119,12 @@ type PokerChatMessage = {
 const inputClasses =
   "w-full rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-ink outline-none transition focus:border-accent/60 focus:bg-white";
 const pokerDockInputClasses =
-  "h-11 w-28 rounded-2xl border border-ink/50 bg-ink/90 px-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-white placeholder:text-white/40 outline-none transition focus:border-emerald-300/70";
+  "h-11 w-28 rounded-2xl border border-card-border/80 bg-white/90 px-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-ink placeholder:text-muted/60 outline-none transition focus:border-accent/50";
 const pokerDockButtonBase =
   "h-11 rounded-2xl border px-5 text-[11px] font-semibold uppercase tracking-[0.2em] shadow-sm transition disabled:cursor-not-allowed disabled:opacity-40";
-const pokerDockButtonGreen = `${pokerDockButtonBase} border-emerald-400/70 bg-ink/90 text-emerald-300 hover:border-emerald-300`;
-const pokerDockButtonSlate = `${pokerDockButtonBase} border-slate-500/50 bg-ink/80 text-slate-200 hover:border-slate-300`;
-const pokerDockButtonRed = `${pokerDockButtonBase} border-rose-500/80 bg-ink/90 text-rose-300 hover:border-rose-400`;
+const pokerDockButtonPrimary = `${pokerDockButtonBase} border-accent/80 bg-accent text-white hover:border-accent`;
+const pokerDockButtonGhost = `${pokerDockButtonBase} border-card-border/80 bg-white/90 text-ink hover:border-accent/40`;
+const pokerDockButtonDanger = `${pokerDockButtonBase} border-rose-500/80 bg-rose-500 text-white hover:border-rose-400`;
 
 const TURN_SECONDS = 15;
 const POKER_TURN_SECONDS = 20;
@@ -478,6 +478,10 @@ export default function RankedPlayPage() {
           }.`
         : "Waiting for next hand.";
   const pokerHandActive = pokerState?.status === "in_hand";
+  const pokerIsBroke = Boolean(pokerYouSeat && pokerYouSeat.chips <= 0);
+  const showPokerActionDock = pokerHandActive && pokerCanAct;
+  const showPokerBuyInDock = !pokerHandActive && (!pokerYouSeat || pokerIsBroke);
+  const showPokerLeave = Boolean(pokerYouSeat || pokerIsQueued);
   const pokerCanRevealCards =
     Boolean(pokerState && pokerYouSeat?.cards?.length) &&
     !pokerHandActive &&
@@ -2862,14 +2866,14 @@ export default function RankedPlayPage() {
                       {pokerError}
                     </div>
                   )}
-                  {pokerState?.status === "in_hand" && pokerCanAct && (
+                  {showPokerActionDock && (
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       {pokerActions?.canCheck && (
                         <button
                           type="button"
                           onClick={() => handlePokerAction("check")}
                           disabled={isPokerActing}
-                          className={pokerDockButtonSlate}
+                          className={pokerDockButtonGhost}
                         >
                           Check
                         </button>
@@ -2879,7 +2883,7 @@ export default function RankedPlayPage() {
                           type="button"
                           onClick={() => handlePokerAction("call")}
                           disabled={isPokerActing}
-                          className={pokerDockButtonGreen}
+                          className={pokerDockButtonPrimary}
                         >
                           Call {pokerCallAmount}
                         </button>
@@ -2903,7 +2907,7 @@ export default function RankedPlayPage() {
                               )
                             }
                             disabled={isPokerActing}
-                            className={pokerDockButtonGreen}
+                            className={pokerDockButtonPrimary}
                           >
                             {pokerState.currentBet === 0 ? "Bet" : "Raise"}
                           </button>
@@ -2913,58 +2917,62 @@ export default function RankedPlayPage() {
                         type="button"
                         onClick={() => handlePokerAction("fold")}
                         disabled={isPokerActing}
-                        className={pokerDockButtonRed}
+                        className={pokerDockButtonDanger}
                       >
                         Fold
                       </button>
                     </div>
                   )}
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <input
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={pokerBuyIn}
-                      onChange={(event) => setPokerBuyIn(event.target.value)}
-                      className={pokerDockInputClasses}
-                      placeholder="Buy-in"
-                    />
-                    {!pokerYouSeat && (
-                      <button
-                        type="button"
-                        onClick={() => handlePokerQueue()}
-                        disabled={isBuyingIn}
-                        className={pokerDockButtonGreen}
-                      >
-                        {isBuyingIn ? "Joining" : "Queue"}
-                      </button>
-                    )}
-                    {pokerYouSeat && (
-                      <button
-                        type="button"
-                        onClick={handlePokerRebuy}
-                        disabled={isBuyingIn}
-                        className={pokerDockButtonSlate}
-                      >
-                        Rebuy
-                      </button>
-                    )}
-                    {(pokerYouSeat || pokerIsQueued) && (
+                  {showPokerBuyInDock && (
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={pokerBuyIn}
+                        onChange={(event) => setPokerBuyIn(event.target.value)}
+                        className={pokerDockInputClasses}
+                        placeholder="Buy-in"
+                      />
+                      {!pokerYouSeat && (
+                        <button
+                          type="button"
+                          onClick={() => handlePokerQueue()}
+                          disabled={isBuyingIn}
+                          className={pokerDockButtonPrimary}
+                        >
+                          {isBuyingIn ? "Joining" : "Queue"}
+                        </button>
+                      )}
+                      {pokerYouSeat && (
+                        <button
+                          type="button"
+                          onClick={handlePokerRebuy}
+                          disabled={isBuyingIn}
+                          className={pokerDockButtonGhost}
+                        >
+                          Rebuy
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {showPokerLeave && (
+                    <div className="flex flex-wrap items-center justify-end gap-2">
                       <button
                         type="button"
                         onClick={handlePokerLeave}
                         disabled={isLeavingPoker}
-                        className={pokerDockButtonRed}
+                        className={pokerDockButtonDanger}
                       >
                         {isLeavingPoker ? "Leaving" : "Leave"}
                       </button>
-                    )}
-                    {pokerIsQueued && !pokerYouSeat && (
-                      <span className="rounded-full border border-white/20 bg-ink/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70">
-                        Queue {pokerQueuePosition ?? 1}
-                      </span>
-                    )}
-                  </div>
+                      {pokerIsQueued && !pokerYouSeat && (
+                        <span className="rounded-full border border-card-border/80 bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
+                          Queue {pokerQueuePosition ?? 1}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
