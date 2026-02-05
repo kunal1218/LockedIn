@@ -150,7 +150,7 @@ const buildMadlibAnswer = (answers: ProfileAnswers | null) => {
 };
 
 export const PublicProfileView = ({ handle }: { handle: string }) => {
-  const { user: viewer, token, isAuthenticated, openAuthModal } = useAuth();
+  const { user: viewer, token, isAuthenticated, openAuthModal, refreshUser } = useAuth();
   const [profile, setProfile] = useState<PublicProfilePayload | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -161,6 +161,9 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
   const [banStatus, setBanStatus] = useState<PublicProfilePayload["ban"] | null>(null);
   const [isBanLoading, setBanLoading] = useState(false);
   const [banError, setBanError] = useState<string | null>(null);
+  const [isGrantingCoins, setGrantingCoins] = useState(false);
+  const [coinGrantError, setCoinGrantError] = useState<string | null>(null);
+  const [coinGrantSuccess, setCoinGrantSuccess] = useState<string | null>(null);
   const params = useParams();
   const pathname = usePathname();
   const rawHandle = typeof handle === "string" ? handle : "";
@@ -422,7 +425,8 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
     user.collegeName ??
     deriveCollegeFromDomain(user.collegeDomain ?? "");
   const isSelf = viewer?.id === user.id;
-  const showAdminControls = Boolean(viewer?.isAdmin && !isSelf);
+  const showAdminTools = Boolean(viewer?.isAdmin);
+  const showBanControls = Boolean(viewer?.isAdmin && !isSelf);
 
   const runRelationshipAction = async (
     action: () => Promise<void>,
@@ -539,7 +543,7 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
   };
 
   const handleBanToggle = async () => {
-    if (!showAdminControls) {
+    if (!showBanControls) {
       return;
     }
     if (!token) {
@@ -567,6 +571,38 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
     }
   };
 
+  const handleGrantCoins = async (amount: number) => {
+    if (!showAdminTools) {
+      return;
+    }
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    setGrantingCoins(true);
+    setCoinGrantError(null);
+    setCoinGrantSuccess(null);
+    try {
+      await apiPost(
+        `/admin/users/${encodeURIComponent(user.id)}/coins`,
+        { amount },
+        token
+      );
+      if (viewer?.id === user.id) {
+        await refreshUser();
+      }
+      setCoinGrantSuccess(`Added ${amount.toLocaleString()} coins.`);
+    } catch (coinError) {
+      setCoinGrantError(
+        coinError instanceof Error
+          ? coinError.message
+          : "Unable to grant coins."
+      );
+    } finally {
+      setGrantingCoins(false);
+    }
+  };
+
   const renderHeader = () => (
     <Card className="relative overflow-hidden">
       <div className="absolute -right-16 -top-12 h-32 w-32 rounded-full bg-accent/20 blur-2xl" />
@@ -591,41 +627,59 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
             )}
           </p>
         </div>
-        {!isSelf && (
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            {showAdminControls && (
-              <div className="flex flex-wrap items-center gap-2">
-                {!banStatus?.isActive && (
-                  <select
-                    className="rounded-full border border-card-border/70 bg-white/90 px-3 py-1 text-xs font-semibold text-ink/70 shadow-sm transition hover:border-accent/40 focus:outline-none focus:ring-2 focus:ring-accent/30"
-                    value={banDuration}
-                    onChange={(event) =>
-                      setBanDuration(event.target.value as BanDuration)
-                    }
-                    disabled={isBanLoading}
-                  >
-                    <option value="day">Ban 1 day</option>
-                    <option value="week">Ban 1 week</option>
-                    <option value="month">Ban 1 month</option>
-                    <option value="forever">Ban forever</option>
-                  </select>
-                )}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {showAdminTools && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted">
+                Grant coins
+              </span>
+              {[100, 1000, 10000, 100000].map((amount) => (
                 <Button
-                  variant={banStatus?.isActive ? "outline" : "primary"}
+                  key={`grant-${amount}`}
+                  variant="outline"
                   requiresAuth={true}
-                  onClick={handleBanToggle}
+                  onClick={() => handleGrantCoins(amount)}
+                  disabled={isGrantingCoins}
+                >
+                  +{amount.toLocaleString()}
+                </Button>
+              ))}
+            </div>
+          )}
+          {!isSelf && showBanControls && (
+            <div className="flex flex-wrap items-center gap-2">
+              {!banStatus?.isActive && (
+                <select
+                  className="rounded-full border border-card-border/70 bg-white/90 px-3 py-1 text-xs font-semibold text-ink/70 shadow-sm transition hover:border-accent/40 focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  value={banDuration}
+                  onChange={(event) =>
+                    setBanDuration(event.target.value as BanDuration)
+                  }
                   disabled={isBanLoading}
                 >
-                  {banStatus?.isActive ? "Unban" : "Ban"}
-                </Button>
-                {formattedBanUntil && (
-                  <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600">
-                    {formattedBanUntil}
-                  </span>
-                )}
-              </div>
-            )}
-            {relationship === "blocked" ? (
+                  <option value="day">Ban 1 day</option>
+                  <option value="week">Ban 1 week</option>
+                  <option value="month">Ban 1 month</option>
+                  <option value="forever">Ban forever</option>
+                </select>
+              )}
+              <Button
+                variant={banStatus?.isActive ? "outline" : "primary"}
+                requiresAuth={true}
+                onClick={handleBanToggle}
+                disabled={isBanLoading}
+              >
+                {banStatus?.isActive ? "Unban" : "Ban"}
+              </Button>
+              {formattedBanUntil && (
+                <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600">
+                  {formattedBanUntil}
+                </span>
+              )}
+            </div>
+          )}
+          {!isSelf &&
+            (relationship === "blocked" ? (
               <Button
                 variant="outline"
                 requiresAuth={true}
@@ -707,9 +761,8 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
                   Block
                 </Button>
               </>
-            )}
-          </div>
-        )}
+            ))}
+        </div>
       </div>
       {relationshipError && (
         <p className="mt-3 text-xs font-semibold text-accent">
@@ -718,6 +771,14 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
       )}
       {banError && (
         <p className="mt-2 text-xs font-semibold text-rose-600">{banError}</p>
+      )}
+      {coinGrantError && (
+        <p className="mt-2 text-xs font-semibold text-rose-600">{coinGrantError}</p>
+      )}
+      {coinGrantSuccess && (
+        <p className="mt-2 text-xs font-semibold text-emerald-600">
+          {coinGrantSuccess}
+        </p>
       )}
     </Card>
   );

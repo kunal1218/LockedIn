@@ -79,6 +79,16 @@ const parseBanDuration = (value: unknown) => {
   throw new AdminActionError("Invalid ban duration", 400);
 };
 
+const parseCoinGrantAmount = (value: unknown) => {
+  const amount = typeof value === "number" ? value : Number(value);
+  const normalized = Number.isFinite(amount) ? Math.floor(amount) : 0;
+  const allowed = [100, 1000, 10000, 100000];
+  if (!allowed.includes(normalized)) {
+    throw new AdminActionError("Invalid coin grant amount", 400);
+  }
+  return normalized;
+};
+
 const buildBanResponse = (row: {
   banned_until?: string | Date | null;
   banned_indefinitely?: boolean | null;
@@ -173,6 +183,35 @@ export const updateUserBan = async (req: Request, res: Response) => {
       banned_indefinitely?: boolean | null;
     };
     res.json({ ban: buildBanResponse(row) });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const grantUserCoins = async (req: Request, res: Response) => {
+  try {
+    await requireAdmin(req);
+    const userId = typeof req.params?.userId === "string" ? req.params.userId : "";
+    if (!userId || !isUuid(userId)) {
+      throw new AdminActionError("Invalid user ID", 400);
+    }
+
+    const amount = parseCoinGrantAmount(req.body?.amount);
+    await ensureUsersTable();
+
+    const result = await db.query(
+      `UPDATE users
+       SET coins = COALESCE(coins, 0) + $2
+       WHERE id = $1
+       RETURNING coins`,
+      [userId, amount]
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      throw new AdminActionError("User not found", 404);
+    }
+
+    res.json({ coins: Number(result.rows[0]?.coins ?? 0) });
   } catch (error) {
     handleError(res, error);
   }
