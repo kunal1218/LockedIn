@@ -26,6 +26,17 @@ type EventChatMessage = {
 const MAX_EVENT_CHAT_MESSAGES = 50;
 const eventChatHistory = new Map<number, EventChatMessage[]>();
 
+type PokerChatMessage = {
+  id: string;
+  tableId: string;
+  message: string;
+  createdAt: string;
+  sender: { id: string; name: string; handle?: string | null };
+};
+
+const MAX_POKER_CHAT_MESSAGES = 50;
+const pokerChatHistory = new Map<string, PokerChatMessage[]>();
+
 const addEventChatMessage = (eventId: number, message: EventChatMessage) => {
   const current = eventChatHistory.get(eventId) ?? [];
   const next = [...current, message].slice(-MAX_EVENT_CHAT_MESSAGES);
@@ -35,6 +46,16 @@ const addEventChatMessage = (eventId: number, message: EventChatMessage) => {
 
 const getEventChatHistory = (eventId: number) =>
   eventChatHistory.get(eventId) ?? [];
+
+const addPokerChatMessage = (tableId: string, message: PokerChatMessage) => {
+  const current = pokerChatHistory.get(tableId) ?? [];
+  const next = [...current, message].slice(-MAX_POKER_CHAT_MESSAGES);
+  pokerChatHistory.set(tableId, next);
+  return next;
+};
+
+const getPokerChatHistory = (tableId: string) =>
+  pokerChatHistory.get(tableId) ?? [];
 
 const normalizeOrigin = (value: string) => value.replace(/\/$/, "");
 const allowedOrigins = (process.env.FRONTEND_URLS ??
@@ -248,6 +269,49 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
           error instanceof Error ? error.message : "Unable to rebuy."
         );
       }
+    });
+
+    socket.on("poker:chat", async (payload?: { message?: string }) => {
+      try {
+        const message = payload?.message?.trim() ?? "";
+        if (!message) {
+          return;
+        }
+        const result = await getPokerStateForUser(userId);
+        if (!result.tableId || !userProfile) {
+          return;
+        }
+        const chatMessage: PokerChatMessage = {
+          id: randomUUID(),
+          tableId: result.tableId,
+          message: message.slice(0, 500),
+          createdAt: new Date().toISOString(),
+          sender: {
+            id: userProfile.id,
+            name: userProfile.name,
+            handle: userProfile.handle,
+          },
+        };
+        addPokerChatMessage(result.tableId, chatMessage);
+        io?.to(pokerRoomForTable(result.tableId)).emit("poker:chat", {
+          message: chatMessage,
+        });
+      } catch (error) {
+        emitPokerError(
+          error instanceof Error ? error.message : "Unable to send chat."
+        );
+      }
+    });
+
+    socket.on("poker:chat:history", async () => {
+      const result = await getPokerStateForUser(userId);
+      if (!result.tableId) {
+        return;
+      }
+      socket.emit("poker:chat:history", {
+        tableId: result.tableId,
+        messages: getPokerChatHistory(result.tableId),
+      });
     });
 
     socket.on("poker:leave", async () => {

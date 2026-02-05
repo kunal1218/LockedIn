@@ -96,6 +96,14 @@ type PokerClientState = {
   log: Array<{ id: string; text: string }>;
 };
 
+type PokerChatMessage = {
+  id: string;
+  tableId: string;
+  message: string;
+  createdAt: string;
+  sender: { id: string; name: string; handle?: string | null };
+};
+
 const inputClasses =
   "w-full rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-ink outline-none transition focus:border-accent/60 focus:bg-white";
 
@@ -170,6 +178,11 @@ export default function RankedPlayPage() {
   const [pokerRaiseAmount, setPokerRaiseAmount] = useState("");
   const [isLeavingPoker, setIsLeavingPoker] = useState(false);
   const [showPokerCards, setShowPokerCards] = useState(false);
+  const [pokerChatMessages, setPokerChatMessages] = useState<PokerChatMessage[]>([]);
+  const [pokerChatDraft, setPokerChatDraft] = useState("");
+  const [pokerChatError, setPokerChatError] = useState<string | null>(null);
+  const [isSendingPokerChat, setIsSendingPokerChat] = useState(false);
+  const pokerChatEndRef = useRef<HTMLDivElement | null>(null);
   const lives =
     rankedStatus.status === "matched"
       ? rankedStatus.lives ?? { me: 3, opponents: [3, 3] }
@@ -428,10 +441,25 @@ export default function RankedPlayPage() {
       ? pokerSeats
       : Array.from({ length: 8 }, () => null);
   const pokerIsQueued = pokerQueuePosition !== null;
+  const lastPokerAction =
+    pokerState?.log?.length ? pokerState.log[pokerState.log.length - 1]?.text : null;
 
   useEffect(() => {
     setShowPokerCards(false);
   }, [pokerState?.tableId, pokerYouSeat?.userId]);
+
+  useEffect(() => {
+    setPokerChatMessages([]);
+    setPokerChatDraft("");
+    setPokerChatError(null);
+  }, [pokerState?.tableId]);
+
+  useEffect(() => {
+    if (!pokerState?.tableId) {
+      return;
+    }
+    pokerChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [pokerChatMessages, pokerState?.tableId]);
   const chatOpponent =
     !displayIsJudge
       ? displayOpponents.find((opponent) => opponent.id !== displayJudgeUserId) ??
@@ -1477,6 +1505,34 @@ export default function RankedPlayPage() {
     }
   };
 
+  const handlePokerChatSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    const message = pokerChatDraft.trim();
+    if (!message || !pokerState?.tableId) {
+      return;
+    }
+    setIsSendingPokerChat(true);
+    setPokerChatError(null);
+    try {
+      if (socket.connected) {
+        socket.emit("poker:chat", { message });
+      } else {
+        setPokerChatError("Poker chat requires a live connection.");
+      }
+      setPokerChatDraft("");
+    } catch (error) {
+      setPokerChatError(
+        error instanceof Error ? error.message : "Unable to send message."
+      );
+    } finally {
+      setIsSendingPokerChat(false);
+    }
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!token) {
@@ -1812,12 +1868,31 @@ export default function RankedPlayPage() {
       return;
     }
     connectSocket(token);
+    const currentTableId = pokerState?.tableId ?? null;
     const handleState = (payload: { state?: PokerClientState | null }) => {
       if (payload && "state" in payload) {
         setPokerState(payload.state ?? null);
         setPokerQueuePosition(null);
         setPokerError(null);
       }
+    };
+    const handlePokerChat = (payload: { message?: PokerChatMessage }) => {
+      if (!payload?.message) {
+        return;
+      }
+      if (!currentTableId || payload.message.tableId !== currentTableId) {
+        return;
+      }
+      setPokerChatMessages((prev) => [...prev, payload.message!]);
+    };
+    const handlePokerChatHistory = (payload: {
+      tableId?: string;
+      messages?: PokerChatMessage[];
+    }) => {
+      if (!payload?.tableId || payload.tableId !== currentTableId) {
+        return;
+      }
+      setPokerChatMessages(payload.messages ?? []);
     };
     const handleQueued = (payload: { queuePosition?: number | null }) => {
       const position = payload?.queuePosition ?? null;
@@ -1830,17 +1905,24 @@ export default function RankedPlayPage() {
       setPokerError(payload?.error ?? "Unable to update poker table.");
     };
     socket.on("poker:state", handleState);
+    socket.on("poker:chat", handlePokerChat);
+    socket.on("poker:chat:history", handlePokerChatHistory);
     socket.on("poker:queued", handleQueued);
     socket.on("poker:error", handleError);
     socket.emit("poker:state");
+    if (currentTableId) {
+      socket.emit("poker:chat:history");
+    }
     void loadPokerState();
 
     return () => {
       socket.off("poker:state", handleState);
+      socket.off("poker:chat", handlePokerChat);
+      socket.off("poker:chat:history", handlePokerChatHistory);
       socket.off("poker:queued", handleQueued);
       socket.off("poker:error", handleError);
     };
-  }, [activeGame, loadPokerState, token]);
+  }, [activeGame, loadPokerState, pokerState?.tableId, token]);
 
   return (
     <div className="mx-auto min-h-[calc(100vh-80px)] max-w-6xl px-4 pb-8 pt-6 flex flex-col gap-4">
@@ -2504,6 +2586,12 @@ export default function RankedPlayPage() {
                       );
                     })}
                   </div>
+                  {lastPokerAction && (
+                    <div className="rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-ink/80">
+                      <span className="font-semibold">Last action:</span>{" "}
+                      {lastPokerAction}
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between gap-4">
                     <div>
@@ -2672,18 +2760,65 @@ export default function RankedPlayPage() {
                 )}
 
                 <div className="rounded-2xl border border-card-border/70 bg-white/80 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-                    Table Log
-                  </p>
-                  <div className="mt-3 space-y-2 text-sm text-muted">
-                    {pokerState?.log?.length ? (
-                      pokerState.log.map((entry) => (
-                        <div key={entry.id}>{entry.text}</div>
-                      ))
-                    ) : (
-                      <div>Join a table to start the action.</div>
-                    )}
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                      Table Chat
+                    </p>
+                    <span className="text-[11px] text-muted">
+                      {pokerState ? "Chat with the table" : "Join a table to chat"}
+                    </span>
                   </div>
+                  <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1 text-sm">
+                    {pokerChatMessages.length ? (
+                      pokerChatMessages.map((message) => {
+                        const isMine = message.sender.id === user?.id;
+                        return (
+                          <div
+                            key={message.id}
+                            className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+                          >
+                            <div
+                              className={`max-w-[80%] rounded-2xl px-3 py-2 text-xs ${
+                                isMine
+                                  ? "bg-accent text-white"
+                                  : "bg-ink/5 text-ink"
+                              }`}
+                            >
+                              <p className="font-semibold">{message.sender.name}</p>
+                              <p className="mt-1">{message.message}</p>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-xs text-muted">No chat messages yet.</p>
+                    )}
+                    <div ref={pokerChatEndRef} />
+                  </div>
+                  <form className="mt-3 flex gap-2" onSubmit={handlePokerChatSubmit}>
+                    <input
+                      type="text"
+                      value={pokerChatDraft}
+                      onChange={(event) => setPokerChatDraft(event.target.value)}
+                      placeholder={
+                        pokerState ? "Send a message..." : "Join a table to chat"
+                      }
+                      className="flex-1 rounded-xl border border-card-border/70 bg-white px-3 py-2 text-xs text-ink outline-none focus:border-accent/60"
+                      disabled={!pokerState}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!pokerState || isSendingPokerChat}
+                      className="rounded-xl bg-ink px-4 py-2 text-xs font-semibold text-white transition hover:bg-ink/90 disabled:opacity-70"
+                    >
+                      {isSendingPokerChat ? "Sending" : "Send"}
+                    </button>
+                  </form>
+                  {pokerChatError && (
+                    <p className="mt-2 text-xs font-semibold text-rose-500">
+                      {pokerChatError}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
