@@ -2537,6 +2537,18 @@ export const markRankedTimeout = async (matchId: string, userId: string) => {
   await ensureMatchTimer(match);
 };
 
+export const leaveRankedGame = async (userId: string) => {
+  await ensureRankedTables();
+  await db.query("DELETE FROM ranked_queue WHERE user_id = $1", [userId]);
+  await db.query(
+    `UPDATE ranked_matches
+     SET timed_out = true
+     WHERE (user_a_id = $1 OR user_b_id = $1 OR user_c_id = $1)
+       AND timed_out = false`,
+    [userId]
+  );
+};
+
 export const getRankedLeaderboard = async (
   limit = 10
 ): Promise<RankedLeaderboardEntry[]> => {

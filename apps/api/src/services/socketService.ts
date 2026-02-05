@@ -11,9 +11,12 @@ import {
   queuePokerPlayer,
   rebuyPoker,
 } from "./pokerService";
+import { leaveRankedGame } from "./rankedService";
 
 let io: Server | null = null;
 const userSocketMap = new Map<string, string>();
+const disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const DISCONNECT_GRACE_MS = 15000;
 
 type EventChatMessage = {
   id: string;
@@ -133,6 +136,12 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
     if (!userId) {
       socket.disconnect(true);
       return;
+    }
+
+    const existingTimer = disconnectTimers.get(userId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      disconnectTimers.delete(userId);
     }
 
     const existingSocketId = userSocketMap.get(userId);
@@ -420,6 +429,39 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
       }
       socket.leave("location-updates");
       console.info(`[socket] user ${userId} disconnected`);
+      const priorTimer = disconnectTimers.get(userId);
+      if (priorTimer) {
+        clearTimeout(priorTimer);
+      }
+      const timer = setTimeout(async () => {
+        disconnectTimers.delete(userId);
+        if (userSocketMap.has(userId)) {
+          return;
+        }
+        try {
+          const result = await leavePokerTable(userId);
+          const tableIds = result.updatedTableIds?.length
+            ? result.updatedTableIds
+            : [];
+          if (tableIds.length) {
+            await Promise.all(tableIds.map((tableId) => emitPokerStatesForTable(tableId)));
+          }
+          if (result.failedUserIds?.length) {
+            emitPokerErrorsForUsers(
+              result.failedUserIds,
+              "Not enough coins for that buy-in."
+            );
+          }
+        } catch (error) {
+          console.warn("[socket] failed to remove poker player", error);
+        }
+        try {
+          await leaveRankedGame(userId);
+        } catch (error) {
+          console.warn("[socket] failed to remove ranked player", error);
+        }
+      }, DISCONNECT_GRACE_MS);
+      disconnectTimers.set(userId, timer);
     });
   });
 

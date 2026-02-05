@@ -8,7 +8,7 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { useAuth } from "@/features/auth";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
-import { connectSocket, socket } from "@/lib/socket";
+import { connectSocket, disconnectSocket, socket } from "@/lib/socket";
 
 type MessageUser = {
   id: string;
@@ -115,11 +115,11 @@ const CHAT_ROUND_SECONDS = 60;
 const ROLE_MODAL_SECONDS = 5;
 const TYPING_TEST_SECONDS = 60;
 
-type ActiveGame = "covo" | "poker";
+type ActiveGame = "convo" | "poker";
 
 export default function RankedPlayPage() {
   const { isAuthenticated, token, user, openAuthModal, refreshUser } = useAuth();
-  const [activeGame, setActiveGame] = useState<ActiveGame>("covo");
+  const [activeGame, setActiveGame] = useState<ActiveGame>("convo");
   const [rankedStatus, setRankedStatus] = useState<RankedStatus>({ status: "idle" });
   const [queueError, setQueueError] = useState<string | null>(null);
   const [isQueuing, setIsQueuing] = useState(false);
@@ -1862,6 +1862,16 @@ export default function RankedPlayPage() {
   ]);
 
   useEffect(() => {
+    if (!token) {
+      return;
+    }
+    connectSocket(token);
+    return () => {
+      disconnectSocket();
+    };
+  }, [token]);
+
+  useEffect(() => {
     if (activeGame !== "poker") {
       return;
     }
@@ -1869,7 +1879,6 @@ export default function RankedPlayPage() {
       setPokerState(null);
       return;
     }
-    connectSocket(token);
     const currentTableId = pokerState?.tableId ?? null;
     const handleState = (payload: { state?: PokerClientState | null }) => {
       if (payload && "state" in payload) {
@@ -1931,14 +1940,14 @@ export default function RankedPlayPage() {
       <div className="inline-flex overflow-hidden rounded-2xl border border-card-border/70 bg-white/80 shadow-sm">
         <button
           type="button"
-          onClick={() => setActiveGame("covo")}
+          onClick={() => setActiveGame("convo")}
           className={`rounded-l-2xl border-b border-card-border/70 px-5 py-2.5 text-xs font-semibold transition ${
-            activeGame === "covo"
+            activeGame === "convo"
               ? "bg-white text-ink border-b-white shadow-[0_6px_16px_rgba(15,23,42,0.12)]"
               : "bg-card-border/30 text-muted hover:bg-white/80 hover:text-ink"
           }`}
         >
-          Covo Game
+          Convo Game
         </button>
         <div className="h-full w-px bg-card-border/60" />
         <button
@@ -1953,7 +1962,7 @@ export default function RankedPlayPage() {
           Poker
         </button>
       </div>
-      {activeGame === "covo" ? (
+      {activeGame === "convo" ? (
         <Card className="relative grid flex-1 min-h-[640px] grid-rows-[auto_1fr_auto] gap-3 overflow-hidden border border-card-border/70 bg-white/85 shadow-sm">
         <div className="flex flex-col gap-4">
           <div className="grid gap-6 md:grid-cols-[1fr_auto_1fr]">
