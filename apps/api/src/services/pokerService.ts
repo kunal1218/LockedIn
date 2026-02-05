@@ -1074,8 +1074,17 @@ const removePlayerFromTable = (table: PokerTable, player: PokerPlayer, reason: s
 
 const buildClientState = (table: PokerTable, userId: string): PokerClientState => {
   const youSeatIndex = getSeatIndexByUserId(table, userId);
+  const youSeat = youSeatIndex !== null ? table.seats[youSeatIndex] : null;
+  const shouldHideSeat = (seat: PokerPlayer) =>
+    (seat.pendingLeave && seat.status !== "all_in") ||
+    seat.status === "out" ||
+    (seat.chips <= 0 && !seat.inHand);
+  const hideYouSeat = youSeat ? shouldHideSeat(youSeat) : false;
   const seats: Array<PokerClientSeat | null> = table.seats.map((seat, index) => {
     if (!seat) {
+      return null;
+    }
+    if (shouldHideSeat(seat)) {
       return null;
     }
     const showCards =
@@ -1093,7 +1102,9 @@ const buildClientState = (table: PokerTable, userId: string): PokerClientState =
     };
   });
 
-  const you = youSeatIndex !== null ? table.seats[youSeatIndex] : null;
+  const effectiveYouSeatIndex =
+    youSeatIndex !== null && !hideYouSeat ? youSeatIndex : null;
+  const you = effectiveYouSeatIndex !== null ? table.seats[effectiveYouSeatIndex] : null;
   const actions = (() => {
     if (!you || !you.inHand || you.status !== "active") {
       return undefined;
@@ -1126,7 +1137,7 @@ const buildClientState = (table: PokerTable, userId: string): PokerClientState =
     minRaise: table.minRaise,
     smallBlindIndex: table.smallBlindIndex ?? null,
     bigBlindIndex: table.bigBlindIndex ?? null,
-    youSeatIndex,
+    youSeatIndex: effectiveYouSeatIndex,
     actions,
     log: table.log.slice(-12),
   };
