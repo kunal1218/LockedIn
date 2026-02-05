@@ -2076,7 +2076,7 @@ export default function RankedPlayPage() {
     }
     const interval = window.setInterval(() => {
       void loadPokerState();
-    }, 6000);
+    }, 4000);
     return () => {
       window.clearInterval(interval);
     };

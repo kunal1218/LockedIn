@@ -1130,6 +1130,41 @@ const updateCurrentPlayer = (table: PokerTable, fromIndex: number) => {
   table.turnStartedAt = nextIndex !== null ? new Date().toISOString() : null;
 };
 
+const ensureTurnState = (table: PokerTable) => {
+  if (table.status !== "in_hand") {
+    return false;
+  }
+  let changed = false;
+  const filteredPending = table.pendingActionUserIds.filter((id) => {
+    const player = getPlayerById(table, id);
+    return Boolean(player && player.inHand && player.status === "active");
+  });
+  if (filteredPending.length !== table.pendingActionUserIds.length) {
+    table.pendingActionUserIds = filteredPending;
+    changed = true;
+  }
+  if (!table.pendingActionUserIds.length) {
+    return changed;
+  }
+  const currentSeat =
+    table.currentPlayerIndex !== null ? table.seats[table.currentPlayerIndex] : null;
+  const isCurrentValid =
+    currentSeat &&
+    currentSeat.inHand &&
+    currentSeat.status === "active" &&
+    table.pendingActionUserIds.includes(currentSeat.userId);
+  if (!isCurrentValid) {
+    const fromIndex =
+      table.currentPlayerIndex !== null ? table.currentPlayerIndex : table.dealerIndex ?? -1;
+    updateCurrentPlayer(table, fromIndex);
+    changed = true;
+  } else if (!table.turnStartedAt) {
+    table.turnStartedAt = new Date().toISOString();
+    changed = true;
+  }
+  return changed;
+};
+
 const handleTurnTimeout = (table: PokerTable) => {
   if (table.status !== "in_hand") {
     return false;
@@ -1532,7 +1567,8 @@ export const getPokerStateForUser = async (userId: string) => {
     } as const;
   }
   const touched = markPlayerSeen(table, userId);
-  if (touched) {
+  const turnFixed = ensureTurnState(table);
+  if (touched || turnFixed) {
     await saveTable(table);
   }
   return {
@@ -1572,6 +1608,10 @@ export const applyPokerAction = async (params: {
   if (!table) {
     await clearPlayerTableId(params.userId);
     throw new PokerError("Table not found.", 404);
+  }
+
+  if (ensureTurnState(table)) {
+    await saveTable(table);
   }
 
   if (table.status !== "in_hand") {
@@ -1889,6 +1929,9 @@ export const getPokerStatesForTable = async (tableId: string) => {
   const table = await loadTable(tableId);
   if (!table) {
     return [] as Array<{ userId: string; state: PokerClientState }>;
+  }
+  if (ensureTurnState(table)) {
+    await saveTable(table);
   }
   return getPlayers(table).map((player) => ({
     userId: player.userId,
