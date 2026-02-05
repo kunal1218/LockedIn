@@ -464,6 +464,18 @@ export default function RankedPlayPage() {
     (seat) => seat && seat.status !== "out"
   ).length;
   const pokerPlayersNeeded = Math.max(0, 2 - pokerActiveCount);
+  const pokerWinnerMessage = useMemo(() => {
+    if (!pokerWinnerBanner?.winners?.length) {
+      return null;
+    }
+    const winners = pokerWinnerBanner.winners;
+    if (winners.length === 1) {
+      return `${winners[0].name} won ${winners[0].amount} chips`;
+    }
+    return `Split pot: ${winners
+      .map((winner) => `${winner.name} +${winner.amount}`)
+      .join(" · ")}`;
+  }, [pokerWinnerBanner]);
   const pokerStatusCopy = isPokerLoading
     ? "Loading table..."
     : pokerWinnerMessage
@@ -498,18 +510,6 @@ export default function RankedPlayPage() {
       return new Set<string>();
     }
     return new Set(pokerWinnerBanner.winners.map((winner) => winner.userId));
-  }, [pokerWinnerBanner]);
-  const pokerWinnerMessage = useMemo(() => {
-    if (!pokerWinnerBanner?.winners?.length) {
-      return null;
-    }
-    const winners = pokerWinnerBanner.winners;
-    if (winners.length === 1) {
-      return `${winners[0].name} won ${winners[0].amount} chips`;
-    }
-    return `Split pot: ${winners
-      .map((winner) => `${winner.name} +${winner.amount}`)
-      .join(" · ")}`;
   }, [pokerWinnerBanner]);
 
   useEffect(() => {
