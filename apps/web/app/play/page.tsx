@@ -2620,23 +2620,6 @@ export default function RankedPlayPage() {
         </Card>
       ) : (
         <Card className="relative flex flex-1 flex-col gap-6 overflow-hidden border border-card-border/70 bg-white/85 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted">
-                Poker Lounge
-              </p>
-              <h1 className="mt-2 font-display text-2xl font-semibold text-ink">
-                Texas Hold&#39;em
-              </h1>
-              <p className="mt-2 text-sm text-muted">
-                Queue up with a buy-in to join the next hand automatically.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-card-border/70 bg-white/80 px-4 py-2 text-sm font-semibold text-ink/80">
-              Balance: {user?.coins ?? 0} coins
-            </div>
-          </div>
-
           {!isAuthenticated ? (
             <div className="rounded-2xl border border-card-border/70 bg-white/80 p-6 text-center">
               <p className="text-sm font-semibold text-ink">
