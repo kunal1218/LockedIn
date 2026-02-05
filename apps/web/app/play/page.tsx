@@ -457,16 +457,16 @@ export default function RankedPlayPage() {
     pokerState?.currentPlayerIndex === pokerYouSeatIndex;
   const pokerYouSeat =
     pokerYouSeatIndex !== null ? pokerSeats[pokerYouSeatIndex] : null;
-  const lastPokerAction =
-    pokerState?.log?.length ? pokerState.log[pokerState.log.length - 1]?.text : null;
   const pokerActiveCount = pokerSeats.filter(
     (seat) => seat && seat.status !== "out"
   ).length;
   const pokerPlayersNeeded = Math.max(0, 2 - pokerActiveCount);
   const pokerStatusCopy =
     pokerState?.status === "in_hand"
-      ? lastPokerAction
-        ? `Last action: ${lastPokerAction}`
+      ? pokerState?.log?.length
+        ? `Last action: ${
+            pokerState.log[pokerState.log.length - 1]?.text ?? "Hand in progress."
+          }`
         : "Hand in progress."
       : pokerPlayersNeeded > 0
         ? `Waiting for ${pokerPlayersNeeded} player${
