@@ -47,6 +47,7 @@ type PokerPlayer = {
   cards: CardCode[];
   pendingLeave?: boolean;
   lastSeenAt?: string;
+  missedTurns?: number;
 };
 
 type PokerTable = {
@@ -1123,30 +1124,78 @@ const updateCurrentPlayer = (table: PokerTable, fromIndex: number) => {
   table.turnStartedAt = nextIndex !== null ? new Date().toISOString() : null;
 };
 
+const handleTurnTimeout = (table: PokerTable) => {
+  if (table.status !== "in_hand") {
+    return false;
+  }
+  if (table.currentPlayerIndex === null || !table.turnStartedAt) {
+    return false;
+  }
+  const startedMs = Date.parse(table.turnStartedAt);
+  if (!Number.isFinite(startedMs)) {
+    return false;
+  }
+  const elapsedSeconds = (Date.now() - startedMs) / 1000;
+  if (elapsedSeconds < POKER_TURN_SECONDS) {
+    return false;
+  }
+
+  const player = table.seats[table.currentPlayerIndex];
+  if (!player) {
+    updateCurrentPlayer(table, table.currentPlayerIndex);
+    return true;
+  }
+  if (!player.inHand || player.status !== "active") {
+    updateCurrentPlayer(table, player.seatIndex);
+    return true;
+  }
+
+  player.missedTurns = (player.missedTurns ?? 0) + 1;
+  table.log.push(toLog(`${player.name} timed out.`));
+
+  if (player.missedTurns >= 2) {
+    removePlayerFromTable(table, player, `${player.name} left the table (AFK).`);
+    return true;
+  }
+
+  applyPlayerAction(table, player, { action: "fold" });
+
+  if (!maybeAwardIfSingle(table)) {
+    const roundResult = ensureBettingRound(table);
+    if (
+      !roundResult.advanced &&
+      table.status === "in_hand" &&
+      table.pendingActionUserIds.length
+    ) {
+      updateCurrentPlayer(table, player.seatIndex);
+    }
+  }
+
+  return true;
+};
+
 const removePlayerFromTable = (table: PokerTable, player: PokerPlayer, reason: string) => {
   const wasCurrent = table.currentPlayerIndex === player.seatIndex;
 
   if (table.status === "in_hand" && player.inHand) {
     player.pendingLeave = true;
-    if (player.status === "active") {
+    if (player.status !== "folded") {
       player.status = "folded";
-      table.pendingActionUserIds = table.pendingActionUserIds.filter(
-        (id) => id !== player.userId
-      );
-      table.log.push(toLog(reason));
+    }
+    table.pendingActionUserIds = table.pendingActionUserIds.filter(
+      (id) => id !== player.userId
+    );
+    table.log.push(toLog(reason));
 
-      if (!maybeAwardIfSingle(table)) {
-        const roundResult = ensureBettingRound(table);
-        if (
-          !roundResult.advanced &&
-          table.status === "in_hand" &&
-          table.pendingActionUserIds.length
-        ) {
-          updateCurrentPlayer(table, player.seatIndex);
-        }
+    if (!maybeAwardIfSingle(table)) {
+      const roundResult = ensureBettingRound(table);
+      if (
+        !roundResult.advanced &&
+        table.status === "in_hand" &&
+        table.pendingActionUserIds.length
+      ) {
+        updateCurrentPlayer(table, player.seatIndex);
       }
-    } else {
-      table.log.push(toLog(reason));
     }
   } else {
     table.seats[player.seatIndex] = null;
@@ -1275,6 +1324,7 @@ const seatPlayerAtTable = async (
     totalBet: 0,
     cards: [],
     lastSeenAt: new Date().toISOString(),
+    missedTurns: 0,
   };
   table.seats[seatIndex] = player;
   table.log.push(toLog(`${player.name} joined the table.`));
@@ -1352,6 +1402,7 @@ export const queuePokerPlayer = async (params: {
       table = null;
     } else {
       player.lastSeenAt = new Date().toISOString();
+      player.missedTurns = 0;
       if (normalizedAmount) {
         await ensureBuyIn(params.userId, normalizedAmount);
         player.chips += normalizedAmount;
@@ -1495,11 +1546,22 @@ export const applyPokerAction = async (params: {
     throw new PokerError("You cannot act right now.", 400);
   }
 
+  if (table.turnStartedAt) {
+    const startedMs = Date.parse(table.turnStartedAt);
+    if (Number.isFinite(startedMs)) {
+      const elapsedSeconds = (Date.now() - startedMs) / 1000;
+      if (elapsedSeconds >= POKER_TURN_SECONDS) {
+        throw new PokerError("Your turn timed out.", 400);
+      }
+    }
+  }
+
   if (table.currentPlayerIndex !== player.seatIndex) {
     throw new PokerError("Waiting for your turn.", 400);
   }
 
   player.lastSeenAt = new Date().toISOString();
+  player.missedTurns = 0;
   applyPlayerAction(table, player, params.action);
 
   if (!maybeAwardIfSingle(table)) {
@@ -1553,6 +1615,7 @@ export const rebuyPoker = async (params: {
   }
 
   player.lastSeenAt = new Date().toISOString();
+  player.missedTurns = 0;
   const amount = Math.floor(params.amount);
   await ensureBuyIn(params.userId, amount);
   player.chips += amount;
@@ -1703,6 +1766,10 @@ export const prunePokerTables = async (params: {
   const removedUserIds: string[] = [];
 
   for (const table of tables) {
+    let changed = false;
+    if (handleTurnTimeout(table)) {
+      changed = true;
+    }
     const staleTargets: Array<{ userId: string; reason: string }> = [];
     for (const seat of table.seats) {
       if (!seat) {
@@ -1725,10 +1792,19 @@ export const prunePokerTables = async (params: {
     }
 
     if (!staleTargets.length) {
+      if (changed) {
+        if (table.status === "waiting") {
+          const eligible = getEligiblePlayers(table);
+          if (eligible.length >= MIN_PLAYERS) {
+            startHand(table);
+          }
+        }
+        await saveTable(table);
+        updatedTableIds.add(table.id);
+      }
       continue;
     }
 
-    let changed = false;
     for (const target of staleTargets) {
       const player = getPlayerById(table, target.userId);
       if (!player) {

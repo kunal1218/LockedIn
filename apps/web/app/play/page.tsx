@@ -2070,6 +2070,18 @@ export default function RankedPlayPage() {
     };
   }, [activeGame, loadPokerState, pokerState?.tableId, token]);
 
+  useEffect(() => {
+    if (activeGame !== "poker" || !token) {
+      return;
+    }
+    const interval = window.setInterval(() => {
+      void loadPokerState();
+    }, 6000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [activeGame, loadPokerState, token]);
+
   return (
     <div className="mx-auto min-h-[calc(100vh-80px)] max-w-6xl px-4 pb-8 pt-6 flex flex-col gap-4">
       <div className="inline-flex overflow-hidden rounded-2xl border border-card-border/70 bg-white/80 shadow-sm">
