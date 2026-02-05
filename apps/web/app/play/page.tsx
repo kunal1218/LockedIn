@@ -457,6 +457,8 @@ export default function RankedPlayPage() {
     pokerState?.currentPlayerIndex === pokerYouSeatIndex;
   const pokerYouSeat =
     pokerYouSeatIndex !== null ? pokerSeats[pokerYouSeatIndex] : null;
+  const lastPokerAction =
+    pokerState?.log?.length ? pokerState.log[pokerState.log.length - 1]?.text : null;
   const pokerActiveCount = pokerSeats.filter(
     (seat) => seat && seat.status !== "out"
   ).length;
@@ -481,8 +483,6 @@ export default function RankedPlayPage() {
       ? pokerSeats
       : Array.from({ length: 8 }, () => null);
   const pokerIsQueued = pokerQueuePosition !== null;
-  const lastPokerAction =
-    pokerState?.log?.length ? pokerState.log[pokerState.log.length - 1]?.text : null;
   const pokerWinnerIds = useMemo(() => {
     if (!pokerWinnerBanner?.winners?.length) {
       return new Set<string>();
@@ -2694,6 +2694,12 @@ export default function RankedPlayPage() {
                   </span>
                 </div>
 
+                {pokerStatusCopy && (
+                  <div className="mt-4 rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-ink/80">
+                    {pokerStatusCopy}
+                  </div>
+                )}
+
                 <div className="mt-6 flex flex-col gap-6">
                   <div className="relative h-[320px] w-full sm:h-[360px] lg:h-[420px]">
                     <div className="absolute inset-0">
@@ -2841,12 +2847,6 @@ export default function RankedPlayPage() {
                   {pokerWinnerBanner && pokerWinnerMessage && (
                     <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
                       <span className="font-semibold">🏆 {pokerWinnerMessage}</span>
-                    </div>
-                  )}
-                  {lastPokerAction && (
-                    <div className="rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-ink/80">
-                      <span className="font-semibold">Last action:</span>{" "}
-                      {lastPokerAction}
                     </div>
                   )}
 
