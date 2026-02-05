@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
 import { useAuth } from "@/features/auth";
+import { apiPost } from "@/lib/api";
 import { deriveCollegeFromEmail } from "@/lib/college";
 import { profile } from "./mock";
 
@@ -32,11 +34,37 @@ export const ProfileHeader = ({
   onMovementModeChange,
   layoutError,
 }: ProfileHeaderProps) => {
-  const { user } = useAuth();
+  const { user, token, openAuthModal, refreshUser } = useAuth();
+  const [isGrantingCoins, setGrantingCoins] = useState(false);
+  const [coinGrantMessage, setCoinGrantMessage] = useState<string | null>(null);
   const displayName = user?.name ?? profile.name;
   const displayHandle = user?.handle ?? profile.handle;
   const displayCollege =
     user?.collegeName ?? (user?.email ? deriveCollegeFromEmail(user.email) : null);
+  const showGrantCoins = Boolean(user?.isAdmin);
+
+  const handleGrantCoins = async (amount: number) => {
+    if (!user?.id) {
+      return;
+    }
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    setGrantingCoins(true);
+    setCoinGrantMessage(null);
+    try {
+      await apiPost(`/admin/users/${encodeURIComponent(user.id)}/coins`, { amount }, token);
+      await refreshUser();
+      setCoinGrantMessage(`Added ${amount.toLocaleString()} coins.`);
+    } catch (error) {
+      setCoinGrantMessage(
+        error instanceof Error ? error.message : "Unable to grant coins."
+      );
+    } finally {
+      setGrantingCoins(false);
+    }
+  };
 
   return (
     <Card className="relative overflow-hidden">
@@ -72,7 +100,25 @@ export const ProfileHeader = ({
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-col items-start gap-3 md:items-end">
+          {showGrantCoins && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted">
+                Grant coins
+              </span>
+              {[100, 1000, 10000, 100000].map((amount) => (
+                <Button
+                  key={`grant-self-${amount}`}
+                  variant="outline"
+                  requiresAuth={true}
+                  onClick={() => handleGrantCoins(amount)}
+                  disabled={isGrantingCoins}
+                >
+                  +{amount.toLocaleString()}
+                </Button>
+              ))}
+            </div>
+          )}
           {isEditing ? (
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center rounded-full border border-card-border/70 bg-white/80 p-1">
@@ -113,6 +159,11 @@ export const ProfileHeader = ({
               </Button>
               <Button variant="profile">Share vibe</Button>
             </>
+          )}
+          {coinGrantMessage && (
+            <p className="text-xs font-semibold text-emerald-600">
+              {coinGrantMessage}
+            </p>
           )}
         </div>
       </div>

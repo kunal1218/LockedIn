@@ -169,6 +169,7 @@ export default function RankedPlayPage() {
   const [isPokerActing, setIsPokerActing] = useState(false);
   const [pokerRaiseAmount, setPokerRaiseAmount] = useState("");
   const [isLeavingPoker, setIsLeavingPoker] = useState(false);
+  const [showPokerCards, setShowPokerCards] = useState(false);
   const lives =
     rankedStatus.status === "matched"
       ? rankedStatus.lives ?? { me: 3, opponents: [3, 3] }
@@ -427,6 +428,10 @@ export default function RankedPlayPage() {
       ? pokerSeats
       : Array.from({ length: 8 }, () => null);
   const pokerIsQueued = pokerQueuePosition !== null;
+
+  useEffect(() => {
+    setShowPokerCards(false);
+  }, [pokerState?.tableId, pokerYouSeat?.userId]);
   const chatOpponent =
     !displayIsJudge
       ? displayOpponents.find((opponent) => opponent.id !== displayJudgeUserId) ??
@@ -2509,16 +2514,25 @@ export default function RankedPlayPage() {
                           : "Not seated"}
                       </p>
                     </div>
+                    {pokerYouSeat && (
+                      <button
+                        type="button"
+                        onClick={() => setShowPokerCards((prev) => !prev)}
+                        className="rounded-full border border-card-border/70 bg-white/80 px-3 py-1 text-xs font-semibold text-ink/70 transition hover:border-accent/40 hover:text-ink"
+                      >
+                        {showPokerCards ? "Hide cards" : "See cards"}
+                      </button>
+                    )}
                     <div className="flex items-center gap-2">
                       {pokerYouSeat?.cards?.length
                         ? pokerYouSeat.cards.map((card, index) => (
                             <div key={`player-card-${index}`}>
-                              {renderPokerCard(card)}
+                              {renderPokerCard(card, !showPokerCards)}
                             </div>
                           ))
                         : [0, 1].map((index) => (
                             <div key={`player-empty-${index}`}>
-                              {renderPokerCard(undefined)}
+                              {renderPokerCard(undefined, true)}
                             </div>
                           ))}
                     </div>
