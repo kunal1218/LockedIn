@@ -145,6 +145,7 @@ type PokerQueueEntry = {
 const MAX_SEATS = 8;
 const MIN_PLAYERS = 2;
 const MAX_TABLES = 25;
+const MIN_BUYIN = 25;
 const POKER_TURN_SECONDS = 20;
 const POKER_HAND_PAUSE_MS = 10000;
 const SESSION_TTL_SECONDS = 60 * 60 * 6;
@@ -1348,8 +1349,8 @@ const buildClientState = (table: PokerTable, userId: string): PokerClientState =
 
 const ensureBuyIn = async (userId: string, amount: number) => {
   await ensureUsersTable();
-  if (!Number.isFinite(amount) || amount <= 0) {
-    throw new PokerError("Enter a valid buy-in amount.", 400);
+  if (!Number.isFinite(amount) || amount < MIN_BUYIN) {
+    throw new PokerError(`Minimum buy-in is ${MIN_BUYIN} coins.`, 400);
   }
   const result = await db.query(
     `UPDATE users
@@ -1507,6 +1508,9 @@ export const queuePokerPlayer = async (params: {
 
   if (!normalizedAmount) {
     throw new PokerError("Buy in to join a table.", 400);
+  }
+  if (normalizedAmount < MIN_BUYIN) {
+    throw new PokerError(`Minimum buy-in is ${MIN_BUYIN} coins.`, 400);
   }
 
   const queuePosition = await enqueuePlayer({

@@ -1527,8 +1527,8 @@ export default function RankedPlayPage() {
       return;
     }
     const amount = Number(pokerBuyIn);
-    if ((!Number.isFinite(amount) || amount <= 0) && !pokerYouSeat) {
-      setPokerError("Enter a valid buy-in amount.");
+    if ((!Number.isFinite(amount) || amount < 25) && !pokerYouSeat) {
+      setPokerError("Minimum buy-in is 25 coins.");
       return;
     }
     setPokerError(null);
@@ -1571,8 +1571,8 @@ export default function RankedPlayPage() {
       return;
     }
     const amount = Number(pokerBuyIn);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setPokerError("Enter a valid rebuy amount.");
+    if (!Number.isFinite(amount) || amount < 25) {
+      setPokerError("Rebuy at least 25 coins.");
       return;
     }
     setPokerError(null);
@@ -2966,12 +2966,12 @@ export default function RankedPlayPage() {
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       <input
                         type="number"
-                        min={1}
+                        min={25}
                         step={1}
                         value={pokerBuyIn}
                         onChange={(event) => setPokerBuyIn(event.target.value)}
                         className={pokerDockInputClasses}
-                        placeholder="Buy-in"
+                        placeholder="Min 25"
                       />
                       {!pokerYouSeat && (
                         <button
