@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
 import { useAuth } from "@/features/auth";
-import { apiPost } from "@/lib/api";
+import { apiGet, apiPost } from "@/lib/api";
 import { deriveCollegeFromEmail } from "@/lib/college";
 import { profile } from "./mock";
 
@@ -20,6 +20,13 @@ type ProfileHeaderProps = {
   onCancelLayout?: () => void;
   onMovementModeChange?: (mode: MovementMode) => void;
   layoutError?: string | null;
+};
+
+type LeaderboardEntry = {
+  id: string;
+  name: string;
+  handle: string;
+  coins: number;
 };
 
 const toggleBaseClasses =
@@ -38,11 +45,55 @@ export const ProfileHeader = ({
   const [isGrantingCoins, setGrantingCoins] = useState(false);
   const [coinGrantMessage, setCoinGrantMessage] = useState<string | null>(null);
   const [coinGrantAmount, setCoinGrantAmount] = useState(100);
+  const [leaderboardRank, setLeaderboardRank] = useState<number | null>(null);
   const displayName = user?.name ?? profile.name;
   const displayHandle = user?.handle ?? profile.handle;
   const displayCollege =
     user?.collegeName ?? (user?.email ? deriveCollegeFromEmail(user.email) : null);
   const showGrantCoins = Boolean(user?.isAdmin);
+
+  useEffect(() => {
+    if (!token || !user?.id) {
+      setLeaderboardRank(null);
+      return;
+    }
+
+    let isActive = true;
+
+    const loadLeaderboard = async () => {
+      const loadEntries = async (path: string) => {
+        const payload = await apiGet<{ entries: LeaderboardEntry[] }>(path, token);
+        return payload.entries ?? [];
+      };
+
+      let entries: LeaderboardEntry[] = [];
+      try {
+        entries = await loadEntries("/leaderboard");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (!message.includes("Route /leaderboard not found")) {
+          throw error;
+        }
+        entries = await loadEntries("/ranked/leaderboard");
+      }
+
+      if (!isActive) {
+        return;
+      }
+
+      const index = entries.findIndex((entry) => entry.id === user.id);
+      setLeaderboardRank(index >= 0 ? index + 1 : null);
+    };
+
+    loadLeaderboard().catch(() => {
+      if (!isActive) return;
+      setLeaderboardRank(null);
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [token, user?.id]);
 
   const handleGrantCoins = async () => {
     if (!user?.id) {
@@ -83,6 +134,11 @@ export const ProfileHeader = ({
               <p className="font-display text-2xl font-semibold text-ink">
                 {displayName}
               </p>
+              {leaderboardRank && (
+                <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                  Leaderboard #{leaderboardRank}
+                </span>
+              )}
             </div>
             <p className="text-sm text-muted">
               {displayHandle}

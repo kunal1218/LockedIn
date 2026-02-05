@@ -2498,7 +2498,7 @@ export default function RankedPlayPage() {
               </Button>
             </div>
           ) : (
-            <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr]">
+            <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr] lg:gap-0">
               <div className="rounded-3xl border border-card-border/70 bg-white/80 p-6">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
                   <span>

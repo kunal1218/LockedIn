@@ -56,6 +56,13 @@ type LayoutMode = "default" | "compact";
 
 type BanDuration = "day" | "week" | "month" | "forever";
 
+type LeaderboardEntry = {
+  id: string;
+  name: string;
+  handle: string;
+  coins: number;
+};
+
 type BlockTemplate = {
   id: string;
   columns: {
@@ -165,6 +172,7 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
   const [coinGrantError, setCoinGrantError] = useState<string | null>(null);
   const [coinGrantSuccess, setCoinGrantSuccess] = useState<string | null>(null);
   const [coinGrantAmount, setCoinGrantAmount] = useState(100);
+  const [leaderboardRank, setLeaderboardRank] = useState<number | null>(null);
   const params = useParams();
   const pathname = usePathname();
   const rawHandle = typeof handle === "string" ? handle : "";
@@ -202,6 +210,49 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
       return segment;
     }
   }, [pathname]);
+
+  useEffect(() => {
+    if (!token || !profile?.user?.id) {
+      setLeaderboardRank(null);
+      return;
+    }
+
+    let isActive = true;
+
+    const loadLeaderboard = async () => {
+      const loadEntries = async (path: string) => {
+        const payload = await apiGet<{ entries: LeaderboardEntry[] }>(path, token);
+        return payload.entries ?? [];
+      };
+
+      let entries: LeaderboardEntry[] = [];
+      try {
+        entries = await loadEntries("/leaderboard");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (!message.includes("Route /leaderboard not found")) {
+          throw error;
+        }
+        entries = await loadEntries("/ranked/leaderboard");
+      }
+
+      if (!isActive) {
+        return;
+      }
+
+      const index = entries.findIndex((entry) => entry.id === profile.user.id);
+      setLeaderboardRank(index >= 0 ? index + 1 : null);
+    };
+
+    loadLeaderboard().catch(() => {
+      if (!isActive) return;
+      setLeaderboardRank(null);
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [profile?.user?.id, token]);
 
   const sanitizedHandle = (rawHandle || paramHandle || pathHandle)
     .trim()
@@ -615,6 +666,11 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
             <p className="font-display text-2xl font-semibold text-ink">
               {user.name}
             </p>
+            {leaderboardRank && (
+              <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                Leaderboard #{leaderboardRank}
+              </span>
+            )}
           </div>
           <p className="text-sm text-muted">
             {user.handle}
