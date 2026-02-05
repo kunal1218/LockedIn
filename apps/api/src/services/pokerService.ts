@@ -73,6 +73,7 @@ type PokerTable = {
   lastUpdatedAt: string;
   turnStartedAt: string | null;
   lastHandResult?: PokerHandResult | null;
+  nextHandAt: string | null;
 };
 
 type PokerClientSeat = {
@@ -143,6 +144,7 @@ const MAX_SEATS = 8;
 const MIN_PLAYERS = 2;
 const MAX_TABLES = 25;
 const POKER_TURN_SECONDS = 20;
+const POKER_HAND_PAUSE_MS = 10000;
 const SESSION_TTL_SECONDS = 60 * 60 * 6;
 const TABLES_KEY = "poker:tables";
 const QUEUE_KEY = "poker:queue";
@@ -572,6 +574,7 @@ const createTable = (smallBlind: number, bigBlind: number): PokerTable => {
     lastUpdatedAt: new Date().toISOString(),
     turnStartedAt: null,
     lastHandResult: null,
+    nextHandAt: null,
   };
 };
 
@@ -711,6 +714,7 @@ const startHand = (table: PokerTable) => {
   table.dealerIndex = nextDealer ?? eligiblePlayers[0].seatIndex;
   table.handId = randomUUID();
   table.status = "in_hand";
+  table.nextHandAt = null;
   table.street = "preflop";
   table.community = [];
   table.deck = createDeck();
@@ -981,7 +985,9 @@ const concludeHand = (table: PokerTable) => {
 
   const eligible = getEligiblePlayers(table);
   if (eligible.length >= MIN_PLAYERS) {
-    startHand(table);
+    table.nextHandAt = new Date(Date.now() + POKER_HAND_PAUSE_MS).toISOString();
+  } else {
+    table.nextHandAt = null;
   }
 };
 
@@ -1171,6 +1177,26 @@ const handleTurnTimeout = (table: PokerTable) => {
     }
   }
 
+  return true;
+};
+
+const maybeStartNextHand = (table: PokerTable, nowMs: number) => {
+  if (table.status !== "waiting") {
+    return false;
+  }
+  const eligible = getEligiblePlayers(table);
+  if (eligible.length < MIN_PLAYERS) {
+    table.nextHandAt = null;
+    return false;
+  }
+  if (!table.nextHandAt) {
+    return false;
+  }
+  const nextAtMs = Date.parse(table.nextHandAt);
+  if (!Number.isFinite(nextAtMs) || nowMs < nextAtMs) {
+    return false;
+  }
+  startHand(table);
   return true;
 };
 
@@ -1373,7 +1399,14 @@ const processQueue = async () => {
     if (table.status === "waiting") {
       const eligible = getEligiblePlayers(table);
       if (eligible.length >= MIN_PLAYERS) {
-        startHand(table);
+        if (table.nextHandAt) {
+          const nextAtMs = Date.parse(table.nextHandAt);
+          if (Number.isFinite(nextAtMs) && Date.now() >= nextAtMs) {
+            startHand(table);
+          }
+        } else {
+          startHand(table);
+        }
       }
     }
 
@@ -1411,12 +1444,19 @@ export const queuePokerPlayer = async (params: {
         }
         table.log.push(toLog(`${player.name} re-bought ${normalizedAmount} chips.`));
       }
-      if (table.status === "waiting") {
-        const eligible = getEligiblePlayers(table);
-        if (eligible.length >= MIN_PLAYERS) {
+    if (table.status === "waiting") {
+      const eligible = getEligiblePlayers(table);
+      if (eligible.length >= MIN_PLAYERS) {
+        if (table.nextHandAt) {
+          const nextAtMs = Date.parse(table.nextHandAt);
+          if (Number.isFinite(nextAtMs) && Date.now() >= nextAtMs) {
+            startHand(table);
+          }
+        } else {
           startHand(table);
         }
       }
+    }
       await saveTable(table);
       return {
         tableId: table.id,
@@ -1627,7 +1667,14 @@ export const rebuyPoker = async (params: {
   if (table.status === "waiting") {
     const eligible = getEligiblePlayers(table);
     if (eligible.length >= MIN_PLAYERS) {
-      startHand(table);
+      if (table.nextHandAt) {
+        const nextAtMs = Date.parse(table.nextHandAt);
+        if (Number.isFinite(nextAtMs) && Date.now() >= nextAtMs) {
+          startHand(table);
+        }
+      } else {
+        startHand(table);
+      }
     }
   }
 
@@ -1792,13 +1839,11 @@ export const prunePokerTables = async (params: {
     }
 
     if (!staleTargets.length) {
+      const started = maybeStartNextHand(table, now);
+      if (started) {
+        changed = true;
+      }
       if (changed) {
-        if (table.status === "waiting") {
-          const eligible = getEligiblePlayers(table);
-          if (eligible.length >= MIN_PLAYERS) {
-            startHand(table);
-          }
-        }
         await saveTable(table);
         updatedTableIds.add(table.id);
       }
@@ -1817,10 +1862,7 @@ export const prunePokerTables = async (params: {
     }
 
     if (changed && table.status === "waiting") {
-      const eligible = getEligiblePlayers(table);
-      if (eligible.length >= MIN_PLAYERS) {
-        startHand(table);
-      }
+      maybeStartNextHand(table, now);
     }
 
     if (changed) {
