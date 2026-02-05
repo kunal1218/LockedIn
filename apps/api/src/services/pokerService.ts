@@ -33,6 +33,7 @@ type PokerPlayer = {
   totalBet: number;
   cards: CardCode[];
   pendingLeave?: boolean;
+  lastSeenAt?: string;
 };
 
 type PokerTable = {
@@ -573,6 +574,15 @@ const getSeatIndexByUserId = (table: PokerTable, userId: string) => {
   return player ? player.seatIndex : null;
 };
 
+const markPlayerSeen = (table: PokerTable, userId: string) => {
+  const player = getPlayerById(table, userId);
+  if (!player) {
+    return false;
+  }
+  player.lastSeenAt = new Date().toISOString();
+  return true;
+};
+
 const nextOccupiedIndex = (table: PokerTable, fromIndex: number) => {
   for (let offset = 1; offset <= table.maxSeats; offset += 1) {
     const index = (fromIndex + offset) % table.maxSeats;
@@ -1027,6 +1037,41 @@ const updateCurrentPlayer = (table: PokerTable, fromIndex: number) => {
   table.currentPlayerIndex = nextIndex;
 };
 
+const removePlayerFromTable = (table: PokerTable, player: PokerPlayer, reason: string) => {
+  const wasCurrent = table.currentPlayerIndex === player.seatIndex;
+
+  if (table.status === "in_hand" && player.inHand) {
+    player.pendingLeave = true;
+    if (player.status === "active") {
+      player.status = "folded";
+      table.pendingActionUserIds = table.pendingActionUserIds.filter(
+        (id) => id !== player.userId
+      );
+      table.log.push(toLog(reason));
+
+      if (!maybeAwardIfSingle(table)) {
+        const roundResult = ensureBettingRound(table);
+        if (
+          !roundResult.advanced &&
+          table.status === "in_hand" &&
+          table.pendingActionUserIds.length
+        ) {
+          updateCurrentPlayer(table, player.seatIndex);
+        }
+      }
+    } else {
+      table.log.push(toLog(reason));
+    }
+  } else {
+    table.seats[player.seatIndex] = null;
+    table.log.push(toLog(reason));
+  }
+
+  if (wasCurrent && table.currentPlayerIndex === player.seatIndex) {
+    updateCurrentPlayer(table, player.seatIndex);
+  }
+};
+
 const buildClientState = (table: PokerTable, userId: string): PokerClientState => {
   const youSeatIndex = getSeatIndexByUserId(table, userId);
   const seats: Array<PokerClientSeat | null> = table.seats.map((seat, index) => {
@@ -1128,6 +1173,7 @@ const seatPlayerAtTable = async (
     bet: 0,
     totalBet: 0,
     cards: [],
+    lastSeenAt: new Date().toISOString(),
   };
   table.seats[seatIndex] = player;
   table.log.push(toLog(`${player.name} joined the table.`));
@@ -1204,6 +1250,7 @@ export const queuePokerPlayer = async (params: {
       await clearPlayerTableId(params.userId);
       table = null;
     } else {
+      player.lastSeenAt = new Date().toISOString();
       if (normalizedAmount) {
         await ensureBuyIn(params.userId, normalizedAmount);
         player.chips += normalizedAmount;
@@ -1292,12 +1339,33 @@ export const getPokerStateForUser = async (userId: string) => {
       queuePosition,
     } as const;
   }
+  const touched = markPlayerSeen(table, userId);
+  if (touched) {
+    await saveTable(table);
+  }
   return {
     tableId,
     state: buildClientState(table, userId),
     queued: false,
     queuePosition: null,
   } as const;
+};
+
+export const touchPokerPlayer = async (userId: string) => {
+  const tableId = await getPlayerTableId(userId);
+  if (!tableId) {
+    return false;
+  }
+  const table = await loadTable(tableId);
+  if (!table) {
+    await clearPlayerTableId(userId);
+    return false;
+  }
+  const touched = markPlayerSeen(table, userId);
+  if (touched) {
+    await saveTable(table);
+  }
+  return touched;
 };
 
 export const applyPokerAction = async (params: {
@@ -1330,6 +1398,7 @@ export const applyPokerAction = async (params: {
     throw new PokerError("Waiting for your turn.", 400);
   }
 
+  player.lastSeenAt = new Date().toISOString();
   applyPlayerAction(table, player, params.action);
 
   if (!maybeAwardIfSingle(table)) {
@@ -1382,6 +1451,7 @@ export const rebuyPoker = async (params: {
     throw new PokerError("Player not seated.", 400);
   }
 
+  player.lastSeenAt = new Date().toISOString();
   const amount = Math.floor(params.amount);
   await ensureBuyIn(params.userId, amount);
   player.chips += amount;
@@ -1445,40 +1515,8 @@ export const leavePokerTable = async (userId: string) => {
   }
 
   await dequeuePlayer(userId);
-  const wasCurrent = table.currentPlayerIndex === player.seatIndex;
-
-  if (table.status === "in_hand" && player.inHand) {
-    player.pendingLeave = true;
-    if (player.status === "active") {
-      player.status = "folded";
-      table.pendingActionUserIds = table.pendingActionUserIds.filter(
-        (id) => id !== player.userId
-      );
-      table.log.push(toLog(`${player.name} left the table.`));
-
-      if (!maybeAwardIfSingle(table)) {
-        const roundResult = ensureBettingRound(table);
-        if (
-          !roundResult.advanced &&
-          table.status === "in_hand" &&
-          table.pendingActionUserIds.length
-        ) {
-          updateCurrentPlayer(table, player.seatIndex);
-        }
-      }
-    } else {
-      table.log.push(toLog(`${player.name} left the table.`));
-    }
-  } else {
-    table.seats[player.seatIndex] = null;
-    table.log.push(toLog(`${player.name} left the table.`));
-  }
-
+  removePlayerFromTable(table, player, `${player.name} left the table.`);
   await clearPlayerTableId(userId);
-
-  if (wasCurrent && table.currentPlayerIndex === player.seatIndex) {
-    updateCurrentPlayer(table, player.seatIndex);
-  }
 
   await saveTable(table);
 
@@ -1500,6 +1538,132 @@ export const leavePokerTable = async (userId: string) => {
     updatedTableIds,
     failedUserIds,
   } as const;
+};
+
+export const forceRemovePokerUser = async (userId: string, reason?: string) => {
+  const tableId = await getPlayerTableId(userId);
+  if (tableId) {
+    return leavePokerTable(userId);
+  }
+
+  const tables = await loadActiveTables();
+  for (const table of tables) {
+    const player = getPlayerById(table, userId);
+    if (!player) {
+      continue;
+    }
+    removePlayerFromTable(
+      table,
+      player,
+      reason ?? `${player.name} left the table.`
+    );
+    await clearPlayerTableId(userId);
+    await saveTable(table);
+
+    let updatedTableIds = [table.id];
+    let failedUserIds: string[] = [];
+    if ((await getQueueLength()) > 0) {
+      const queueResult = await processQueue();
+      updatedTableIds = Array.from(
+        new Set([...updatedTableIds, ...queueResult.updatedTableIds])
+      );
+      failedUserIds = queueResult.failedUserIds;
+    }
+
+    return {
+      tableId: null,
+      state: null,
+      queued: false,
+      queuePosition: null,
+      updatedTableIds,
+      failedUserIds,
+    } as const;
+  }
+
+  await dequeuePlayer(userId);
+  return {
+    tableId: null,
+    state: null,
+    queued: false,
+    queuePosition: null,
+    updatedTableIds: [],
+    failedUserIds: [],
+  } as const;
+};
+
+export const prunePokerTables = async (params: {
+  inactivityMs: number;
+  isUserActive?: (userId: string) => boolean;
+}) => {
+  const { inactivityMs, isUserActive } = params;
+  const now = Date.now();
+  const tables = await loadActiveTables();
+  const updatedTableIds = new Set<string>();
+  const removedUserIds: string[] = [];
+
+  for (const table of tables) {
+    const staleTargets: Array<{ userId: string; reason: string }> = [];
+    for (const seat of table.seats) {
+      if (!seat) {
+        continue;
+      }
+      const lastSeenMs = seat.lastSeenAt ? Date.parse(seat.lastSeenAt) : Number.NaN;
+      const active = isUserActive ? isUserActive(seat.userId) : false;
+      const hasSeen = Number.isFinite(lastSeenMs);
+      const isStale =
+        !active && (hasSeen ? now - lastSeenMs > inactivityMs : true);
+      const isBroke = seat.chips <= 0 && (!seat.inHand || table.status !== "in_hand");
+      if (isStale || isBroke) {
+        staleTargets.push({
+          userId: seat.userId,
+          reason: isBroke
+            ? `${seat.name} busted out.`
+            : `${seat.name} left the table.`,
+        });
+      }
+    }
+
+    if (!staleTargets.length) {
+      continue;
+    }
+
+    let changed = false;
+    for (const target of staleTargets) {
+      const player = getPlayerById(table, target.userId);
+      if (!player) {
+        continue;
+      }
+      removePlayerFromTable(table, player, target.reason);
+      await clearPlayerTableId(target.userId);
+      removedUserIds.push(target.userId);
+      changed = true;
+    }
+
+    if (changed && table.status === "waiting") {
+      const eligible = getEligiblePlayers(table);
+      if (eligible.length >= MIN_PLAYERS) {
+        startHand(table);
+      }
+    }
+
+    if (changed) {
+      await saveTable(table);
+      updatedTableIds.add(table.id);
+    }
+  }
+
+  let failedUserIds: string[] = [];
+  if ((await getQueueLength()) > 0) {
+    const queueResult = await processQueue();
+    queueResult.updatedTableIds.forEach((id) => updatedTableIds.add(id));
+    failedUserIds = queueResult.failedUserIds;
+  }
+
+  return {
+    updatedTableIds: Array.from(updatedTableIds),
+    failedUserIds,
+    removedUserIds,
+  };
 };
 
 export const getPokerStatesForTable = async (tableId: string) => {

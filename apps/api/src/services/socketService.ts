@@ -4,9 +4,12 @@ import { Server, type Socket } from "socket.io";
 import { getUserFromToken } from "./authService";
 import {
   applyPokerAction,
+  forceRemovePokerUser,
   getPokerStateForUser,
   getPokerStatesForTable,
   leavePokerTable,
+  prunePokerTables,
+  touchPokerPlayer,
   type PokerAction,
   queuePokerPlayer,
   rebuyPoker,
@@ -125,7 +128,7 @@ const clearPresence = (userId: string, game: "poker" | "convo") => {
 };
 
 const removePokerUser = async (userId: string) => {
-  const result = await leavePokerTable(userId);
+  const result = await forceRemovePokerUser(userId);
   const socketId = userSocketMap.get(userId);
   if (socketId && io) {
     const socket = io.sockets.sockets.get(socketId);
@@ -173,6 +176,38 @@ const startPresenceSweep = () => {
           console.warn("[socket] failed to remove ranked player (presence)", error);
         }
       }
+    }
+    try {
+      const pruneResult = await prunePokerTables({
+        inactivityMs: DISCONNECT_GRACE_MS,
+        isUserActive: (userId) => {
+          const presence = presenceTimers.get(userId);
+          return Boolean(
+            presence?.pokerAt && now - presence.pokerAt <= DISCONNECT_GRACE_MS
+          );
+        },
+      });
+      if (pruneResult.removedUserIds?.length) {
+        pruneResult.removedUserIds.forEach((removedUserId) => {
+          const socketId = userSocketMap.get(removedUserId);
+          if (socketId) {
+            io?.to(socketId).emit("poker:state", { state: null });
+          }
+        });
+      }
+      if (pruneResult.updatedTableIds?.length) {
+        await Promise.all(
+          pruneResult.updatedTableIds.map((tableId) => emitPokerStatesForTable(tableId))
+        );
+      }
+      if (pruneResult.failedUserIds?.length) {
+        emitPokerErrorsForUsers(
+          pruneResult.failedUserIds,
+          "Not enough coins for that buy-in."
+        );
+      }
+    } catch (error) {
+      console.warn("[socket] failed to prune poker tables", error);
     }
     isPresenceSweepRunning = false;
   }, PRESENCE_SWEEP_INTERVAL_MS);
@@ -290,6 +325,7 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
     socket.on("poker:state", async () => {
       try {
         updatePresence(userId, "poker");
+        await touchPokerPlayer(userId);
         await joinPokerTableRoom();
       } catch (error) {
         emitPokerError(
@@ -301,6 +337,7 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
     socket.on("poker:queue", async (payload?: { amount?: number }) => {
       try {
         updatePresence(userId, "poker");
+        await touchPokerPlayer(userId);
         if (!userProfile) {
           throw new Error("Missing user profile");
         }
@@ -334,6 +371,7 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
       async (payload?: { action?: string; amount?: number }) => {
         try {
           updatePresence(userId, "poker");
+          await touchPokerPlayer(userId);
           const actionType =
             typeof payload?.action === "string"
               ? payload.action.toLowerCase()
@@ -368,6 +406,7 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
     socket.on("poker:rebuy", async (payload?: { amount?: number }) => {
       try {
         updatePresence(userId, "poker");
+        await touchPokerPlayer(userId);
         const amount =
           typeof payload?.amount === "number"
             ? payload.amount
@@ -384,6 +423,7 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
     socket.on("poker:chat", async (payload?: { message?: string }) => {
       try {
         updatePresence(userId, "poker");
+        await touchPokerPlayer(userId);
         const message = payload?.message?.trim() ?? "";
         if (!message) {
           return;
@@ -416,6 +456,7 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
 
     socket.on("poker:chat:history", async () => {
       updatePresence(userId, "poker");
+      await touchPokerPlayer(userId);
       const result = await getPokerStateForUser(userId);
       if (!result.tableId) {
         return;
@@ -455,6 +496,9 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
       const game = payload?.game;
       if (game === "poker" || game === "convo") {
         updatePresence(userId, game);
+      }
+      if (game === "poker") {
+        void touchPokerPlayer(userId);
       }
     });
 
