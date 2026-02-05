@@ -1872,6 +1872,38 @@ export default function RankedPlayPage() {
   }, [token]);
 
   useEffect(() => {
+    if (!token) {
+      return;
+    }
+    const sendHeartbeat = () => {
+      if (!socket.connected) {
+        return;
+      }
+      const games = new Set<ActiveGame>();
+      if (activeGame === "poker" || pokerState?.tableId || pokerQueuePosition) {
+        games.add("poker");
+      }
+      if (activeGame === "convo" || rankedStatus.status !== "idle") {
+        games.add("convo");
+      }
+      games.forEach((game) => {
+        socket.emit("game:heartbeat", { game });
+      });
+    };
+    sendHeartbeat();
+    const interval = window.setInterval(sendHeartbeat, 5000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [
+    activeGame,
+    pokerQueuePosition,
+    pokerState?.tableId,
+    rankedStatus.status,
+    token,
+  ]);
+
+  useEffect(() => {
     if (activeGame !== "poker") {
       return;
     }
@@ -2507,7 +2539,7 @@ export default function RankedPlayPage() {
               </Button>
             </div>
           ) : (
-            <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr] lg:gap-0">
+            <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr] lg:items-stretch">
               <div className="rounded-3xl border border-card-border/70 bg-white/80 p-6">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
                   <span>
@@ -2653,7 +2685,7 @@ export default function RankedPlayPage() {
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="flex h-full flex-col gap-4">
                 <form className="flex flex-wrap items-end gap-3" onSubmit={handlePokerQueue}>
                   <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
                     Buy-in
@@ -2784,7 +2816,7 @@ export default function RankedPlayPage() {
                   </div>
                 )}
 
-                <div className="rounded-2xl border border-card-border/70 bg-white/80 p-4">
+                <div className="flex flex-1 flex-col rounded-2xl border border-card-border/70 bg-white/80 p-4">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
                       Table Chat
@@ -2793,7 +2825,7 @@ export default function RankedPlayPage() {
                       {pokerState ? "Chat with the table" : "Join a table to chat"}
                     </span>
                   </div>
-                  <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1 text-sm">
+                  <div className="mt-3 flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
                     {pokerChatMessages.length ? (
                       pokerChatMessages.map((message) => {
                         const isMine = message.sender.id === user?.id;
