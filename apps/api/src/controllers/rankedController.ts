@@ -242,6 +242,20 @@ export const getRankedLeaderboardHandler = async (req: Request, res: Response) =
   }
 };
 
+export const getRankedLeaderboardPublicHandler = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const rawLimit = typeof req.query?.limit === "string" ? Number(req.query.limit) : 10;
+    const limit = Number.isFinite(rawLimit) ? rawLimit : 10;
+    const entries = await getRankedLeaderboard(limit);
+    res.json({ entries });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
 export const postRankedVote = async (req: Request, res: Response) => {
   try {
     const user = await requireUser(req);

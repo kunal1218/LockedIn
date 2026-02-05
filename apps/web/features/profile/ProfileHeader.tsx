@@ -53,28 +53,41 @@ export const ProfileHeader = ({
   const showGrantCoins = Boolean(user?.isAdmin);
 
   useEffect(() => {
-    if (!token || !user?.id) {
+    if (!user?.id) {
       setLeaderboardRank(null);
       return;
     }
 
     let isActive = true;
 
-    const loadLeaderboard = async () => {
-      const loadEntries = async (path: string) => {
-        const payload = await apiGet<{ entries: LeaderboardEntry[] }>(path, token);
-        return payload.entries ?? [];
-      };
+    const loadEntries = async (path: string, authToken?: string) => {
+      const payload = await apiGet<{ entries: LeaderboardEntry[] }>(path, authToken);
+      return payload.entries ?? [];
+    };
 
-      let entries: LeaderboardEntry[] = [];
-      try {
-        entries = await loadEntries("/leaderboard");
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "";
-        if (!message.includes("Route /leaderboard not found")) {
-          throw error;
+    const loadLeaderboard = async () => {
+      const attempts: Array<{ path: string; token?: string }> = token
+        ? [
+            { path: "/leaderboard", token },
+            { path: "/ranked/leaderboard", token },
+            { path: "/leaderboard/public" },
+          ]
+        : [{ path: "/leaderboard/public" }, { path: "/leaderboard" }];
+
+      let entries: LeaderboardEntry[] | null = null;
+      let lastError: unknown = null;
+
+      for (const attempt of attempts) {
+        try {
+          entries = await loadEntries(attempt.path, attempt.token);
+          break;
+        } catch (error) {
+          lastError = error;
         }
-        entries = await loadEntries("/ranked/leaderboard");
+      }
+
+      if (!entries) {
+        throw lastError ?? new Error("Unable to load leaderboard.");
       }
 
       if (!isActive) {
