@@ -2891,7 +2891,7 @@ export default function RankedPlayPage() {
                     </div>
                   )}
                   {showPokerActionDock && (
-                    <div className="flex flex-wrap items-center justify-end gap-2">
+                    <div className="flex flex-nowrap items-center justify-end gap-2">
                       {pokerEffectiveActions?.canCheck && (
                         <button
                           type="button"
@@ -2946,6 +2946,16 @@ export default function RankedPlayPage() {
                       >
                         Fold
                       </button>
+                      {showPokerLeave && (
+                        <button
+                          type="button"
+                          onClick={handlePokerLeave}
+                          disabled={isLeavingPoker}
+                          className={pokerDockButtonDanger}
+                        >
+                          {isLeavingPoker ? "Leaving" : "Leave"}
+                        </button>
+                      )}
                     </div>
                   )}
                   {showPokerBuyInDock && (
@@ -2981,7 +2991,7 @@ export default function RankedPlayPage() {
                       )}
                     </div>
                   )}
-                  {showPokerLeave && (
+                  {showPokerLeave && !showPokerActionDock && (
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       <button
                         type="button"
