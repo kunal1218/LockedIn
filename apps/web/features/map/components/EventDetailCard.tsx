@@ -159,8 +159,8 @@ export const EventDetailCard = ({
     setIsChatOpen((prev) => !prev);
   };
 
-  const handleChatSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleChatSubmit = async (formEvent: FormEvent<HTMLFormElement>) => {
+    formEvent.preventDefault();
     if (!isAuthenticated) {
       openAuthModal("login");
       return;
