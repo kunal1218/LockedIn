@@ -2688,7 +2688,7 @@ export default function RankedPlayPage() {
             </div>
           ) : (
             <div className="flex flex-col gap-6">
-              <div className="relative rounded-3xl border border-card-border/70 bg-white/80 p-6">
+              <div className="relative rounded-3xl border border-card-border/70 bg-white/80 p-6 pb-28">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
                   <span>
                     Table:{" "}
