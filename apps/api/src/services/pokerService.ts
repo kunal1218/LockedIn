@@ -1418,9 +1418,7 @@ const processQueue = async () => {
       if (tables.length >= MAX_TABLES) {
         break;
       }
-      const bigBlind = Math.max(2, Math.floor(entry.amount * 0.05));
-      const smallBlind = Math.max(1, Math.floor(bigBlind / 2));
-      table = createTable(smallBlind, bigBlind);
+      table = createTable(10, 25);
       tables.push(table);
     }
 

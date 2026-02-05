@@ -466,22 +466,23 @@ export default function RankedPlayPage() {
   const pokerPlayersNeeded = Math.max(0, 2 - pokerActiveCount);
   const pokerStatusCopy = isPokerLoading
     ? "Loading table..."
-    : pokerState?.status === "in_hand"
-      ? pokerState?.log?.length
-        ? `Last action: ${
-            pokerState.log[pokerState.log.length - 1]?.text ?? "Hand in progress."
-          }`
-        : "Hand in progress."
-      : pokerPlayersNeeded > 0
-        ? `Waiting for ${pokerPlayersNeeded} player${
-            pokerPlayersNeeded === 1 ? "" : "s"
-          }.`
-        : "Waiting for next hand.";
+    : pokerWinnerMessage
+      ? `🏆 ${pokerWinnerMessage}`
+      : pokerState?.status === "in_hand"
+        ? pokerState?.log?.length
+          ? `Last action: ${
+              pokerState.log[pokerState.log.length - 1]?.text ?? "Hand in progress."
+            }`
+          : "Hand in progress."
+        : pokerPlayersNeeded > 0
+          ? `Waiting for ${pokerPlayersNeeded} player${
+              pokerPlayersNeeded === 1 ? "" : "s"
+            }.`
+          : "Waiting for next hand.";
   const pokerHandActive = pokerState?.status === "in_hand";
   const pokerIsBroke = Boolean(pokerYouSeat && pokerYouSeat.chips <= 0);
   const showPokerActionDock = pokerHandActive && pokerCanAct;
   const showPokerBuyInDock = !pokerHandActive && (!pokerYouSeat || pokerIsBroke);
-  const showPokerLeave = Boolean(pokerYouSeat || pokerIsQueued);
   const pokerCanRevealCards =
     Boolean(pokerState && pokerYouSeat?.cards?.length) &&
     !pokerHandActive &&
@@ -491,6 +492,7 @@ export default function RankedPlayPage() {
       ? pokerSeats
       : Array.from({ length: 8 }, () => null);
   const pokerIsQueued = pokerQueuePosition !== null;
+  const showPokerLeave = Boolean(pokerYouSeat || pokerIsQueued);
   const pokerWinnerIds = useMemo(() => {
     if (!pokerWinnerBanner?.winners?.length) {
       return new Set<string>();
@@ -2852,11 +2854,6 @@ export default function RankedPlayPage() {
                       );
                     })}
                   </div>
-                  {pokerWinnerBanner && pokerWinnerMessage && (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                      <span className="font-semibold">🏆 {pokerWinnerMessage}</span>
-                    </div>
-                  )}
 
                 </div>
 
