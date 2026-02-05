@@ -151,12 +151,16 @@ export const EventDetailCard = ({
     }
   };
 
-  const handleToggleChat = () => {
+  const handleOpenChat = () => {
     if (!isAuthenticated) {
       openAuthModal("login");
       return;
     }
-    setIsChatOpen((prev) => !prev);
+    setIsChatOpen(true);
+  };
+
+  const handleCloseChat = () => {
+    setIsChatOpen(false);
   };
 
   const handleChatSubmit = async (formEvent: FormEvent<HTMLFormElement>) => {
@@ -204,14 +208,15 @@ export const EventDetailCard = ({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-card-border/60 bg-white shadow-[0_24px_60px_rgba(27,26,23,0.25)] max-h-[85vh] animate-scale-in">
-        <div className="sticky top-0 z-10 flex items-start justify-between border-b border-card-border/60 bg-white px-6 py-4">
+    <>
+      <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+        <div
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+        <div className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-card-border/60 bg-white shadow-[0_24px_60px_rgba(27,26,23,0.25)] max-h-[85vh] animate-scale-in">
+          <div className="sticky top-0 z-10 flex items-start justify-between border-b border-card-border/60 bg-white px-6 py-4">
           <div className="mt-6">
             <div className="mb-2 flex items-center gap-2 text-sm text-muted">
               <span className="text-3xl">{categoryIcon}</span>
@@ -343,72 +348,6 @@ export const EventDetailCard = ({
             </div>
           )}
 
-          {isChatOpen && (
-            <div className="rounded-2xl border border-card-border/70 bg-white/80 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-                  Event Chat
-                </p>
-                <button
-                  type="button"
-                  onClick={handleToggleChat}
-                  className="text-xs font-semibold text-ink/70 transition hover:text-ink"
-                >
-                  Close
-                </button>
-              </div>
-              <div className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
-                {chatMessages.length ? (
-                  chatMessages.map((message) => {
-                    const isMine = message.sender.id === user?.id;
-                    return (
-                      <div
-                        key={message.id}
-                        className={`flex ${isMine ? "justify-end" : "justify-start"}`}
-                      >
-                        <div
-                          className={`max-w-[80%] rounded-2xl px-3 py-2 text-xs ${
-                            isMine
-                              ? "bg-accent text-white"
-                              : "bg-ink/5 text-ink"
-                          }`}
-                        >
-                          <p className="font-semibold">
-                            {message.sender.name}
-                          </p>
-                          <p className="mt-1">{message.message}</p>
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <p className="text-xs text-muted">No messages yet.</p>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-              <form className="mt-3 flex gap-2" onSubmit={handleChatSubmit}>
-                <input
-                  type="text"
-                  value={chatDraft}
-                  onChange={(event) => setChatDraft(event.target.value)}
-                  placeholder="Send a message..."
-                  className="flex-1 rounded-xl border border-card-border/70 bg-white px-3 py-2 text-xs text-ink outline-none focus:border-accent/60"
-                />
-                <button
-                  type="submit"
-                  disabled={isSendingChat}
-                  className="rounded-xl bg-ink px-4 py-2 text-xs font-semibold text-white transition hover:bg-ink/90 disabled:opacity-70"
-                >
-                  {isSendingChat ? "Sending" : "Send"}
-                </button>
-              </form>
-              {chatError && (
-                <p className="mt-2 text-xs font-semibold text-rose-500">
-                  {chatError}
-                </p>
-              )}
-            </div>
-          )}
         </div>
 
         <div className="sticky bottom-0 border-t border-card-border/60 bg-white px-6 py-4">
@@ -416,10 +355,10 @@ export const EventDetailCard = ({
             <div className="flex items-center justify-between">
               <button
                 type="button"
-                onClick={handleToggleChat}
+                onClick={handleOpenChat}
                 className="text-sm font-semibold text-ink/70 transition hover:text-ink"
               >
-                {isChatOpen ? "Hide chat" : "Open chat"}
+                Open chat
               </button>
               <span className="text-xs text-muted">
                 Chat is event-only
@@ -474,7 +413,89 @@ export const EventDetailCard = ({
             </div>
           </div>
         </div>
+        </div>
       </div>
+      {isChatOpen && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={handleCloseChat}
+            aria-hidden="true"
+          />
+          <div className="relative flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-card-border/60 bg-white shadow-[0_24px_60px_rgba(27,26,23,0.25)] max-h-[80vh] animate-scale-in">
+            <div className="flex items-start justify-between border-b border-card-border/60 bg-white px-6 py-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                  Event Chat
+                </p>
+                <p className="mt-2 text-lg font-semibold text-ink">{event.title}</p>
+                <p className="text-xs text-muted">
+                  {event.attendee_count}{" "}
+                  {event.attendee_count === 1 ? "person" : "people"} going
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseChat}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-card-border/70 text-ink/60 transition hover:border-accent/40"
+                aria-label="Close chat"
+              >
+                <span className="text-lg">×</span>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              <div className="space-y-2">
+                {chatMessages.length ? (
+                  chatMessages.map((message) => {
+                    const isMine = message.sender.id === user?.id;
+                    return (
+                      <div
+                        key={message.id}
+                        className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`max-w-[80%] rounded-2xl px-3 py-2 text-xs ${
+                            isMine ? "bg-accent text-white" : "bg-ink/5 text-ink"
+                          }`}
+                        >
+                          <p className="font-semibold">{message.sender.name}</p>
+                          <p className="mt-1">{message.message}</p>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-xs text-muted">No messages yet.</p>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+            </div>
+            <div className="border-t border-card-border/60 bg-white px-6 py-4">
+              <form className="flex gap-2" onSubmit={handleChatSubmit}>
+                <input
+                  type="text"
+                  value={chatDraft}
+                  onChange={(event) => setChatDraft(event.target.value)}
+                  placeholder="Send a message..."
+                  className="flex-1 rounded-xl border border-card-border/70 bg-white px-3 py-2 text-xs text-ink outline-none focus:border-accent/60"
+                />
+                <button
+                  type="submit"
+                  disabled={isSendingChat}
+                  className="rounded-xl bg-ink px-4 py-2 text-xs font-semibold text-white transition hover:bg-ink/90 disabled:opacity-70"
+                >
+                  {isSendingChat ? "Sending" : "Send"}
+                </button>
+              </form>
+              {chatError && (
+                <p className="mt-2 text-xs font-semibold text-rose-500">
+                  {chatError}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <style>{`
         @keyframes scale-in {
           from {
@@ -490,7 +511,7 @@ export const EventDetailCard = ({
           animation: scale-in 0.2s ease-out;
         }
       `}</style>
-    </div>,
+    </>,
     document.body
   );
 };

@@ -21,6 +21,19 @@ type PokerPlayerStatus = "active" | "folded" | "all_in" | "out";
 
 type PokerLog = { id: string; text: string };
 
+type PokerHandPayout = {
+  userId: string;
+  name: string;
+  amount: number;
+};
+
+type PokerHandResult = {
+  winners: PokerHandPayout[];
+  totalPot: number;
+  isSplit: boolean;
+  at: string;
+};
+
 type PokerPlayer = {
   userId: string;
   name: string;
@@ -57,6 +70,8 @@ type PokerTable = {
   handId: string | null;
   log: PokerLog[];
   lastUpdatedAt: string;
+  turnStartedAt: string | null;
+  lastHandResult?: PokerHandResult | null;
 };
 
 type PokerClientSeat = {
@@ -84,6 +99,10 @@ export type PokerClientState = {
   smallBlindIndex: number | null;
   bigBlindIndex: number | null;
   youSeatIndex: number | null;
+  turnStartedAt: string | null;
+  turnDurationSeconds: number;
+  serverTime: string;
+  lastHandResult?: PokerHandResult | null;
   actions?: {
     canCheck: boolean;
     canCall: boolean;
@@ -122,6 +141,7 @@ type PokerQueueEntry = {
 const MAX_SEATS = 8;
 const MIN_PLAYERS = 2;
 const MAX_TABLES = 25;
+const POKER_TURN_SECONDS = 20;
 const SESSION_TTL_SECONDS = 60 * 60 * 6;
 const TABLES_KEY = "poker:tables";
 const QUEUE_KEY = "poker:queue";
@@ -549,6 +569,8 @@ const createTable = (smallBlind: number, bigBlind: number): PokerTable => {
     handId: null,
     log: [toLog("Table created.")],
     lastUpdatedAt: new Date().toISOString(),
+    turnStartedAt: null,
+    lastHandResult: null,
   };
 };
 
@@ -680,6 +702,7 @@ const startHand = (table: PokerTable) => {
     table.status = "waiting";
     table.smallBlindIndex = null;
     table.bigBlindIndex = null;
+    table.turnStartedAt = null;
     return;
   }
 
@@ -731,6 +754,7 @@ const startHand = (table: PokerTable) => {
     ? table.dealerIndex
     : nextActiveIndex(table, bigBlindIndex);
   table.currentPlayerIndex = firstToAct ?? table.dealerIndex;
+  table.turnStartedAt = new Date().toISOString();
 
   table.log.push(toLog(`New hand started.`));
   table.log.push(toLog(`Dealer is seat ${table.dealerIndex + 1}.`));
@@ -766,6 +790,7 @@ const advanceStreet = (table: PokerTable) => {
 
   const nextIndex = nextActiveIndex(table, table.dealerIndex);
   table.currentPlayerIndex = nextIndex ?? table.dealerIndex;
+  table.turnStartedAt = table.currentPlayerIndex !== null ? new Date().toISOString() : null;
 };
 
 const allPlayersAllIn = (table: PokerTable) => {
@@ -808,7 +833,8 @@ const buildSidePots = (players: PokerPlayer[]): SidePot[] => {
 const distributePot = (
   table: PokerTable,
   pot: SidePot,
-  winners: PokerPlayer[]
+  winners: PokerPlayer[],
+  payouts?: Map<string, PokerHandPayout>
 ) => {
   if (!winners.length || pot.amount <= 0) {
     return;
@@ -817,12 +843,36 @@ const distributePot = (
   const remainder = pot.amount - split * winners.length;
   winners.forEach((winner) => {
     winner.chips += split;
+    if (payouts) {
+      const existing = payouts.get(winner.userId);
+      if (existing) {
+        existing.amount += split;
+      } else {
+        payouts.set(winner.userId, {
+          userId: winner.userId,
+          name: winner.name,
+          amount: split,
+        });
+      }
+    }
   });
   if (remainder > 0) {
     const orderedWinners = [...winners].sort(
       (a, b) => a.seatIndex - b.seatIndex
     );
     orderedWinners[0].chips += remainder;
+    if (payouts) {
+      const existing = payouts.get(orderedWinners[0].userId);
+      if (existing) {
+        existing.amount += remainder;
+      } else {
+        payouts.set(orderedWinners[0].userId, {
+          userId: orderedWinners[0].userId,
+          name: orderedWinners[0].name,
+          amount: remainder,
+        });
+      }
+    }
   }
 };
 
@@ -830,11 +880,24 @@ const resolveShowdown = (table: PokerTable) => {
   table.street = "showdown";
   const players = getPlayers(table);
   const activePlayers = players.filter((player) => player.status !== "folded");
+  const totalPot = table.pot;
+  const payouts = new Map<string, PokerHandPayout>();
   if (activePlayers.length === 1) {
     const winner = activePlayers[0];
     winner.chips += table.pot;
+    payouts.set(winner.userId, {
+      userId: winner.userId,
+      name: winner.name,
+      amount: table.pot,
+    });
     table.log.push(toLog(`${winner.name} wins ${table.pot}.`));
     table.pot = 0;
+    table.lastHandResult = {
+      winners: Array.from(payouts.values()),
+      totalPot,
+      isSplit: false,
+      at: new Date().toISOString(),
+    };
     return;
   }
 
@@ -860,7 +923,7 @@ const resolveShowdown = (table: PokerTable) => {
     const winners = hands
       .filter(({ hand }) => best && compareHands(hand, best) === 0)
       .map(({ player }) => player);
-    distributePot(table, pot, winners);
+    distributePot(table, pot, winners, payouts);
     if (winners.length === 1) {
       table.log.push(toLog(`${winners[0].name} wins ${pot.amount}.`));
     } else {
@@ -871,6 +934,14 @@ const resolveShowdown = (table: PokerTable) => {
   });
 
   table.pot = 0;
+  if (payouts.size > 0) {
+    table.lastHandResult = {
+      winners: Array.from(payouts.values()),
+      totalPot,
+      isSplit: payouts.size > 1,
+      at: new Date().toISOString(),
+    };
+  }
 };
 
 const concludeHand = (table: PokerTable) => {
@@ -878,6 +949,7 @@ const concludeHand = (table: PokerTable) => {
   table.status = "waiting";
   table.handId = null;
   table.currentPlayerIndex = null;
+  table.turnStartedAt = null;
   table.pendingActionUserIds = [];
   table.currentBet = 0;
   table.minRaise = table.bigBlind;
@@ -916,8 +988,21 @@ const maybeAwardIfSingle = (table: PokerTable) => {
   const active = getActivePlayers(table);
   if (active.length === 1) {
     const winner = active[0];
-    winner.chips += table.pot;
-    table.log.push(toLog(`${winner.name} wins ${table.pot}.`));
+    const potAmount = table.pot;
+    winner.chips += potAmount;
+    table.log.push(toLog(`${winner.name} wins ${potAmount}.`));
+    table.lastHandResult = {
+      winners: [
+        {
+          userId: winner.userId,
+          name: winner.name,
+          amount: potAmount,
+        },
+      ],
+      totalPot: potAmount,
+      isSplit: false,
+      at: new Date().toISOString(),
+    };
     table.pot = 0;
     concludeHand(table);
     return true;
@@ -1035,6 +1120,7 @@ const ensureBettingRound = (table: PokerTable) => {
 const updateCurrentPlayer = (table: PokerTable, fromIndex: number) => {
   const nextIndex = nextPendingIndex(table, fromIndex);
   table.currentPlayerIndex = nextIndex;
+  table.turnStartedAt = nextIndex !== null ? new Date().toISOString() : null;
 };
 
 const removePlayerFromTable = (table: PokerTable, player: PokerPlayer, reason: string) => {
@@ -1138,6 +1224,10 @@ const buildClientState = (table: PokerTable, userId: string): PokerClientState =
     smallBlindIndex: table.smallBlindIndex ?? null,
     bigBlindIndex: table.bigBlindIndex ?? null,
     youSeatIndex: effectiveYouSeatIndex,
+    turnStartedAt: table.turnStartedAt ?? null,
+    turnDurationSeconds: POKER_TURN_SECONDS,
+    serverTime: new Date().toISOString(),
+    lastHandResult: table.lastHandResult ?? null,
     actions,
     log: table.log.slice(-12),
   };

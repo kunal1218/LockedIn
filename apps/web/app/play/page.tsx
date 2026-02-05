@@ -86,6 +86,15 @@ type PokerClientState = {
   smallBlindIndex: number | null;
   bigBlindIndex: number | null;
   youSeatIndex: number | null;
+  turnStartedAt: string | null;
+  turnDurationSeconds: number;
+  serverTime: string;
+  lastHandResult?: {
+    winners: Array<{ userId: string; name: string; amount: number }>;
+    totalPot: number;
+    isSplit: boolean;
+    at: string;
+  } | null;
   actions?: {
     canCheck: boolean;
     canCall: boolean;
@@ -110,6 +119,7 @@ const inputClasses =
   "w-full rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-ink outline-none transition focus:border-accent/60 focus:bg-white";
 
 const TURN_SECONDS = 15;
+const POKER_TURN_SECONDS = 20;
 const TYPING_TEST_MODAL_SECONDS = 3;
 const CHAT_ROUND_SECONDS = 60;
 const ROLE_MODAL_SECONDS = 5;
@@ -185,6 +195,14 @@ export default function RankedPlayPage() {
   const [pokerChatError, setPokerChatError] = useState<string | null>(null);
   const [isSendingPokerChat, setIsSendingPokerChat] = useState(false);
   const pokerChatEndRef = useRef<HTMLDivElement | null>(null);
+  const pokerServerTimeOffsetRef = useRef<number>(0);
+  const [pokerTurnTimeLeft, setPokerTurnTimeLeft] = useState<number | null>(null);
+  const [pokerTurnProgress, setPokerTurnProgress] = useState<number>(1);
+  const [pokerWinnerBanner, setPokerWinnerBanner] = useState<
+    PokerClientState["lastHandResult"] | null
+  >(null);
+  const lastPokerResultRef = useRef<string | null>(null);
+  const pokerWinnerTimerRef = useRef<number | null>(null);
   const lives =
     rankedStatus.status === "matched"
       ? rankedStatus.lives ?? { me: 3, opponents: [3, 3] }
@@ -445,6 +463,24 @@ export default function RankedPlayPage() {
   const pokerIsQueued = pokerQueuePosition !== null;
   const lastPokerAction =
     pokerState?.log?.length ? pokerState.log[pokerState.log.length - 1]?.text : null;
+  const pokerWinnerIds = useMemo(() => {
+    if (!pokerWinnerBanner?.winners?.length) {
+      return new Set<string>();
+    }
+    return new Set(pokerWinnerBanner.winners.map((winner) => winner.userId));
+  }, [pokerWinnerBanner]);
+  const pokerWinnerMessage = useMemo(() => {
+    if (!pokerWinnerBanner?.winners?.length) {
+      return null;
+    }
+    const winners = pokerWinnerBanner.winners;
+    if (winners.length === 1) {
+      return `${winners[0].name} won ${winners[0].amount} chips`;
+    }
+    return `Split pot: ${winners
+      .map((winner) => `${winner.name} +${winner.amount}`)
+      .join(" · ")}`;
+  }, [pokerWinnerBanner]);
 
   useEffect(() => {
     setShowPokerCards(false);
@@ -462,6 +498,61 @@ export default function RankedPlayPage() {
     }
     pokerChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [pokerChatMessages, pokerState?.tableId]);
+
+  useEffect(() => {
+    if (!pokerState?.turnStartedAt || pokerState.currentPlayerIndex === null) {
+      setPokerTurnTimeLeft(null);
+      setPokerTurnProgress(1);
+      return;
+    }
+    if (pokerState.status !== "in_hand") {
+      setPokerTurnTimeLeft(null);
+      setPokerTurnProgress(1);
+      return;
+    }
+    const duration = pokerState.turnDurationSeconds ?? POKER_TURN_SECONDS;
+    const startedMs = Date.parse(pokerState.turnStartedAt);
+    if (!Number.isFinite(startedMs)) {
+      setPokerTurnTimeLeft(null);
+      setPokerTurnProgress(1);
+      return;
+    }
+    const tick = () => {
+      const now = Date.now() - pokerServerTimeOffsetRef.current;
+      const elapsed = Math.max(0, (now - startedMs) / 1000);
+      const remaining = Math.max(0, duration - elapsed);
+      setPokerTurnTimeLeft(remaining);
+      setPokerTurnProgress(duration > 0 ? remaining / duration : 0);
+    };
+    tick();
+    const interval = window.setInterval(tick, 250);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [pokerState?.turnStartedAt, pokerState?.currentPlayerIndex, pokerState?.status, pokerState?.turnDurationSeconds]);
+
+  useEffect(() => {
+    const result = pokerState?.lastHandResult;
+    if (!result?.at || result.at === lastPokerResultRef.current) {
+      return;
+    }
+    lastPokerResultRef.current = result.at;
+    setPokerWinnerBanner(result);
+    if (pokerWinnerTimerRef.current) {
+      window.clearTimeout(pokerWinnerTimerRef.current);
+    }
+    pokerWinnerTimerRef.current = window.setTimeout(() => {
+      setPokerWinnerBanner(null);
+    }, 5000);
+  }, [pokerState?.lastHandResult]);
+
+  useEffect(() => {
+    return () => {
+      if (pokerWinnerTimerRef.current) {
+        window.clearTimeout(pokerWinnerTimerRef.current);
+      }
+    };
+  }, []);
   const chatOpponent =
     !displayIsJudge
       ? displayOpponents.find((opponent) => opponent.id !== displayJudgeUserId) ??
@@ -1352,6 +1443,12 @@ export default function RankedPlayPage() {
         queued?: boolean;
         queuePosition?: number | null;
       }>("/poker/state", token);
+      if (response.state?.serverTime) {
+        const serverMs = Date.parse(response.state.serverTime);
+        if (!Number.isNaN(serverMs)) {
+          pokerServerTimeOffsetRef.current = Date.now() - serverMs;
+        }
+      }
       setPokerState(response.state);
       setPokerQueuePosition(
         response.queued ? response.queuePosition ?? 1 : null
@@ -1914,6 +2011,12 @@ export default function RankedPlayPage() {
     const currentTableId = pokerState?.tableId ?? null;
     const handleState = (payload: { state?: PokerClientState | null }) => {
       if (payload && "state" in payload) {
+        if (payload.state?.serverTime) {
+          const serverMs = Date.parse(payload.state.serverTime);
+          if (!Number.isNaN(serverMs)) {
+            pokerServerTimeOffsetRef.current = Date.now() - serverMs;
+          }
+        }
         setPokerState(payload.state ?? null);
         setPokerQueuePosition(null);
         setPokerError(null);
@@ -2621,6 +2724,11 @@ export default function RankedPlayPage() {
                                     {isSmallBlind ? "SB" : "BB"}
                                   </span>
                                 )}
+                                {pokerWinnerIds.has(seat.userId) && (
+                                  <span className="absolute -left-2 -top-3 text-lg drop-shadow">
+                                    👑
+                                  </span>
+                                )}
                               </div>
                               <div className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold text-ink shadow-sm">
                                 {seat.name}
@@ -2628,6 +2736,14 @@ export default function RankedPlayPage() {
                               <div className="text-[11px] text-muted">
                                 {seat.chips} chips
                               </div>
+                              {isCurrent && pokerTurnTimeLeft !== null && (
+                                <div className="mt-1 h-1 w-16 overflow-hidden rounded-full bg-ink/10">
+                                  <div
+                                    className="h-full bg-accent transition-[width] duration-200"
+                                    style={{ width: `${pokerTurnProgress * 100}%` }}
+                                  />
+                                </div>
+                              )}
                             </>
                           ) : (
                             <div className="flex h-12 w-12 items-center justify-center rounded-full border border-dashed border-card-border/70 bg-white/70 text-[10px] text-muted">
@@ -2638,6 +2754,11 @@ export default function RankedPlayPage() {
                       );
                     })}
                   </div>
+                  {pokerWinnerBanner && pokerWinnerMessage && (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                      <span className="font-semibold">🏆 {pokerWinnerMessage}</span>
+                    </div>
+                  )}
                   {lastPokerAction && (
                     <div className="rounded-2xl border border-card-border/70 bg-white/80 px-4 py-3 text-sm text-ink/80">
                       <span className="font-semibold">Last action:</span>{" "}
