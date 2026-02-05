@@ -454,12 +454,39 @@ export default function RankedPlayPage() {
     ? opponentLivesById.get(rightOpponent.id) ?? 3
     : 3;
   const pokerActions = pokerState?.actions;
-  const pokerCallAmount = pokerActions?.callAmount ?? 0;
-  const pokerCanAct = Boolean(pokerActions);
   const pokerSeats = pokerState?.seats ?? [];
   const pokerYouSeatIndex = pokerState?.youSeatIndex ?? null;
+  const pokerIsPlayerTurn =
+    pokerState?.status === "in_hand" &&
+    pokerYouSeatIndex !== null &&
+    pokerState?.currentPlayerIndex === pokerYouSeatIndex;
   const pokerYouSeat =
     pokerYouSeatIndex !== null ? pokerSeats[pokerYouSeatIndex] : null;
+  const pokerComputedActions = useMemo(() => {
+    if (!pokerState || !pokerYouSeat || !pokerIsPlayerTurn) {
+      return undefined;
+    }
+    const callAmount = Math.max(0, pokerState.currentBet - pokerYouSeat.bet);
+    const maxRaise = Math.max(0, pokerYouSeat.chips - callAmount);
+    return {
+      canCheck: callAmount === 0,
+      canCall: callAmount > 0 && pokerYouSeat.chips > 0,
+      canBet: pokerState.currentBet === 0 && pokerYouSeat.chips > 0,
+      canRaise: pokerState.currentBet > 0 && pokerYouSeat.chips > callAmount,
+      callAmount,
+      minRaise: pokerState.minRaise,
+      maxRaise,
+    };
+  }, [
+    pokerIsPlayerTurn,
+    pokerState,
+    pokerState?.currentBet,
+    pokerState?.minRaise,
+    pokerYouSeat,
+  ]);
+  const pokerEffectiveActions = pokerActions ?? pokerComputedActions;
+  const pokerCallAmount = pokerEffectiveActions?.callAmount ?? 0;
+  const pokerCanAct = Boolean(pokerEffectiveActions);
   const pokerActiveCount = pokerSeats.filter(
     (seat) => seat && seat.status !== "out"
   ).length;
@@ -493,7 +520,7 @@ export default function RankedPlayPage() {
           : "Waiting for next hand.";
   const pokerHandActive = pokerState?.status === "in_hand";
   const pokerIsBroke = Boolean(pokerYouSeat && pokerYouSeat.chips <= 0);
-  const showPokerActionDock = pokerHandActive && pokerCanAct;
+  const showPokerActionDock = pokerHandActive && pokerIsPlayerTurn;
   const showPokerBuyInDock = !pokerHandActive && (!pokerYouSeat || pokerIsBroke);
   const pokerCanRevealCards =
     Boolean(pokerState && pokerYouSeat?.cards?.length) &&
@@ -2865,7 +2892,7 @@ export default function RankedPlayPage() {
                   )}
                   {showPokerActionDock && (
                     <div className="flex flex-wrap items-center justify-end gap-2">
-                      {pokerActions?.canCheck && (
+                      {pokerEffectiveActions?.canCheck && (
                         <button
                           type="button"
                           onClick={() => handlePokerAction("check")}
@@ -2875,7 +2902,7 @@ export default function RankedPlayPage() {
                           Check
                         </button>
                       )}
-                      {pokerActions?.canCall && (
+                      {pokerEffectiveActions?.canCall && (
                         <button
                           type="button"
                           onClick={() => handlePokerAction("call")}
@@ -2885,11 +2912,12 @@ export default function RankedPlayPage() {
                           Call {pokerCallAmount}
                         </button>
                       )}
-                      {(pokerActions?.canBet || pokerActions?.canRaise) && (
+                      {(pokerEffectiveActions?.canBet ||
+                        pokerEffectiveActions?.canRaise) && (
                         <>
                           <input
                             type="number"
-                            min={pokerActions?.minRaise ?? 1}
+                            min={pokerEffectiveActions?.minRaise ?? 1}
                             step={1}
                             value={pokerRaiseAmount}
                             onChange={(event) => setPokerRaiseAmount(event.target.value)}
