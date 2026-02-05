@@ -77,6 +77,7 @@ type PokerClientState = {
         status: "active" | "folded" | "all_in" | "out";
         isDealer: boolean;
         cards?: string[];
+        showCards?: boolean;
       }
     | null
   >;
@@ -456,6 +457,25 @@ export default function RankedPlayPage() {
     pokerState?.currentPlayerIndex === pokerYouSeatIndex;
   const pokerYouSeat =
     pokerYouSeatIndex !== null ? pokerSeats[pokerYouSeatIndex] : null;
+  const pokerActiveCount = pokerSeats.filter(
+    (seat) => seat && seat.status !== "out"
+  ).length;
+  const pokerPlayersNeeded = Math.max(0, 2 - pokerActiveCount);
+  const pokerStatusCopy =
+    pokerState?.status === "in_hand"
+      ? lastPokerAction
+        ? `Last action: ${lastPokerAction}`
+        : "Hand in progress."
+      : pokerPlayersNeeded > 0
+        ? `Waiting for ${pokerPlayersNeeded} player${
+            pokerPlayersNeeded === 1 ? "" : "s"
+          }.`
+        : "Waiting for next hand.";
+  const pokerHandActive = pokerState?.status === "in_hand";
+  const pokerCanRevealCards =
+    Boolean(pokerState && pokerYouSeat?.cards?.length) &&
+    !pokerHandActive &&
+    !pokerYouSeat?.showCards;
   const pokerSeatSlots =
     pokerSeats.length > 0
       ? pokerSeats
@@ -605,7 +625,7 @@ export default function RankedPlayPage() {
     const isRed = suit === "H" || suit === "D";
     return (
       <div
-        className={`flex h-12 w-9 items-center justify-center rounded-xl border text-sm font-semibold shadow-sm ${
+        className={`flex h-14 w-10 items-center justify-center rounded-xl border text-base font-semibold shadow-sm ${
           hidden
             ? "border-ink/70 bg-ink text-white"
             : `border-card-border/70 bg-white ${isRed ? "text-rose-500" : "text-ink"}`
@@ -1631,6 +1651,26 @@ export default function RankedPlayPage() {
       setIsSendingPokerChat(false);
     }
   };
+
+  const handlePokerShowCards = useCallback(() => {
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    if (!pokerState || pokerState.status === "in_hand") {
+      setPokerError("Cards can only be shown after the hand ends.");
+      return;
+    }
+    if (!pokerCanRevealCards) {
+      return;
+    }
+    if (!socket.connected) {
+      setPokerError("Poker reveal requires a live connection.");
+      return;
+    }
+    setPokerError(null);
+    socket.emit("poker:show");
+  }, [openAuthModal, pokerCanRevealCards, pokerState, token]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2701,29 +2741,78 @@ export default function RankedPlayPage() {
                         >
                           {seat ? (
                             <>
-                              <div
-                                className={`relative rounded-full p-[3px] ${
-                                  isCurrent
-                                    ? "bg-accent/30 ring-2 ring-accent/60"
-                                    : "bg-white/80"
-                                }`}
-                              >
-                                <Avatar name={seat.name} size={48} />
-                                {seat.isDealer && (
-                                  <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-300 text-[10px] font-bold text-amber-900 shadow-sm">
-                                    D
-                                  </span>
-                                )}
-                                {(isSmallBlind || isBigBlind) && (
-                                  <span className="absolute -right-2 -bottom-2 flex h-5 w-5 items-center justify-center rounded-full bg-ink/80 text-[9px] font-bold text-white shadow-sm">
-                                    {isSmallBlind ? "SB" : "BB"}
-                                  </span>
-                                )}
-                                {pokerWinnerIds.has(seat.userId) && (
-                                  <span className="absolute -left-2 -top-3 text-lg drop-shadow">
-                                    👑
-                                  </span>
-                                )}
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className={`relative rounded-full p-[3px] ${
+                                    isCurrent
+                                      ? "bg-accent/30 ring-2 ring-accent/60"
+                                      : "bg-white/80"
+                                  }`}
+                                >
+                                  <Avatar name={seat.name} size={48} />
+                                  {seat.isDealer && (
+                                    <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-300 text-[10px] font-bold text-amber-900 shadow-sm">
+                                      D
+                                    </span>
+                                  )}
+                                  {(isSmallBlind || isBigBlind) && (
+                                    <span className="absolute -right-2 -bottom-2 flex h-5 w-5 items-center justify-center rounded-full bg-ink/80 text-[9px] font-bold text-white shadow-sm">
+                                      {isSmallBlind ? "SB" : "BB"}
+                                    </span>
+                                  )}
+                                  {pokerWinnerIds.has(seat.userId) && (
+                                    <span className="absolute -left-2 -top-3 text-lg drop-shadow">
+                                      👑
+                                    </span>
+                                  )}
+                                </div>
+                                {(() => {
+                                  const isViewerSeat = seat.userId === user?.id;
+                                  const revealToTable =
+                                    !pokerHandActive && Boolean(seat.showCards);
+                                  const shouldRenderCards =
+                                    isViewerSeat ||
+                                    (pokerHandActive && seat.status !== "out") ||
+                                    revealToTable;
+                                  if (!shouldRenderCards) {
+                                    return null;
+                                  }
+                                  const shouldShowFaces = isViewerSeat
+                                    ? showPokerCards || revealToTable
+                                    : revealToTable;
+                                  const rawCards = seat.cards?.length
+                                    ? seat.cards
+                                    : [undefined, undefined];
+                                  const cardsToRender =
+                                    rawCards.length >= 2
+                                      ? rawCards.slice(0, 2)
+                                      : [...rawCards, undefined].slice(0, 2);
+                                  const canTapToShow =
+                                    isViewerSeat && pokerCanRevealCards;
+                                  return (
+                                    <div
+                                      className={`flex items-center gap-1 ${
+                                        canTapToShow ? "cursor-pointer" : ""
+                                      }`}
+                                      onClick={
+                                        canTapToShow ? handlePokerShowCards : undefined
+                                      }
+                                      role={canTapToShow ? "button" : undefined}
+                                      title={
+                                        canTapToShow ? "Tap to show your cards" : undefined
+                                      }
+                                    >
+                                      {cardsToRender.map((card, index) => (
+                                        <div key={`seat-card-${seat.userId}-${index}`}>
+                                          {renderPokerCard(
+                                            card,
+                                            !shouldShowFaces || !card
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                               <div className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold text-ink shadow-sm">
                                 {seat.name}
@@ -2771,24 +2860,41 @@ export default function RankedPlayPage() {
                       </p>
                     </div>
                     {pokerYouSeat && (
-                      <button
-                        type="button"
-                        onMouseDown={() => setShowPokerCards(true)}
-                        onMouseUp={() => setShowPokerCards(false)}
-                        onMouseLeave={() => setShowPokerCards(false)}
-                        onTouchStart={() => setShowPokerCards(true)}
-                        onTouchEnd={() => setShowPokerCards(false)}
-                        onTouchCancel={() => setShowPokerCards(false)}
-                        className="rounded-full border border-card-border/70 bg-white/80 px-3 py-1 text-xs font-semibold text-ink/70 transition hover:border-accent/40 hover:text-ink"
-                      >
-                        Hold to see
-                      </button>
+                      <div className="flex flex-col items-end gap-1">
+                        <button
+                          type="button"
+                          onMouseDown={() => setShowPokerCards(true)}
+                          onMouseUp={() => setShowPokerCards(false)}
+                          onMouseLeave={() => setShowPokerCards(false)}
+                          onTouchStart={() => setShowPokerCards(true)}
+                          onTouchEnd={() => setShowPokerCards(false)}
+                          onTouchCancel={() => setShowPokerCards(false)}
+                          className="rounded-full border border-card-border/70 bg-white/80 px-3 py-1 text-xs font-semibold text-ink/70 transition hover:border-accent/40 hover:text-ink"
+                        >
+                          Hold to see
+                        </button>
+                        {pokerCanRevealCards && (
+                          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted/70">
+                            Tap cards to show
+                          </span>
+                        )}
+                      </div>
                     )}
-                    <div className="flex items-center gap-2">
+                    <div
+                      className={`flex items-center gap-2 ${
+                        pokerCanRevealCards ? "cursor-pointer" : ""
+                      }`}
+                      onClick={pokerCanRevealCards ? handlePokerShowCards : undefined}
+                      role={pokerCanRevealCards ? "button" : undefined}
+                      title={pokerCanRevealCards ? "Tap to show your cards" : undefined}
+                    >
                       {pokerYouSeat?.cards?.length
                         ? pokerYouSeat.cards.map((card, index) => (
                             <div key={`player-card-${index}`}>
-                              {renderPokerCard(card, !showPokerCards)}
+                              {renderPokerCard(
+                                card,
+                                !showPokerCards && !pokerYouSeat?.showCards
+                              )}
                             </div>
                           ))
                         : [0, 1].map((index) => (

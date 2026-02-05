@@ -48,6 +48,7 @@ type PokerPlayer = {
   pendingLeave?: boolean;
   lastSeenAt?: string;
   missedTurns?: number;
+  showCards?: boolean;
 };
 
 type PokerTable = {
@@ -86,6 +87,7 @@ type PokerClientSeat = {
   status: PokerPlayerStatus;
   isDealer: boolean;
   cards?: CardCode[];
+  showCards?: boolean;
 };
 
 export type PokerClientState = {
@@ -731,6 +733,7 @@ const startHand = (table: PokerTable) => {
     seat.status = seat.inHand ? "active" : "out";
     seat.bet = 0;
     seat.totalBet = 0;
+    seat.showCards = false;
     seat.cards = seat.inHand ? [drawCard(table), drawCard(table)] : [];
   });
 
@@ -979,7 +982,6 @@ const concludeHand = (table: PokerTable) => {
     seat.inHand = false;
     seat.bet = 0;
     seat.totalBet = 0;
-    seat.cards = [];
     seat.status = seat.chips > 0 ? "active" : "out";
   });
 
@@ -1283,8 +1285,8 @@ const buildClientState = (table: PokerTable, userId: string): PokerClientState =
     if (shouldHideSeat(seat)) {
       return null;
     }
-    const showCards =
-      table.street === "showdown" || seat.userId === userId || table.status !== "in_hand";
+    const revealToTable = table.status !== "in_hand" && Boolean(seat.showCards);
+    const showCards = seat.userId === userId || revealToTable;
     return {
       seatIndex: index,
       userId: seat.userId,
@@ -1295,6 +1297,7 @@ const buildClientState = (table: PokerTable, userId: string): PokerClientState =
       status: seat.status,
       isDealer: index === table.dealerIndex,
       cards: showCards ? seat.cards : undefined,
+      showCards: seat.showCards ?? false,
     };
   });
 
@@ -1386,6 +1389,7 @@ const seatPlayerAtTable = async (
     cards: [],
     lastSeenAt: new Date().toISOString(),
     missedTurns: 0,
+    showCards: false,
   };
   table.seats[seatIndex] = player;
   table.log.push(toLog(`${player.name} joined the table.`));
@@ -1673,6 +1677,31 @@ export const applyPokerAction = async (params: {
     : buildClientState(table, params.userId);
 
   return { tableId: table.id, state, updatedTableIds, failedUserIds };
+};
+
+export const showPokerCards = async (userId: string) => {
+  const tableId = await getPlayerTableId(userId);
+  if (!tableId) {
+    throw new PokerError("Join a table first.", 400);
+  }
+  const table = await loadTable(tableId);
+  if (!table) {
+    await clearPlayerTableId(userId);
+    throw new PokerError("Table not found.", 404);
+  }
+  const player = getPlayerById(table, userId);
+  if (!player) {
+    throw new PokerError("Player not seated.", 400);
+  }
+  if (table.status === "in_hand") {
+    throw new PokerError("Cards can only be shown after the hand ends.", 400);
+  }
+  player.lastSeenAt = new Date().toISOString();
+  if (player.cards?.length) {
+    player.showCards = true;
+  }
+  await saveTable(table);
+  return { tableId: table.id, updatedTableIds: [table.id] };
 };
 
 export const rebuyPoker = async (params: {

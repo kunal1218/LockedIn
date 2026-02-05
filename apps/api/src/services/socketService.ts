@@ -9,6 +9,7 @@ import {
   getPokerStatesForTable,
   leavePokerTable,
   prunePokerTables,
+  showPokerCards,
   touchPokerPlayer,
   type PokerAction,
   queuePokerPlayer,
@@ -450,6 +451,22 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
       } catch (error) {
         emitPokerError(
           error instanceof Error ? error.message : "Unable to send chat."
+        );
+      }
+    });
+
+    socket.on("poker:show", async () => {
+      try {
+        updatePresence(userId, "poker");
+        await touchPokerPlayer(userId);
+        const result = await showPokerCards(userId);
+        const tableIds = result.updatedTableIds?.length
+          ? result.updatedTableIds
+          : [result.tableId];
+        await Promise.all(tableIds.map((tableId) => emitPokerStatesForTable(tableId)));
+      } catch (error) {
+        emitPokerError(
+          error instanceof Error ? error.message : "Unable to reveal cards."
         );
       }
     });
