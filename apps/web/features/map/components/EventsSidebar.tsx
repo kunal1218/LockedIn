@@ -44,29 +44,37 @@ type EventsSidebarProps = {
   onClose: () => void;
   onEventClick: (eventId: number) => void;
   userLocation: { latitude: number; longitude: number } | null;
+  now?: Date;
 };
 
 export const EventsSidebar = ({
   events,
   onClose,
   onEventClick,
+  now,
 }: EventsSidebarProps) => {
+  const currentTime = now ?? new Date();
   const sortedEvents = useMemo(() => {
     return [...events].sort((a, b) => {
       const statusA = getEventStatus(a.start_time, a.end_time);
       const statusB = getEventStatus(b.start_time, b.end_time);
 
-      if (statusA.urgent && !statusB.urgent) return -1;
-      if (!statusA.urgent && statusB.urgent) return 1;
+      if (statusA.status === "happening-now" && statusB.status !== "happening-now") {
+        return -1;
+      }
+      if (statusA.status !== "happening-now" && statusB.status === "happening-now") {
+        return 1;
+      }
 
       return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
     });
   }, [events]);
 
-  const urgentCount = useMemo(
+  const liveCount = useMemo(
     () =>
-      events.filter((event) =>
-        getEventStatus(event.start_time, event.end_time).urgent
+      events.filter(
+        (event) =>
+          getEventStatus(event.start_time, event.end_time).status === "happening-now"
       ).length,
     [events]
   );
@@ -76,14 +84,13 @@ export const EventsSidebar = ({
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between border-b border-ink/10 bg-white p-4">
           <div>
-            <h2 className="text-2xl font-bold text-ink">
-              Nearby Events ({events.length})
-            </h2>
-            <div className="mt-1 flex items-center gap-2">
-              <p className="text-sm text-muted">{events.length} events found</p>
-              {urgentCount > 0 && (
-                <span className="rounded-full bg-rose-500/10 px-2 py-1 text-[10px] font-semibold text-rose-600">
-                  🔴 {urgentCount} happening now
+            <h2 className="text-xl font-bold text-ink">Nearby Events</h2>
+            <div className="mt-1 text-sm text-muted">
+              {events.length} events
+              {liveCount > 0 && (
+                <span className="ml-2 inline-flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                  <span className="font-medium text-rose-600">{liveCount} live</span>
                 </span>
               )}
             </div>
@@ -118,6 +125,10 @@ export const EventsSidebar = ({
           ) : (
             sortedEvents.map((event) => {
               const status = getEventStatus(event.start_time, event.end_time);
+              const minutesUntilStart = Math.floor(
+                (new Date(event.start_time).getTime() - currentTime.getTime()) /
+                  (1000 * 60)
+              );
               return (
                 <div
                   key={event.id}
@@ -133,25 +144,14 @@ export const EventsSidebar = ({
                       onClose();
                     }
                   }}
-                  className={`cursor-pointer rounded-2xl border border-ink/10 bg-white/90 p-3 backdrop-blur-sm transition hover:bg-white hover:shadow-md ${
-                    status.urgent
-                      ? "border-rose-400/60 shadow-[0_4px_12px_rgba(239,68,68,0.18)]"
+                  className={`relative cursor-pointer rounded-2xl border border-ink/10 bg-white/90 p-4 backdrop-blur-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md ${
+                    status.status === "happening-now"
+                      ? "border-rose-300/70 bg-gradient-to-r from-rose-500/[0.03] to-white"
                       : ""
                   }`}
                 >
-                  {status.label && (
-                    <div
-                      className={`mb-2 inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold tracking-[0.08em] ${
-                        status.status === "happening-now"
-                          ? "bg-rose-500 text-white animate-pulse"
-                          : status.status === "starting-soon"
-                            ? "bg-amber-500 text-white"
-                            : "bg-ink/10 text-ink/70"
-                      }`}
-                    >
-                      {status.status === "happening-now" ? "🔴 " : ""}
-                      {status.label}
-                    </div>
+                  {status.status === "happening-now" && (
+                    <span className="absolute -left-1 top-0 h-full w-1 rounded-l-lg bg-gradient-to-b from-rose-500 to-rose-600" />
                   )}
                 <div className="mb-2 flex items-start gap-3">
                   <span className="text-3xl">
@@ -164,17 +164,22 @@ export const EventsSidebar = ({
                     {event.venue_name && (
                       <p className="text-sm text-muted">📍 {event.venue_name}</p>
                     )}
+                    {status.status === "happening-now" && (
+                      <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-rose-600">
+                        <span className="inline-flex h-2 w-2 rounded-full bg-rose-500" />
+                        <span>Live now</span>
+                      </div>
+                    )}
+                    {status.status === "starting-soon" && minutesUntilStart > 0 && (
+                      <div className="mt-1 text-xs font-medium text-amber-600">
+                        Starts in {minutesUntilStart} min
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="mb-2 flex items-center gap-2 text-sm">
-                  {status.status === "happening-now" ? (
-                    <span className="rounded bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
-                      HAPPENING NOW
-                    </span>
-                  ) : (
-                    <span className="text-muted">📅 {formatTime(event.start_time)}</span>
-                  )}
+                  <span className="text-muted">📅 {formatTime(event.start_time)}</span>
                   <span
                     className={`rounded px-2 py-1 text-xs font-medium capitalize ${
                       CATEGORY_COLORS[event.category] ?? CATEGORY_COLORS.other
