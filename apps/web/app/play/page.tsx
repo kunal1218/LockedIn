@@ -2928,7 +2928,7 @@ export default function RankedPlayPage() {
                         setIsPokerChatOpen(true);
                         setPokerUnreadCount(0);
                       }}
-                      className={`${pokerDockButtonGhost} relative inline-flex min-w-[120px] items-center justify-center gap-2 sm:min-w-[140px]`}
+                      className={`${pokerDockButtonGhost} relative inline-flex w-[min(300px,calc(100vw-5rem))] items-center justify-center gap-2 sm:w-[min(360px,calc(100vw-10rem))]`}
                     >
                       Chat
                       {pokerUnreadCount > 0 && (
