@@ -12,21 +12,29 @@ const toInitials = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
 type PublicUserPopupProps = {
   user: PublicUserLocation;
   onClose: () => void;
-  onAddFriend: (handle: string) => Promise<void>;
+  onAddFriend: (userId: string) => Promise<void>;
+  isFriend: boolean;
 };
 
 export const PublicUserPopup = ({
   user,
   onClose,
   onAddFriend,
+  isFriend,
 }: PublicUserPopupProps) => {
   const router = useRouter();
   const [isVisible, setIsVisible] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
 
   useEffect(() => {
     setIsVisible(true);
   }, []);
+
+  useEffect(() => {
+    setRequestSent(false);
+    setIsSending(false);
+  }, [user.userId]);
 
   const handleClose = () => {
     setIsVisible(false);
@@ -34,12 +42,13 @@ export const PublicUserPopup = ({
   };
 
   const handleAddFriend = async () => {
-    if (!user.handle) {
+    if (!user.userId) {
       return;
     }
     setIsSending(true);
     try {
-      await onAddFriend(user.handle);
+      await onAddFriend(user.userId);
+      setRequestSent(true);
     } finally {
       setIsSending(false);
     }
@@ -116,20 +125,34 @@ export const PublicUserPopup = ({
         <div className="mt-6 flex gap-3">
           <Button
             requiresAuth={false}
-            className="min-h-[44px] flex-1"
-            onClick={handleAddFriend}
-            disabled={isSending}
-          >
-            {isSending ? "Sending..." : "Add Friend"}
-          </Button>
-          <Button
-            requiresAuth={false}
             variant="outline"
             className="min-h-[44px] flex-1"
             onClick={handleViewProfile}
           >
             View Profile
           </Button>
+          {isFriend ? (
+            <Button
+              requiresAuth={false}
+              className="min-h-[44px] flex-1"
+              onClick={() => router.push("/messages")}
+            >
+              Message
+            </Button>
+          ) : requestSent ? (
+            <div className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-ink/10 text-xs font-semibold text-muted">
+              ✓ Request sent
+            </div>
+          ) : (
+            <Button
+              requiresAuth={false}
+              className="min-h-[44px] flex-1"
+              onClick={handleAddFriend}
+              disabled={isSending}
+            >
+              {isSending ? "Sending..." : "Add Friend"}
+            </Button>
+          )}
         </div>
       </div>
     </div>

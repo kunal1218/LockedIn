@@ -53,7 +53,10 @@ export const FriendPopup = ({
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    setIsVisible(true);
+    const timeout = window.setTimeout(() => {
+      setIsVisible(true);
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   const activity = useMemo(() => {
@@ -84,7 +87,7 @@ export const FriendPopup = ({
   };
 
   const handleMessage = () => {
-    router.push(`/messages?userId=${encodeURIComponent(friend.id)}`);
+    router.push("/messages");
   };
 
   const handleProfile = () => {

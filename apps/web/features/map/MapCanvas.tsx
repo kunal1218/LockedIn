@@ -42,6 +42,10 @@ type FriendsResponse = {
   settings: MapSettings;
 };
 
+type FriendSummaryResponse = {
+  friends: Array<{ id: string }>;
+};
+
 const mapColors = ["#fde68a", "#a7f3d0", "#fecdd3", "#bae6fd"];
 
 const getMarkerColor = (name: string) =>
@@ -102,6 +106,7 @@ export const MapCanvas = () => {
   const [selectedFriend, setSelectedFriend] = useState<FriendLocation | null>(
     null
   );
+  const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
   const [selectedPublicUser, setSelectedPublicUser] = useState<PublicUserLocation | null>(
     null
   );
@@ -1189,6 +1194,23 @@ export const MapCanvas = () => {
   }, [refreshFriends, token]);
 
   useEffect(() => {
+    if (!token) {
+      setFriendIds(new Set());
+      return;
+    }
+
+    apiGet<FriendSummaryResponse>("/friends/summary", token)
+      .then((response) => {
+        setFriendIds(new Set(response.friends.map((friend) => friend.id)));
+      })
+      .catch((err) => {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[map] failed to load friend summary", err);
+        }
+      });
+  }, [token]);
+
+  useEffect(() => {
     if (!mapRef.current || !isMapReady) {
       return;
     }
@@ -1710,13 +1732,20 @@ export const MapCanvas = () => {
         <PublicUserPopup
           user={selectedPublicUser}
           onClose={() => setSelectedPublicUser(null)}
-          onAddFriend={async (handle) => {
+          isFriend={friendIds.has(selectedPublicUser.userId)}
+          onAddFriend={async (userId) => {
             if (!token) {
               openAuthModal("login");
               return;
             }
             try {
-              await apiPost("/friends/requests", { handle }, token);
+              const target =
+                publicUsers.find((user) => user.userId === userId) ??
+                selectedPublicUser;
+              if (!target?.handle) {
+                return;
+              }
+              await apiPost("/friends/requests", { handle: target.handle }, token);
               refetchPublicUsers();
             } catch (addError) {
               if (process.env.NODE_ENV !== "production") {
