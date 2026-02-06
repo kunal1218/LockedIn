@@ -2912,7 +2912,7 @@ export default function RankedPlayPage() {
                     <button
                       type="button"
                       onClick={() => setIsPokerChatOpen(true)}
-                      className="flex h-10 w-[min(240px,calc(100vw-5rem))] items-center gap-2 rounded-2xl border border-card-border/70 bg-white/90 px-4 text-xs text-ink shadow-sm transition hover:border-accent/40 sm:h-11 sm:w-[min(320px,calc(100vw-10rem))]"
+                      className="flex h-10 w-[min(240px,calc(100vw-5rem))] items-center gap-2 rounded-full border border-card-border/70 bg-white/90 px-4 text-xs text-ink shadow-sm transition hover:border-accent/40 sm:h-11 sm:w-[min(320px,calc(100vw-10rem))]"
                     >
                       <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
                         Chat
