@@ -6,6 +6,7 @@ import {
   getCategoryColor,
   getCategoryIcon,
   getEventMarkerSize,
+  getEventStatus,
   isHappeningNow,
   isStartingSoon,
 } from "../utils/eventHelpers";
@@ -29,6 +30,8 @@ export const EventMarker = ({
   const size = getEventMarkerSize(event);
   const startingSoon = isStartingSoon(event);
   const happeningNow = isHappeningNow(event);
+  const status = getEventStatus(event.start_time, event.end_time);
+  const markerSize = status.urgent ? Math.round(size * 1.25) : size;
   const title =
     tooltip ??
     `${event.title} • ${formatEventTooltipTime(event.start_time)} • ${count} going`;
@@ -41,8 +44,8 @@ export const EventMarker = ({
       onClick={() => onClick?.(event)}
       className={`relative flex cursor-pointer items-center justify-center rounded-full text-white shadow-[0_8px_20px_rgba(0,0,0,0.35)] transition-transform duration-200 ${
         isSelected ? "scale-110" : "hover:scale-105"
-      }`}
-      style={{ backgroundColor, width: size, height: size }}
+      } ${status.urgent ? "animate-pulse" : ""}`}
+      style={{ backgroundColor, width: markerSize, height: markerSize }}
     >
       {startingSoon && !happeningNow && (
         <span

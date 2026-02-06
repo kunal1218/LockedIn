@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { EventWithDetails } from "@lockedin/shared";
+import { getEventStatus } from "@/features/map/utils/eventHelpers";
 
 const CATEGORY_ICONS: Record<string, string> = {
   study: "🎓",
@@ -38,11 +39,6 @@ const formatTime = (isoString: string) => {
   });
 };
 
-const isHappeningNow = (event: EventWithDetails) => {
-  const now = new Date();
-  return now >= new Date(event.start_time) && now <= new Date(event.end_time);
-};
-
 type EventsSidebarProps = {
   events: EventWithDetails[];
   onClose: () => void;
@@ -54,22 +50,43 @@ export const EventsSidebar = ({
   events,
   onClose,
   onEventClick,
-  userLocation: _userLocation,
 }: EventsSidebarProps) => {
   const sortedEvents = useMemo(() => {
-    return [...events].sort(
-      (a, b) =>
-        new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-    );
+    return [...events].sort((a, b) => {
+      const statusA = getEventStatus(a.start_time, a.end_time);
+      const statusB = getEventStatus(b.start_time, b.end_time);
+
+      if (statusA.urgent && !statusB.urgent) return -1;
+      if (!statusA.urgent && statusB.urgent) return 1;
+
+      return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+    });
   }, [events]);
+
+  const urgentCount = useMemo(
+    () =>
+      events.filter((event) =>
+        getEventStatus(event.start_time, event.end_time).urgent
+      ).length,
+    [events]
+  );
 
   return (
     <div className="fixed inset-0 left-0 z-40 w-full bg-white shadow-xl sm:inset-y-auto sm:top-[96px] sm:h-[calc(100vh-96px)] sm:w-[400px]">
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between border-b border-ink/10 bg-white p-4">
           <div>
-            <h2 className="text-2xl font-bold text-ink">Nearby Events</h2>
-            <p className="text-sm text-muted">{events.length} events found</p>
+            <h2 className="text-2xl font-bold text-ink">
+              Nearby Events ({events.length})
+            </h2>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="text-sm text-muted">{events.length} events found</p>
+              {urgentCount > 0 && (
+                <span className="rounded-full bg-rose-500/10 px-2 py-1 text-[10px] font-semibold text-rose-600">
+                  🔴 {urgentCount} happening now
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -99,23 +116,43 @@ export const EventsSidebar = ({
               <p className="mt-1 text-sm">Create one to get started!</p>
             </div>
           ) : (
-            sortedEvents.map((event) => (
-              <div
-                key={event.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  onEventClick(event.id);
-                  onClose();
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
+            sortedEvents.map((event) => {
+              const status = getEventStatus(event.start_time, event.end_time);
+              return (
+                <div
+                  key={event.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
                     onEventClick(event.id);
                     onClose();
-                  }
-                }}
-                className="cursor-pointer rounded-2xl border border-ink/10 bg-white/90 p-3 backdrop-blur-sm transition hover:bg-white hover:shadow-md"
-              >
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      onEventClick(event.id);
+                      onClose();
+                    }
+                  }}
+                  className={`cursor-pointer rounded-2xl border border-ink/10 bg-white/90 p-3 backdrop-blur-sm transition hover:bg-white hover:shadow-md ${
+                    status.urgent
+                      ? "border-rose-400/60 shadow-[0_4px_12px_rgba(239,68,68,0.18)]"
+                      : ""
+                  }`}
+                >
+                  {status.label && (
+                    <div
+                      className={`mb-2 inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold tracking-[0.08em] ${
+                        status.status === "happening-now"
+                          ? "bg-rose-500 text-white animate-pulse"
+                          : status.status === "starting-soon"
+                            ? "bg-amber-500 text-white"
+                            : "bg-ink/10 text-ink/70"
+                      }`}
+                    >
+                      {status.status === "happening-now" ? "🔴 " : ""}
+                      {status.label}
+                    </div>
+                  )}
                 <div className="mb-2 flex items-start gap-3">
                   <span className="text-3xl">
                     {CATEGORY_ICONS[event.category] ?? CATEGORY_ICONS.other}
@@ -162,8 +199,9 @@ export const EventsSidebar = ({
                     🚶 {event.distance_km.toFixed(1)} km away
                   </div>
                 )}
-              </div>
-            ))
+                </div>
+              );
+            })
           )}
         </div>
       </div>

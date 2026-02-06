@@ -42,6 +42,45 @@ export const getEventMarkerSize = (event: EventWithDetails) => {
   return 40 + Math.min(20, count);
 };
 
+export const getEventStatus = (startTime: string, endTime: string) => {
+  const now = new Date();
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  const minutesUntilStart = Math.floor(
+    (start.getTime() - now.getTime()) / (1000 * 60)
+  );
+
+  if (now >= start && now <= end) {
+    return {
+      status: "happening-now",
+      label: "HAPPENING NOW",
+      urgent: true,
+    };
+  }
+
+  if (minutesUntilStart > 0 && minutesUntilStart <= 30) {
+    return {
+      status: "starting-soon",
+      label: `STARTS IN ${minutesUntilStart} MIN`,
+      urgent: true,
+    };
+  }
+
+  if (now > end) {
+    return {
+      status: "ended",
+      label: "ENDED",
+      urgent: false,
+    };
+  }
+
+  return {
+    status: "upcoming",
+    label: null,
+    urgent: false,
+  };
+};
+
 const isSameDay = (left: Date, right: Date) =>
   left.getFullYear() === right.getFullYear() &&
   left.getMonth() === right.getMonth() &&
