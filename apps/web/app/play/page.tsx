@@ -204,6 +204,7 @@ export default function RankedPlayPage() {
   const [pokerChatDraft, setPokerChatDraft] = useState("");
   const [pokerChatError, setPokerChatError] = useState<string | null>(null);
   const [isSendingPokerChat, setIsSendingPokerChat] = useState(false);
+  const [isPokerChatOpen, setIsPokerChatOpen] = useState(false);
   const pokerChatEndRef = useRef<HTMLDivElement | null>(null);
   const pokerServerTimeOffsetRef = useRef<number>(0);
   const [pokerTurnTimeLeft, setPokerTurnTimeLeft] = useState<number | null>(null);
@@ -538,6 +539,15 @@ export default function RankedPlayPage() {
     }
     return new Set(pokerWinnerBanner.winners.map((winner) => winner.userId));
   }, [pokerWinnerBanner]);
+  const pokerLastChatLine = useMemo(() => {
+    if (!pokerChatMessages.length) {
+      return "No chat yet";
+    }
+    const last = pokerChatMessages[pokerChatMessages.length - 1];
+    const name = last?.sender?.name ?? "Player";
+    const body = last?.message ?? "";
+    return `${name}: ${body}`.slice(0, 140);
+  }, [pokerChatMessages]);
 
   useEffect(() => {
     setHidePokerCards(false);
@@ -547,6 +557,7 @@ export default function RankedPlayPage() {
     setPokerChatMessages([]);
     setPokerChatDraft("");
     setPokerChatError(null);
+    setIsPokerChatOpen(false);
   }, [pokerState?.tableId]);
 
   useEffect(() => {
@@ -2884,6 +2895,101 @@ export default function RankedPlayPage() {
 
                 </div>
 
+                <div className="pointer-events-auto absolute bottom-6 left-6 z-30 flex items-end gap-2">
+                  {!isPokerChatOpen ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsPokerChatOpen(true)}
+                      className="flex h-11 w-[min(320px,calc(100vw-12rem))] items-center gap-2 rounded-2xl border border-card-border/70 bg-white/90 px-4 text-xs text-ink shadow-sm transition hover:border-accent/40"
+                    >
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
+                        Chat
+                      </span>
+                      <span className="truncate text-ink/80">{pokerLastChatLine}</span>
+                    </button>
+                  ) : (
+                    <div className="flex h-1/2 w-[min(360px,calc(100vw-12rem))] flex-col overflow-hidden rounded-2xl border border-card-border/70 bg-white/95 shadow-lg">
+                      <div className="flex items-center justify-between border-b border-card-border/70 px-4 py-2">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
+                          Table chat
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsPokerChatOpen(false)}
+                          className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted hover:text-ink"
+                        >
+                          Close
+                        </button>
+                      </div>
+                      <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3 text-xs">
+                        {pokerChatMessages.length ? (
+                          pokerChatMessages.map((message) => {
+                            const isMine = message.sender.id === user?.id;
+                            return (
+                              <div
+                                key={message.id}
+                                className={`flex ${
+                                  isMine ? "justify-end" : "justify-start"
+                                }`}
+                              >
+                                <div
+                                  className={`max-w-[80%] rounded-2xl px-3 py-2 ${
+                                    isMine
+                                      ? "bg-accent text-white"
+                                      : "bg-ink/5 text-ink"
+                                  }`}
+                                >
+                                  <p className="font-semibold">{message.sender.name}</p>
+                                  <p className="mt-1">{message.message}</p>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <p className="text-xs text-muted">No chat messages yet.</p>
+                        )}
+                        <div ref={pokerChatEndRef} />
+                      </div>
+                      <form
+                        className="flex gap-2 border-t border-card-border/70 px-4 py-3"
+                        onSubmit={handlePokerChatSubmit}
+                      >
+                        <input
+                          type="text"
+                          value={pokerChatDraft}
+                          onChange={(event) => setPokerChatDraft(event.target.value)}
+                          placeholder={
+                            pokerState ? "Send a message..." : "Join a table to chat"
+                          }
+                          className="flex-1 rounded-xl border border-card-border/70 bg-white px-3 py-2 text-xs text-ink outline-none focus:border-accent/60"
+                          disabled={!pokerState}
+                        />
+                        <button
+                          type="submit"
+                          disabled={!pokerState || isSendingPokerChat}
+                          className="rounded-xl bg-ink px-3 py-2 text-xs font-semibold text-white transition hover:bg-ink/90 disabled:opacity-70"
+                        >
+                          {isSendingPokerChat ? "Sending" : "Send"}
+                        </button>
+                      </form>
+                      {pokerChatError && (
+                        <p className="px-4 pb-3 text-xs font-semibold text-rose-500">
+                          {pokerChatError}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {pokerYouSeat && (
+                    <button
+                      type="button"
+                      onClick={() => setHidePokerCards((prev) => !prev)}
+                      className={pokerDockButtonGhost}
+                    >
+                      {hidePokerCards ? "Show cards" : "Hide cards"}
+                    </button>
+                  )}
+                </div>
+
                 <div className="pointer-events-auto absolute bottom-6 right-6 z-30 flex flex-col items-end gap-3">
                   {pokerError && (
                     <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-rose-200">
@@ -2892,15 +2998,6 @@ export default function RankedPlayPage() {
                   )}
                   {showPokerActionDock && (
                     <div className="flex flex-nowrap items-center gap-2">
-                      {pokerYouSeat && (
-                        <button
-                          type="button"
-                          onClick={() => setHidePokerCards((prev) => !prev)}
-                          className={`${pokerDockButtonGhost} mr-auto`}
-                        >
-                          {hidePokerCards ? "Show cards" : "Hide cards"}
-                        </button>
-                      )}
                       {pokerEffectiveActions?.canCheck && (
                         <button
                           type="button"
@@ -3006,15 +3103,6 @@ export default function RankedPlayPage() {
                   )}
                   {showPokerLeave && !showPokerActionDock && (
                     <div className="flex flex-wrap items-center justify-end gap-2">
-                      {pokerYouSeat && (
-                        <button
-                          type="button"
-                          onClick={() => setHidePokerCards((prev) => !prev)}
-                          className={`${pokerDockButtonGhost} mr-auto`}
-                        >
-                          {hidePokerCards ? "Show cards" : "Hide cards"}
-                        </button>
-                      )}
                       <button
                         type="button"
                         onClick={handlePokerLeave}
@@ -3033,69 +3121,6 @@ export default function RankedPlayPage() {
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-card-border/70 bg-white/80 p-6">
-                <div className="flex flex-col rounded-2xl border border-card-border/70 bg-white/80 p-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-                      Table Chat
-                    </p>
-                    <span className="text-[11px] text-muted">
-                      {pokerState ? "Chat with the table" : "Join a table to chat"}
-                    </span>
-                  </div>
-                  <div className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1 text-sm">
-                    {pokerChatMessages.length ? (
-                      pokerChatMessages.map((message) => {
-                        const isMine = message.sender.id === user?.id;
-                        return (
-                          <div
-                            key={message.id}
-                            className={`flex ${isMine ? "justify-end" : "justify-start"}`}
-                          >
-                            <div
-                              className={`max-w-[80%] rounded-2xl px-3 py-2 text-xs ${
-                                isMine
-                                  ? "bg-accent text-white"
-                                  : "bg-ink/5 text-ink"
-                              }`}
-                            >
-                              <p className="font-semibold">{message.sender.name}</p>
-                              <p className="mt-1">{message.message}</p>
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <p className="text-xs text-muted">No chat messages yet.</p>
-                    )}
-                    <div ref={pokerChatEndRef} />
-                  </div>
-                  <form className="mt-3 flex gap-2" onSubmit={handlePokerChatSubmit}>
-                    <input
-                      type="text"
-                      value={pokerChatDraft}
-                      onChange={(event) => setPokerChatDraft(event.target.value)}
-                      placeholder={
-                        pokerState ? "Send a message..." : "Join a table to chat"
-                      }
-                      className="flex-1 rounded-xl border border-card-border/70 bg-white px-3 py-2 text-xs text-ink outline-none focus:border-accent/60"
-                      disabled={!pokerState}
-                    />
-                    <button
-                      type="submit"
-                      disabled={!pokerState || isSendingPokerChat}
-                      className="rounded-xl bg-ink px-4 py-2 text-xs font-semibold text-white transition hover:bg-ink/90 disabled:opacity-70"
-                    >
-                      {isSendingPokerChat ? "Sending" : "Send"}
-                    </button>
-                  </form>
-                  {pokerChatError && (
-                    <p className="mt-2 text-xs font-semibold text-rose-500">
-                      {pokerChatError}
-                    </p>
-                  )}
-                </div>
-              </div>
             </div>
           )}
         </Card>
