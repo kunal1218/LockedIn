@@ -2890,19 +2890,17 @@ export default function RankedPlayPage() {
                       {pokerError}
                     </div>
                   )}
-                  {pokerYouSeat && (
-                    <div className="flex flex-nowrap items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setHidePokerCards((prev) => !prev)}
-                        className={pokerDockButtonGhost}
-                      >
-                        {hidePokerCards ? "Show cards" : "Hide cards"}
-                      </button>
-                    </div>
-                  )}
                   {showPokerActionDock && (
-                    <div className="flex flex-nowrap items-center justify-end gap-2">
+                    <div className="flex flex-nowrap items-center gap-2">
+                      {pokerYouSeat && (
+                        <button
+                          type="button"
+                          onClick={() => setHidePokerCards((prev) => !prev)}
+                          className={`${pokerDockButtonGhost} mr-auto`}
+                        >
+                          {hidePokerCards ? "Show cards" : "Hide cards"}
+                        </button>
+                      )}
                       {pokerEffectiveActions?.canCheck && (
                         <button
                           type="button"
@@ -3008,6 +3006,15 @@ export default function RankedPlayPage() {
                   )}
                   {showPokerLeave && !showPokerActionDock && (
                     <div className="flex flex-wrap items-center justify-end gap-2">
+                      {pokerYouSeat && (
+                        <button
+                          type="button"
+                          onClick={() => setHidePokerCards((prev) => !prev)}
+                          className={`${pokerDockButtonGhost} mr-auto`}
+                        >
+                          {hidePokerCards ? "Show cards" : "Hide cards"}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={handlePokerLeave}

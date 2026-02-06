@@ -1108,6 +1108,12 @@ const applyPlayerAction = (table: PokerTable, player: PokerPlayer, action: Poker
 };
 
 const ensureBettingRound = (table: PokerTable) => {
+  if (allPlayersAllIn(table)) {
+    dealToShowdown(table);
+    concludeHand(table);
+    return { advanced: true };
+  }
+
   if (!table.pendingActionUserIds.length) {
     if (table.street === "river") {
       table.street = "showdown";
@@ -1115,12 +1121,6 @@ const ensureBettingRound = (table: PokerTable) => {
       return { advanced: true };
     }
     advanceStreet(table);
-    return { advanced: true };
-  }
-
-  if (allPlayersAllIn(table)) {
-    dealToShowdown(table);
-    concludeHand(table);
     return { advanced: true };
   }
 
