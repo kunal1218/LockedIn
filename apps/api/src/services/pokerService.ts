@@ -1168,7 +1168,7 @@ const ensureTurnState = (table: PokerTable) => {
   return changed;
 };
 
-const handleTurnTimeout = (table: PokerTable) => {
+const handleTurnTimeout = async (table: PokerTable) => {
   if (table.status !== "in_hand") {
     return false;
   }
@@ -1198,6 +1198,7 @@ const handleTurnTimeout = (table: PokerTable) => {
   table.log.push(toLog(`${player.name} timed out.`));
 
   if (player.missedTurns >= 2) {
+    await refundPlayerChips(player);
     removePlayerFromTable(table, player, `${player.name} left the table (AFK).`);
     return true;
   }
@@ -1364,6 +1365,22 @@ const ensureBuyIn = async (userId: string, amount: number) => {
     throw new PokerError("Not enough coins for that buy-in.", 400);
   }
   return Number(result.rows[0]?.coins ?? 0);
+};
+
+const refundPlayerChips = async (player: PokerPlayer) => {
+  const amount = Math.floor(player.chips);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return 0;
+  }
+  await ensureUsersTable();
+  await db.query(
+    `UPDATE users
+     SET coins = COALESCE(coins, 0) + $2
+     WHERE id = $1`,
+    [player.userId, amount]
+  );
+  player.chips = 0;
+  return amount;
 };
 
 const seatPlayerAtTable = async (
@@ -1797,6 +1814,7 @@ export const leavePokerTable = async (userId: string) => {
   }
 
   await dequeuePlayer(userId);
+  await refundPlayerChips(player);
   removePlayerFromTable(table, player, `${player.name} left the table.`);
   await clearPlayerTableId(userId);
 
@@ -1834,6 +1852,7 @@ export const forceRemovePokerUser = async (userId: string, reason?: string) => {
     if (!player) {
       continue;
     }
+    await refundPlayerChips(player);
     removePlayerFromTable(
       table,
       player,
@@ -1885,7 +1904,7 @@ export const prunePokerTables = async (params: {
 
   for (const table of tables) {
     let changed = false;
-    if (handleTurnTimeout(table)) {
+    if (await handleTurnTimeout(table)) {
       changed = true;
     }
     const staleTargets: Array<{ userId: string; reason: string }> = [];
@@ -1926,6 +1945,7 @@ export const prunePokerTables = async (params: {
       if (!player) {
         continue;
       }
+      await refundPlayerChips(player);
       removePlayerFromTable(table, player, target.reason);
       await clearPlayerTableId(target.userId);
       removedUserIds.push(target.userId);
