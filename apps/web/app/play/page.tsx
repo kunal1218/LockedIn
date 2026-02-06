@@ -205,7 +205,10 @@ export default function RankedPlayPage() {
   const [pokerChatError, setPokerChatError] = useState<string | null>(null);
   const [isSendingPokerChat, setIsSendingPokerChat] = useState(false);
   const [isPokerChatOpen, setIsPokerChatOpen] = useState(false);
+  const [pokerUnreadCount, setPokerUnreadCount] = useState(0);
   const pokerChatEndRef = useRef<HTMLDivElement | null>(null);
+  const pokerChatOpenRef = useRef(false);
+  const pokerUserIdRef = useRef<string | null>(null);
   const pokerServerTimeOffsetRef = useRef<number>(0);
   const [pokerTurnTimeLeft, setPokerTurnTimeLeft] = useState<number | null>(null);
   const [pokerTurnProgress, setPokerTurnProgress] = useState<number>(1);
@@ -539,15 +542,6 @@ export default function RankedPlayPage() {
     }
     return new Set(pokerWinnerBanner.winners.map((winner) => winner.userId));
   }, [pokerWinnerBanner]);
-  const pokerLastChatLine = useMemo(() => {
-    if (!pokerChatMessages.length) {
-      return "No chat yet";
-    }
-    const last = pokerChatMessages[pokerChatMessages.length - 1];
-    const name = last?.sender?.name ?? "Player";
-    const body = last?.message ?? "";
-    return `${name}: ${body}`.slice(0, 140);
-  }, [pokerChatMessages]);
 
   useEffect(() => {
     setHidePokerCards(false);
@@ -558,6 +552,7 @@ export default function RankedPlayPage() {
     setPokerChatDraft("");
     setPokerChatError(null);
     setIsPokerChatOpen(false);
+    setPokerUnreadCount(0);
   }, [pokerState?.tableId]);
 
   useEffect(() => {
@@ -566,6 +561,17 @@ export default function RankedPlayPage() {
     }
     pokerChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [pokerChatMessages, pokerState?.tableId]);
+
+  useEffect(() => {
+    pokerChatOpenRef.current = isPokerChatOpen;
+    if (isPokerChatOpen) {
+      setPokerUnreadCount(0);
+    }
+  }, [isPokerChatOpen]);
+
+  useEffect(() => {
+    pokerUserIdRef.current = user?.id ?? null;
+  }, [user?.id]);
 
   useEffect(() => {
     if (!pokerState?.turnStartedAt || pokerState.currentPlayerIndex === null) {
@@ -2118,6 +2124,12 @@ export default function RankedPlayPage() {
         return;
       }
       setPokerChatMessages((prev) => [...prev, payload.message!]);
+      if (
+        !pokerChatOpenRef.current &&
+        payload.message.sender.id !== pokerUserIdRef.current
+      ) {
+        setPokerUnreadCount((prev) => prev + 1);
+      }
     };
     const handlePokerChatHistory = (payload: {
       tableId?: string;
@@ -2127,6 +2139,7 @@ export default function RankedPlayPage() {
         return;
       }
       setPokerChatMessages(payload.messages ?? []);
+      setPokerUnreadCount(0);
     };
     const handleQueued = (payload: { queuePosition?: number | null }) => {
       const position = payload?.queuePosition ?? null;
@@ -2911,17 +2924,18 @@ export default function RankedPlayPage() {
                   {!isPokerChatOpen ? (
                     <button
                       type="button"
-                      onClick={() => setIsPokerChatOpen(true)}
-                      className="flex h-10 w-[min(240px,calc(100vw-5rem))] items-center gap-2 rounded-full border border-card-border/70 bg-white/90 px-4 text-xs text-ink shadow-sm transition hover:border-accent/40 sm:h-11 sm:w-[min(320px,calc(100vw-10rem))]"
+                      onClick={() => {
+                        setIsPokerChatOpen(true);
+                        setPokerUnreadCount(0);
+                      }}
+                      className={`${pokerDockButtonGhost} relative inline-flex min-w-[120px] items-center justify-center gap-2 sm:min-w-[140px]`}
                     >
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
-                        Chat
-                      </span>
-                      <span className="flex min-w-0 flex-1">
-                        <span className="w-full truncate rounded-full border border-card-border/70 bg-white/90 px-3 py-1 text-ink/70">
-                          {pokerLastChatLine}
+                      Chat
+                      {pokerUnreadCount > 0 && (
+                        <span className="absolute -right-2 -top-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white shadow-sm">
+                          {pokerUnreadCount > 99 ? "99+" : pokerUnreadCount}
                         </span>
-                      </span>
+                      )}
                     </button>
                   ) : (
                     <div className="flex h-[calc(50%-3.5rem)] w-[min(300px,calc(100vw-5rem))] flex-col overflow-hidden rounded-2xl border border-card-border/70 bg-white/95 shadow-lg sm:w-[min(360px,calc(100vw-10rem))]">
