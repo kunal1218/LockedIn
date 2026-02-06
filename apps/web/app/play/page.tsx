@@ -2918,7 +2918,7 @@ export default function RankedPlayPage() {
                         Chat
                       </span>
                       <span className="flex min-w-0 flex-1">
-                        <span className="truncate rounded-full border border-card-border/70 bg-white/95 px-3 py-1 text-ink/80 shadow-sm">
+                        <span className="w-full truncate rounded-full border border-card-border/70 bg-white/90 px-3 py-1 text-ink/70">
                           {pokerLastChatLine}
                         </span>
                       </span>
