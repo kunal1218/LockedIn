@@ -1,14 +1,25 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { EventWithDetails } from "@lockedin/shared";
 import { getEventStatus } from "@/features/map/utils/eventHelpers";
+
+const CATEGORIES = [
+  { id: "all", label: "All", icon: "🎯" },
+  { id: "study", label: "Study", icon: "🎓" },
+  { id: "social", label: "Social", icon: "🎉" },
+  { id: "build", label: "Build", icon: "💻" },
+  { id: "sports", label: "Sports", icon: "⚽" },
+  { id: "food", label: "Food", icon: "🍕" },
+  { id: "other", label: "Other", icon: "✨" },
+] as const;
 
 const CATEGORY_ICONS: Record<string, string> = {
   study: "🎓",
   social: "🎉",
   build: "💻",
   sports: "🏀",
+  food: "🍕",
   other: "📍",
 };
 
@@ -17,7 +28,27 @@ const CATEGORY_COLORS: Record<string, string> = {
   social: "bg-purple-100 text-purple-700",
   build: "bg-green-100 text-green-700",
   sports: "bg-orange-100 text-orange-700",
+  food: "bg-amber-100 text-amber-700",
   other: "bg-gray-100 text-gray-700",
+};
+
+const CATEGORY_MAP: Record<string, string> = {
+  study: "study",
+  academic: "study",
+  social: "social",
+  party: "social",
+  build: "build",
+  hack: "build",
+  sports: "sports",
+  athletics: "sports",
+  food: "food",
+  dining: "food",
+  other: "other",
+};
+
+const normalizeCategory = (value?: string | null) => {
+  const cleaned = value?.toLowerCase().trim() ?? "other";
+  return CATEGORY_MAP[cleaned] ?? cleaned;
 };
 
 const formatTime = (isoString: string) => {
@@ -54,8 +85,43 @@ export const EventsSidebar = ({
   now,
 }: EventsSidebarProps) => {
   const currentTime = now ?? new Date();
+  const [selectedCategory, setSelectedCategory] = useState("all");
+
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (event.key < "1" || event.key > String(CATEGORIES.length)) {
+        return;
+      }
+      const index = Number(event.key) - 1;
+      const category = CATEGORIES[index];
+      if (category) {
+        setSelectedCategory(category.id);
+      }
+    };
+
+    window.addEventListener("keypress", handleKeyPress);
+    return () => window.removeEventListener("keypress", handleKeyPress);
+  }, []);
+
+  const filteredEvents = useMemo(() => {
+    if (selectedCategory === "all") {
+      return events;
+    }
+    return events.filter(
+      (event) => normalizeCategory(event.category) === selectedCategory
+    );
+  }, [events, selectedCategory]);
+
+  const categoryCounts = useMemo(() => {
+    return events.reduce<Record<string, number>>((acc, event) => {
+      const category = normalizeCategory(event.category);
+      acc[category] = (acc[category] ?? 0) + 1;
+      return acc;
+    }, {});
+  }, [events]);
+
   const sortedEvents = useMemo(() => {
-    return [...events].sort((a, b) => {
+    return [...filteredEvents].sort((a, b) => {
       const statusA = getEventStatus(a.start_time, a.end_time);
       const statusB = getEventStatus(b.start_time, b.end_time);
 
@@ -68,15 +134,15 @@ export const EventsSidebar = ({
 
       return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
     });
-  }, [events]);
+  }, [filteredEvents]);
 
   const liveCount = useMemo(
     () =>
-      events.filter(
+      filteredEvents.filter(
         (event) =>
           getEventStatus(event.start_time, event.end_time).status === "happening-now"
       ).length,
-    [events]
+    [filteredEvents]
   );
 
   return (
@@ -86,7 +152,7 @@ export const EventsSidebar = ({
           <div>
             <h2 className="text-xl font-bold text-ink">Nearby Events</h2>
             <div className="mt-1 text-sm text-muted">
-              {events.length} events
+              {filteredEvents.length} events
               {liveCount > 0 && (
                 <span className="ml-2 inline-flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
@@ -114,13 +180,70 @@ export const EventsSidebar = ({
             </button>
           </div>
         </div>
+        <style>{`
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
+
+        <div className="border-b border-ink/10 bg-white px-4 py-3">
+          <div
+            className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide"
+            style={{ scrollbarWidth: "none" }}
+          >
+            {CATEGORIES.map((category) => {
+              const isActive = selectedCategory === category.id;
+              const count =
+                category.id === "all"
+                  ? events.length
+                  : categoryCounts[category.id] ?? 0;
+              return (
+                <button
+                  key={category.id}
+                  type="button"
+                  onClick={() => setSelectedCategory(category.id)}
+                  className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
+                    isActive
+                      ? "bg-orange-500 text-white shadow-sm"
+                      : "bg-ink/5 text-ink/70 hover:bg-ink/10"
+                  }`}
+                >
+                  <span>{category.icon}</span>
+                  <span>{category.label}</span>
+                  {category.id !== "all" && isActive && (
+                    <span className="text-xs opacity-90">({count})</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {selectedCategory !== "all" && (
+          <div className="border-b border-orange-100 bg-orange-50 px-4 py-2 text-sm text-orange-700">
+            Showing {filteredEvents.length} {selectedCategory} events
+            <button
+              type="button"
+              onClick={() => setSelectedCategory("all")}
+              className="ml-2 font-medium text-orange-600 hover:text-orange-700"
+            >
+              Clear ✕
+            </button>
+          </div>
+        )}
 
         <div className="flex-1 space-y-2 overflow-y-auto bg-white p-3">
           {sortedEvents.length === 0 ? (
             <div className="py-12 text-center text-muted">
-              <p className="mb-2 text-4xl">📍</p>
-              <p>No events nearby</p>
-              <p className="mt-1 text-sm">Create one to get started!</p>
+              <p className="mb-2 text-4xl">🔍</p>
+              <p className="font-medium text-ink/70">
+                No{" "}
+                {selectedCategory === "all"
+                  ? "events"
+                  : `${selectedCategory} events`}{" "}
+                nearby
+              </p>
+              <p className="mt-1 text-sm">Try a different category.</p>
             </div>
           ) : (
             sortedEvents.map((event) => {
