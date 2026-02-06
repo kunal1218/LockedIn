@@ -199,7 +199,7 @@ export default function RankedPlayPage() {
   const [isPokerActing, setIsPokerActing] = useState(false);
   const [pokerRaiseAmount, setPokerRaiseAmount] = useState("");
   const [isLeavingPoker, setIsLeavingPoker] = useState(false);
-  const [showPokerCards, setShowPokerCards] = useState(false);
+  const [hidePokerCards, setHidePokerCards] = useState(false);
   const [pokerChatMessages, setPokerChatMessages] = useState<PokerChatMessage[]>([]);
   const [pokerChatDraft, setPokerChatDraft] = useState("");
   const [pokerChatError, setPokerChatError] = useState<string | null>(null);
@@ -540,7 +540,7 @@ export default function RankedPlayPage() {
   }, [pokerWinnerBanner]);
 
   useEffect(() => {
-    setShowPokerCards(false);
+    setHidePokerCards(false);
   }, [pokerState?.tableId, pokerYouSeat?.userId]);
 
   useEffect(() => {
@@ -2821,7 +2821,7 @@ export default function RankedPlayPage() {
                                     return null;
                                   }
                                   const shouldShowFaces = isViewerSeat
-                                    ? showPokerCards || revealToTable
+                                    ? !hidePokerCards
                                     : revealToTable;
                                   const rawCards = seat.cards?.length
                                     ? seat.cards
@@ -2888,6 +2888,17 @@ export default function RankedPlayPage() {
                   {pokerError && (
                     <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-rose-200">
                       {pokerError}
+                    </div>
+                  )}
+                  {pokerYouSeat && (
+                    <div className="flex flex-nowrap items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setHidePokerCards((prev) => !prev)}
+                        className={pokerDockButtonGhost}
+                      >
+                        {hidePokerCards ? "Show cards" : "Hide cards"}
+                      </button>
                     </div>
                   )}
                   {showPokerActionDock && (
