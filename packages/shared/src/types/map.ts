@@ -10,3 +10,17 @@ export type FriendLocation = {
   previousLatitude?: number | null;
   previousLongitude?: number | null;
 };
+
+export type PublicUserLocation = {
+  userId: string;
+  name: string;
+  handle: string;
+  profilePictureUrl?: string | null;
+  bio?: string | null;
+  collegeName?: string | null;
+  collegeDomain?: string | null;
+  latitude: number;
+  longitude: number;
+  mutualFriendsCount?: number | null;
+  lastUpdated: string;
+};

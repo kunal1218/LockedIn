@@ -7,6 +7,7 @@ import type {
   CreateEventRequest,
   EventWithDetails,
   FriendLocation,
+  PublicUserLocation,
 } from "@lockedin/shared";
 import { Card } from "@/components/Card";
 import { Tag } from "@/components/Tag";
@@ -17,6 +18,7 @@ import { EventMarker } from "@/features/map/components/EventMarker";
 import { FriendPopup } from "@/features/map/components/FriendPopup";
 import { MapControls } from "@/features/map/components/MapControls";
 import { EventsSidebar } from "@/features/map/components/EventsSidebar";
+import { PublicUserPopup } from "@/features/map/components/PublicUserPopup";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { createEvent, getEventDetails, getNearbyEvents } from "@/lib/api/events";
 import {
@@ -27,10 +29,12 @@ import {
 } from "@/lib/socket";
 import { formatEventTooltipTime } from "@/features/map/utils/eventHelpers";
 import { formatRelativeTime } from "@/lib/time";
+import { usePublicUsers } from "@/features/map/hooks/usePublicUsers";
 
 type MapSettings = {
   shareLocation: boolean;
   ghostMode: boolean;
+  publicMode: boolean;
 };
 
 type FriendsResponse = {
@@ -90,11 +94,15 @@ export const MapCanvas = () => {
   const [settings, setSettings] = useState<MapSettings>({
     shareLocation: false,
     ghostMode: false,
+    publicMode: false,
   });
   const [isMapReady, setMapReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<FriendLocation | null>(
+    null
+  );
+  const [selectedPublicUser, setSelectedPublicUser] = useState<PublicUserLocation | null>(
     null
   );
   const [selectedEvent, setSelectedEvent] = useState<EventWithDetails | null>(
@@ -110,6 +118,13 @@ export const MapCanvas = () => {
     }
     return { latitude: self.latitude, longitude: self.longitude };
   }, [friends, user?.id]);
+  const { publicUsers, refetch: refetchPublicUsers } = usePublicUsers({
+    token,
+    center: userLocation,
+    enabled: Boolean(token && userLocation),
+    radiusMeters: 5000,
+    refreshMs: 10000,
+  });
   const [isPlacingPin, setIsPlacingPin] = useState(false);
   const [showEventsSidebar, setShowEventsSidebar] = useState(false);
   const [showEventForm, setShowEventForm] = useState(false);
@@ -122,11 +137,13 @@ export const MapCanvas = () => {
   const [mapInstanceKey, setMapInstanceKey] = useState(0);
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   const missingFieldsLoggedRef = useRef<Set<string>>(new Set());
+  const [showPublicConfirm, setShowPublicConfirm] = useState(false);
 
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const markerAnimationsRef = useRef<Map<string, number>>(new Map());
   const eventMarkersRef = useRef<Map<number, mapboxgl.Marker>>(new Map());
   const eventMarkerRootsRef = useRef<Map<number, Root>>(new Map());
+  const publicMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const lastEventCenterRef = useRef<mapboxgl.LngLat | null>(null);
   const pressTimerRef = useRef<number | null>(null);
   const tempMarkerRef = useRef<mapboxgl.Marker | null>(null);
@@ -575,6 +592,120 @@ export const MapCanvas = () => {
     [updateMarkerElement, user?.id]
   );
 
+  const updatePublicMarkerElement = useCallback(
+    (element: HTMLElement, publicUser: PublicUserLocation) => {
+      const inner = element.querySelector<HTMLElement>("[data-role='inner']");
+      const label = element.querySelector<HTMLElement>("[data-role='label']");
+      const profilePictureUrl = publicUser.profilePictureUrl ?? null;
+      const fallback = getInitial(publicUser.name);
+
+      if (label) {
+        label.textContent = formatRelativeTime(publicUser.lastUpdated);
+      }
+
+      if (inner) {
+        inner.style.backgroundColor = getMarkerColor(publicUser.name);
+        const existingImg = inner.querySelector("img");
+        if (profilePictureUrl) {
+          if (existingImg) {
+            existingImg.setAttribute("src", profilePictureUrl);
+            existingImg.setAttribute("alt", publicUser.name);
+          } else {
+            inner.textContent = "";
+            const img = document.createElement("img");
+            img.src = profilePictureUrl;
+            img.alt = publicUser.name;
+            img.className = "h-full w-full object-cover";
+            img.loading = "lazy";
+            img.onerror = () => {
+              inner.textContent = fallback;
+              img.remove();
+            };
+            inner.appendChild(img);
+          }
+        } else {
+          if (existingImg) {
+            existingImg.remove();
+          }
+          inner.textContent = fallback;
+        }
+      }
+    },
+    []
+  );
+
+  const buildPublicMarker = useCallback(
+    (publicUser: PublicUserLocation) => {
+      const map = mapRef.current;
+      if (!map) {
+        return null;
+      }
+
+      if (!Number.isFinite(publicUser.latitude) || !Number.isFinite(publicUser.longitude)) {
+        return null;
+      }
+
+      const profilePictureUrl = publicUser.profilePictureUrl ?? null;
+      const fallback = getInitial(publicUser.name);
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "relative flex h-12 w-12 items-center justify-center";
+      wrapper.style.cursor = "pointer";
+      wrapper.style.pointerEvents = "auto";
+      wrapper.style.opacity = "0.8";
+
+      const ring = document.createElement("div");
+      ring.className = "relative flex h-12 w-12 items-center justify-center rounded-full";
+      ring.style.border = "3px solid #f59e0b";
+      ring.style.boxShadow = "0 0 12px rgba(245, 158, 11, 0.4)";
+
+      const inner = document.createElement("div");
+      inner.dataset.role = "inner";
+      inner.className =
+        "relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white text-[10px] font-semibold text-white";
+      inner.style.backgroundColor = getMarkerColor(publicUser.name);
+
+      if (profilePictureUrl) {
+        const img = document.createElement("img");
+        img.src = profilePictureUrl;
+        img.alt = publicUser.name;
+        img.className = "h-full w-full object-cover";
+        img.loading = "lazy";
+        img.onerror = () => {
+          inner.textContent = fallback;
+          img.remove();
+        };
+        inner.appendChild(img);
+      } else {
+        inner.textContent = fallback;
+      }
+
+      ring.appendChild(inner);
+      wrapper.appendChild(ring);
+
+      const label = document.createElement("div");
+      label.dataset.role = "label";
+      label.className =
+        "absolute left-1/2 top-full mt-1 -translate-x-1/2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white shadow-[0_2px_6px_rgba(0,0,0,0.2)] backdrop-blur";
+      label.textContent = formatRelativeTime(publicUser.lastUpdated);
+      label.style.pointerEvents = "none";
+      wrapper.appendChild(label);
+
+      wrapper.addEventListener("click", () => {
+        setSelectedPublicUser(publicUser);
+      });
+
+      const marker = new mapboxgl.Marker({ element: wrapper, anchor: "center" })
+        .setLngLat([publicUser.longitude, publicUser.latitude])
+        .addTo(map);
+
+      updatePublicMarkerElement(wrapper, publicUser);
+
+      return marker;
+    },
+    [updatePublicMarkerElement]
+  );
+
   const animateMarkerTo = useCallback(
     (id: string, marker: mapboxgl.Marker, target: [number, number]) => {
       if (!Number.isFinite(target[0]) || !Number.isFinite(target[1])) {
@@ -722,10 +853,40 @@ export const MapCanvas = () => {
   ]);
 
   useEffect(() => {
+    if (!mapRef.current || !isMapReady) {
+      return;
+    }
+
+    const markerMap = publicMarkersRef.current;
+    const nextIds = new Set(publicUsers.map((user) => user.userId));
+
+    publicUsers.forEach((user) => {
+      const existing = markerMap.get(user.userId);
+      if (existing) {
+        updatePublicMarkerElement(existing.getElement(), user);
+        existing.setLngLat([user.longitude, user.latitude]);
+      } else {
+        const marker = buildPublicMarker(user);
+        if (marker) {
+          markerMap.set(user.userId, marker);
+        }
+      }
+    });
+
+    markerMap.forEach((marker, id) => {
+      if (!nextIds.has(id)) {
+        marker.remove();
+        markerMap.delete(id);
+      }
+    });
+  }, [buildPublicMarker, isMapReady, publicUsers, updatePublicMarkerElement]);
+
+  useEffect(() => {
     const markers = markersRef.current;
     const markerAnimations = markerAnimationsRef.current;
     const eventMarkers = eventMarkersRef.current;
     const eventMarkerRoots = eventMarkerRootsRef.current;
+    const publicMarkers = publicMarkersRef.current;
     const tempMarker = tempMarkerRef;
 
     return () => {
@@ -739,6 +900,8 @@ export const MapCanvas = () => {
       eventMarkers.clear();
       eventMarkerRoots.forEach((root) => root.unmount());
       eventMarkerRoots.clear();
+      publicMarkers.forEach((marker) => marker.remove());
+      publicMarkers.clear();
       if (tempMarker.current) {
         tempMarker.current.remove();
         tempMarker.current = null;
@@ -766,6 +929,22 @@ export const MapCanvas = () => {
       setSelectedFriend(updated);
     }
   }, [friends, selectedFriend]);
+
+  useEffect(() => {
+    if (!selectedPublicUser) {
+      return;
+    }
+    const updated = publicUsers.find(
+      (user) => user.userId === selectedPublicUser.userId
+    );
+    if (!updated) {
+      setSelectedPublicUser(null);
+      return;
+    }
+    if (updated !== selectedPublicUser) {
+      setSelectedPublicUser(updated);
+    }
+  }, [publicUsers, selectedPublicUser]);
 
   useEffect(() => {
     if (!selectedEvent) {
@@ -889,7 +1068,11 @@ export const MapCanvas = () => {
       setFriends(normalized);
       if (!Array.isArray(response)) {
         setSettings(
-          response.settings ?? { shareLocation: false, ghostMode: false }
+          response.settings ?? {
+            shareLocation: false,
+            ghostMode: false,
+            publicMode: false,
+          }
         );
       }
     } catch (loadError) {
@@ -919,7 +1102,7 @@ export const MapCanvas = () => {
     }
   }, [normalizeFriend, requestPosition, token, user?.handle, user?.id, user?.name]);
 
-  const updateLocation = useCallback(async () => {
+  const updateLocation = useCallback(async (publicOverride?: boolean) => {
     if (!token) {
       return;
     }
@@ -938,6 +1121,10 @@ export const MapCanvas = () => {
       {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
+        isPublic:
+          typeof publicOverride === "boolean"
+            ? publicOverride
+            : settings.publicMode,
       },
       token
     );
@@ -948,7 +1135,7 @@ export const MapCanvas = () => {
         zoom: Math.max(mapRef.current.getZoom(), 13),
       });
     }
-  }, [requestPosition, token]);
+  }, [requestPosition, settings.publicMode, token]);
 
   const handleHomeClick = useCallback(() => {
     if (!mapRef.current) {
@@ -1171,12 +1358,15 @@ export const MapCanvas = () => {
       const next = !settings.shareLocation;
       const response = await apiPatch<{ settings: MapSettings }>(
         "/map/settings",
-        { shareLocation: next },
+        {
+          shareLocation: next,
+          publicMode: next ? settings.publicMode : false,
+        },
         token
       );
       setSettings(response.settings);
       if (next) {
-        await updateLocation();
+        await updateLocation(response.settings.publicMode);
       }
     } catch (toggleError) {
       setError(
@@ -1194,9 +1384,13 @@ export const MapCanvas = () => {
     }
 
     try {
+      const next = !settings.ghostMode;
       const response = await apiPatch<{ settings: MapSettings }>(
         "/map/settings",
-        { ghostMode: !settings.ghostMode },
+        {
+          ghostMode: next,
+          publicMode: next ? false : settings.publicMode,
+        },
         token
       );
       setSettings(response.settings);
@@ -1209,13 +1403,60 @@ export const MapCanvas = () => {
     }
   };
 
+  const applyPublicMode = useCallback(
+    async (next: boolean) => {
+      if (!token) {
+        openAuthModal("login");
+        return;
+      }
+
+      try {
+        const response = await apiPatch<{ settings: MapSettings }>(
+          "/map/settings",
+          {
+            publicMode: next,
+            ghostMode: next ? false : settings.ghostMode,
+            shareLocation: next ? true : settings.shareLocation,
+          },
+          token
+        );
+        setSettings(response.settings);
+        if (next) {
+          await updateLocation(response.settings.publicMode);
+        }
+      } catch (toggleError) {
+        setError(
+          toggleError instanceof Error
+            ? toggleError.message
+            : "Unable to update public mode."
+        );
+      }
+    },
+    [openAuthModal, settings.ghostMode, settings.shareLocation, token, updateLocation]
+  );
+
+  const handleTogglePublic = () => {
+    if (settings.publicMode) {
+      applyPublicMode(false);
+      return;
+    }
+    setShowPublicConfirm(true);
+  };
+
+  const handleConfirmPublic = () => {
+    setShowPublicConfirm(false);
+    applyPublicMode(true);
+  };
+
   const handleRetry = useCallback(() => {
     setError(null);
     setSelectedFriend(null);
+    setSelectedPublicUser(null);
     setSelectedEvent(null);
     setIsPlacingPin(false);
     setShowEventForm(false);
     setNewEventLocation(null);
+    setShowPublicConfirm(false);
     setTempMarker((current) => {
       current?.remove();
       return null;
@@ -1234,6 +1475,8 @@ export const MapCanvas = () => {
     eventMarkersRef.current.clear();
     eventMarkerRootsRef.current.forEach((root) => root.unmount());
     eventMarkerRootsRef.current.clear();
+    publicMarkersRef.current.forEach((marker) => marker.remove());
+    publicMarkersRef.current.clear();
     if (mapRef.current) {
       mapRef.current.remove();
       mapRef.current = null;
@@ -1242,7 +1485,8 @@ export const MapCanvas = () => {
     setMapInstanceKey((prev) => prev + 1);
     refreshFriends();
     refreshEvents({ force: true });
-  }, [refreshEvents, refreshFriends]);
+    refetchPublicUsers();
+  }, [refetchPublicUsers, refreshEvents, refreshFriends]);
 
   useEffect(() => {
     if (!token) {
@@ -1367,9 +1611,11 @@ export const MapCanvas = () => {
         isAuthenticated={isAuthenticated}
         shareLocation={settings.shareLocation}
         ghostMode={settings.ghostMode}
+        publicMode={settings.publicMode}
         isPlacingPin={isPlacingPin}
         onToggleShare={handleToggleShare}
         onToggleGhost={handleToggleGhost}
+        onTogglePublic={handleTogglePublic}
         onToggleCreateEvent={() => setIsPlacingPin((prev) => !prev)}
         showCreateEvent={!showEventForm}
         onLogin={() => openAuthModal("login")}
@@ -1460,12 +1706,63 @@ export const MapCanvas = () => {
           onClose={() => setSelectedFriend(null)}
         />
       )}
+      {selectedPublicUser && (
+        <PublicUserPopup
+          user={selectedPublicUser}
+          onClose={() => setSelectedPublicUser(null)}
+          onAddFriend={async (handle) => {
+            if (!token) {
+              openAuthModal("login");
+              return;
+            }
+            try {
+              await apiPost("/friends/requests", { handle }, token);
+              refetchPublicUsers();
+            } catch (addError) {
+              if (process.env.NODE_ENV !== "production") {
+                console.error("[map] failed to add friend", addError);
+              }
+              window.alert("Unable to send friend request.");
+            }
+          }}
+        />
+      )}
+      {showPublicConfirm && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-ink/40 backdrop-blur"
+            onClick={() => setShowPublicConfirm(false)}
+          />
+          <div className="relative z-10 w-full max-w-md rounded-3xl border border-card-border/60 bg-white/95 p-6 text-center shadow-[0_24px_60px_rgba(27,26,23,0.25)] backdrop-blur">
+            <h3 className="text-lg font-semibold text-ink">Go public?</h3>
+            <p className="mt-2 text-sm text-muted">
+              Going public lets anyone on campus see your location and profile.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                className="flex-1 rounded-xl border border-card-border/70 px-4 py-3 text-sm font-semibold text-ink/70 transition hover:border-accent/40"
+                onClick={() => setShowPublicConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition hover:bg-accent/90"
+                onClick={handleConfirmPublic}
+              >
+                Go public
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showEventsSidebar && (
         <EventsSidebar
           events={events}
           onClose={() => setShowEventsSidebar(false)}
           onEventClick={handleEventClickById}
-          userLocation={newEventLocation}
+          userLocation={userLocation}
         />
       )}
       {selectedEvent && (

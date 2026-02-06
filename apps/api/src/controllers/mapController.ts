@@ -2,7 +2,9 @@ import type { Request, Response } from "express";
 import { AuthError, getUserFromToken } from "../services/authService";
 import {
   MapError,
+  PublicUserLocation,
   fetchFriendLocations,
+  fetchPublicNearby,
   getMapSettings,
   updateMapSettings,
   upsertUserLocation,
@@ -60,6 +62,8 @@ export const postLocation = async (req: Request, res: Response) => {
     const user = await requireUser(req);
     const latitude = asNumber(req.body?.latitude);
     const longitude = asNumber(req.body?.longitude);
+    const isPublic =
+      typeof req.body?.isPublic === "boolean" ? req.body.isPublic : undefined;
 
     if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) {
       throw new MapError("Valid latitude and longitude are required.", 400);
@@ -69,9 +73,38 @@ export const postLocation = async (req: Request, res: Response) => {
       userId: user.id,
       latitude,
       longitude,
+      isPublic,
     });
 
     res.json({ status: "ok" });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const getPublicNearby = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const latitude = asNumber(req.query?.latitude);
+    const longitude = asNumber(req.query?.longitude);
+    const radius = asNumber(req.query?.radius ?? 5000);
+
+    if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) {
+      throw new MapError("Valid latitude and longitude are required.", 400);
+    }
+
+    if (!Number.isFinite(radius) || radius <= 0) {
+      throw new MapError("Radius must be a positive number.", 400);
+    }
+
+    const publicUsers: PublicUserLocation[] = await fetchPublicNearby({
+      userId: user.id,
+      latitude,
+      longitude,
+      radiusMeters: radius,
+    });
+
+    res.json({ publicUsers });
   } catch (error) {
     handleError(res, error);
   }
@@ -96,7 +129,8 @@ export const patchSettings = async (req: Request, res: Response) => {
     const user = await requireUser(req);
     const hasShare =
       typeof req.body?.shareLocation === "boolean" ||
-      typeof req.body?.ghostMode === "boolean";
+      typeof req.body?.ghostMode === "boolean" ||
+      typeof req.body?.publicMode === "boolean";
 
     if (!hasShare) {
       throw new MapError("Provide shareLocation or ghostMode to update.", 400);
@@ -110,6 +144,10 @@ export const patchSettings = async (req: Request, res: Response) => {
       ghostMode:
         typeof req.body?.ghostMode === "boolean"
           ? req.body.ghostMode
+          : undefined,
+      publicMode:
+        typeof req.body?.publicMode === "boolean"
+          ? req.body.publicMode
           : undefined,
     });
 

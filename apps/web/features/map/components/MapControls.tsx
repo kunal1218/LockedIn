@@ -8,9 +8,11 @@ type MapControlsProps = {
   isAuthenticated: boolean;
   shareLocation: boolean;
   ghostMode: boolean;
+  publicMode: boolean;
   isPlacingPin?: boolean;
   onToggleShare: () => void;
   onToggleGhost: () => void;
+  onTogglePublic: () => void;
   onToggleCreateEvent?: () => void;
   showCreateEvent?: boolean;
   onLogin: () => void;
@@ -23,9 +25,11 @@ export const MapControls = ({
   isAuthenticated,
   shareLocation,
   ghostMode,
+  publicMode,
   isPlacingPin,
   onToggleShare,
   onToggleGhost,
+  onTogglePublic,
   onToggleCreateEvent,
   showCreateEvent = true,
   onLogin,
@@ -120,6 +124,30 @@ export const MapControls = ({
             onClick={onToggleGhost}
           >
             {ghostMode ? "Ghosted" : "Go ghost"}
+          </button>
+        </div>
+      </div>
+
+      <div className="pointer-events-auto rounded-2xl border border-black/10 bg-white/95 p-4 text-xs text-[#6B7280] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-[#1F2937]">Go public 🌍</p>
+            <p className="mt-1 text-[11px] text-[#6B7280]">
+              Let anyone on campus see you.
+            </p>
+          </div>
+          <button
+            type="button"
+            className={`min-h-[44px] rounded-full border px-4 py-2 text-[11px] font-semibold transition ${
+              publicMode
+                ? "border-accent bg-accent/15 text-accent"
+                : "border-black/10 text-[#6B7280] hover:border-accent/40"
+            } ${ghostMode ? "opacity-50" : ""}`}
+            onClick={onTogglePublic}
+            disabled={ghostMode}
+            aria-pressed={publicMode}
+          >
+            {publicMode ? "Public" : "Private"}
           </button>
         </div>
       </div>
