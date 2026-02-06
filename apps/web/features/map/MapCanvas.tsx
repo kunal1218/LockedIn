@@ -131,7 +131,6 @@ export const MapCanvas = () => {
   const pressTimerRef = useRef<number | null>(null);
   const tempMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
-  const didAutoCenterRef = useRef(false);
 
   const normalizeFriend = useCallback(
     (raw: FriendLocation & {
@@ -407,7 +406,7 @@ export const MapCanvas = () => {
         window.alert("Failed to create event. Please try again.");
       }
     },
-    [closeEventForm, createEvent, newEventLocation, normalizeEvent, token]
+    [closeEventForm, newEventLocation, normalizeEvent, token]
   );
 
   useEffect(() => {
@@ -716,26 +715,33 @@ export const MapCanvas = () => {
     buildEventTooltip,
     eventClock,
     events,
+    handleEventClick,
     isMapReady,
     renderEventMarker,
     selectedEvent,
   ]);
 
   useEffect(() => {
+    const markers = markersRef.current;
+    const markerAnimations = markerAnimationsRef.current;
+    const eventMarkers = eventMarkersRef.current;
+    const eventMarkerRoots = eventMarkerRootsRef.current;
+    const tempMarker = tempMarkerRef;
+
     return () => {
-      markersRef.current.forEach((marker) => marker.remove());
-      markersRef.current.clear();
-      markerAnimationsRef.current.forEach((rafId) => {
+      markers.forEach((marker) => marker.remove());
+      markers.clear();
+      markerAnimations.forEach((rafId) => {
         window.cancelAnimationFrame(rafId);
       });
-      markerAnimationsRef.current.clear();
-      eventMarkersRef.current.forEach((marker) => marker.remove());
-      eventMarkersRef.current.clear();
-      eventMarkerRootsRef.current.forEach((root) => root.unmount());
-      eventMarkerRootsRef.current.clear();
-      if (tempMarkerRef.current) {
-        tempMarkerRef.current.remove();
-        tempMarkerRef.current = null;
+      markerAnimations.clear();
+      eventMarkers.forEach((marker) => marker.remove());
+      eventMarkers.clear();
+      eventMarkerRoots.forEach((root) => root.unmount());
+      eventMarkerRoots.clear();
+      if (tempMarker.current) {
+        tempMarker.current.remove();
+        tempMarker.current = null;
       }
     };
   }, []);
@@ -945,48 +951,32 @@ export const MapCanvas = () => {
   }, [requestPosition, token]);
 
   const handleHomeClick = useCallback(() => {
-    const map = mapRef.current;
-    if (!map) {
+    if (!mapRef.current) {
       return;
     }
 
-    if (userLocation) {
-      map.flyTo({
-        center: [userLocation.longitude, userLocation.latitude],
-        zoom: 15,
-        duration: 1500,
-      });
-      return;
-    }
-
-if (token && settings.shareLocation && !settings.ghostMode) {
-      navigator.geolocation.getCurrentPosition(async (position) => {
-        await apiPost(
-          "/map/location",
-          {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          },
-          token
-        );
-      });
-    }
-  }, [settings.ghostMode, settings.shareLocation, token]);
-
-  useEffect(() => {
-    if (!mapRef.current || !isMapReady) {
-      return;
-    }
-  }, [isMapReady, mapInstanceKey]);
-
-  const zoomToCampus = useCallback(() => {
-    if (mapRef.current) {
-      mapRef.current.flyTo({
-        center: DEFAULT_CENTER,
-        zoom: DEFAULT_ZOOM,
-        duration: 1500,
-      });
-    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        mapRef.current?.flyTo({
+          center: [position.coords.longitude, position.coords.latitude],
+          zoom: 15,
+          duration: 1500,
+        });
+      },
+      () => {
+        // Location denied/unavailable -> campus fallback.
+        mapRef.current?.flyTo({
+          center: DEFAULT_CENTER,
+          zoom: DEFAULT_ZOOM,
+          duration: 1500,
+        });
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0,
+      }
+    );
   }, []);
 
   const zoomIn = useCallback(() => {
