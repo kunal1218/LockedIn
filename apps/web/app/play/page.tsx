@@ -2951,7 +2951,7 @@ export default function RankedPlayPage() {
                           Close
                         </button>
                       </div>
-                      <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3 text-xs">
+                      <div className="min-h-0 max-h-[240px] flex-1 space-y-2 overflow-y-auto px-4 py-3 text-xs">
                         {pokerChatMessages.length ? (
                           pokerChatMessages.map((message) => {
                             const isMine = message.sender.id === user?.id;
