@@ -74,6 +74,15 @@ const addPokerChatMessage = (tableId: string, message: PokerChatMessage) => {
 const getPokerChatHistory = (tableId: string) =>
   pokerChatHistory.get(tableId) ?? [];
 
+const removePokerChatMessagesForUser = (userId: string) => {
+  pokerChatHistory.forEach((messages, tableId) => {
+    const filtered = messages.filter((message) => message.sender.id !== userId);
+    if (filtered.length !== messages.length) {
+      pokerChatHistory.set(tableId, filtered);
+    }
+  });
+};
+
 const pokerRoomForTable = (tableId: string) => `poker:table:${tableId}`;
 
 const emitPokerStatesForTable = async (tableId: string) => {
@@ -130,6 +139,7 @@ const clearPresence = (userId: string, game: "poker" | "convo") => {
 
 const removePokerUser = async (userId: string) => {
   const result = await forceRemovePokerUser(userId);
+  removePokerChatMessagesForUser(userId);
   const socketId = userSocketMap.get(userId);
   if (socketId && io) {
     const socket = io.sockets.sockets.get(socketId);
@@ -161,10 +171,10 @@ const startPresenceSweep = () => {
     const now = Date.now();
     const users = Array.from(presenceTimers.entries());
     for (const [userId, presence] of users) {
-      if (presence.pokerAt && now - presence.pokerAt > DISCONNECT_GRACE_MS) {
-        clearPresence(userId, "poker");
-        try {
-          await removePokerUser(userId);
+    if (presence.pokerAt && now - presence.pokerAt > DISCONNECT_GRACE_MS) {
+      clearPresence(userId, "poker");
+      try {
+        await removePokerUser(userId);
         } catch (error) {
           console.warn("[socket] failed to remove poker player (presence)", error);
         }
@@ -190,6 +200,7 @@ const startPresenceSweep = () => {
       });
       if (pruneResult.removedUserIds?.length) {
         pruneResult.removedUserIds.forEach((removedUserId) => {
+          removePokerChatMessagesForUser(removedUserId);
           const socketId = userSocketMap.get(removedUserId);
           if (socketId) {
             io?.to(socketId).emit("poker:state", { state: null });
@@ -488,6 +499,7 @@ export const initializeSocketServer = (httpServer: HttpServer) => {
       try {
         clearPresence(userId, "poker");
         const result = await leavePokerTable(userId);
+        removePokerChatMessagesForUser(userId);
         socket.emit("poker:state", { state: null });
         if (result.queued) {
           socket.emit("poker:queued", { queuePosition: result.queuePosition });

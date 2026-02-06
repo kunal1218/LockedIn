@@ -2908,7 +2908,7 @@ export default function RankedPlayPage() {
                       <span className="truncate text-ink/80">{pokerLastChatLine}</span>
                     </button>
                   ) : (
-                    <div className="flex h-1/2 w-[min(360px,calc(100vw-12rem))] flex-col overflow-hidden rounded-2xl border border-card-border/70 bg-white/95 shadow-lg">
+                    <div className="flex h-[calc(50%-3.5rem)] w-[min(360px,calc(100vw-12rem))] flex-col overflow-hidden rounded-2xl border border-card-border/70 bg-white/95 shadow-lg">
                       <div className="flex items-center justify-between border-b border-card-border/70 px-4 py-2">
                         <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
                           Table chat
