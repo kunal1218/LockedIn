@@ -168,7 +168,7 @@ export const EventsSidebar = ({
                 </div>
 
                 <div className="mb-2 flex items-center gap-2 text-sm">
-                  {isHappeningNow(event) ? (
+                  {status.status === "happening-now" ? (
                     <span className="rounded bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
                       HAPPENING NOW
                     </span>
