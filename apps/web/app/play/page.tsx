@@ -2881,11 +2881,6 @@ export default function RankedPlayPage() {
                                           }`}
                                         >
                                           <Avatar name={seat.name} size={48} />
-                                          {seat.isDealer && (
-                                            <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-300 text-[10px] font-bold text-amber-900 shadow-sm">
-                                              D
-                                            </span>
-                                          )}
                                           {(isSmallBlind || isBigBlind) && (
                                             <span className="absolute -right-2 -bottom-2 flex h-5 w-5 items-center justify-center rounded-full bg-ink/80 text-[9px] font-bold text-white shadow-sm">
                                               {isSmallBlind ? "SB" : "BB"}
