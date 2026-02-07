@@ -2185,7 +2185,7 @@ export default function RankedPlayPage() {
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-80px)] max-w-6xl flex-col gap-4 px-4 pb-8 pt-6">
-      <div className="inline-flex overflow-hidden rounded-2xl border border-card-border/70 bg-white/80 shadow-sm">
+      <div className="inline-flex w-fit self-start overflow-hidden rounded-2xl border border-card-border/70 bg-white/80 shadow-sm">
         <button
           type="button"
           onClick={() => setActiveGame("convo")}
@@ -2195,7 +2195,7 @@ export default function RankedPlayPage() {
               : "bg-card-border/30 text-muted hover:bg-white/80 hover:text-ink"
           }`}
         >
-          Convo Game
+          Convo
         </button>
         <div className="h-full w-px bg-card-border/60" />
         <button
