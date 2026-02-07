@@ -2766,8 +2766,8 @@ export default function RankedPlayPage() {
                     <div className="absolute inset-0 origin-top-center scale-[0.92] sm:scale-100">
                       <div className="relative h-full w-full">
                         <div className="absolute inset-0">
-                          <div className="absolute inset-12 rounded-[999px] border border-emerald-200/70 bg-emerald-100/60 shadow-[inset_0_0_40px_rgba(16,185,129,0.18)]" />
-                          <div className="absolute inset-20 rounded-[999px] border border-emerald-200/40 bg-emerald-50/80" />
+                          <div className="absolute inset-14 rounded-[999px] border border-emerald-200/70 bg-emerald-100/60 shadow-[inset_0_0_40px_rgba(16,185,129,0.18)]" />
+                          <div className="absolute inset-24 rounded-[999px] border border-emerald-200/40 bg-emerald-50/80" />
                         </div>
 
                         <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3">
