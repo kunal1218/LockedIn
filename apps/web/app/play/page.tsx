@@ -2766,8 +2766,8 @@ export default function RankedPlayPage() {
                     <div className="absolute inset-0 origin-top-center scale-[0.92] sm:scale-100">
                       <div className="relative h-full w-full">
                         <div className="absolute inset-0">
-                          <div className="absolute inset-6 rounded-[999px] border border-emerald-200/70 bg-emerald-100/60 shadow-[inset_0_0_40px_rgba(16,185,129,0.18)]" />
-                          <div className="absolute inset-12 rounded-[999px] border border-emerald-200/40 bg-emerald-50/80" />
+                          <div className="absolute inset-8 rounded-[999px] border border-emerald-200/70 bg-emerald-100/60 shadow-[inset_0_0_40px_rgba(16,185,129,0.18)]" />
+                          <div className="absolute inset-16 rounded-[999px] border border-emerald-200/40 bg-emerald-50/80" />
                         </div>
 
                         <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3">
@@ -2816,81 +2816,93 @@ export default function RankedPlayPage() {
                             >
                               {seat ? (
                                 <>
-                                  <div className="flex items-center gap-2">
-                                    <div
-                                      className={`relative rounded-full p-[3px] ${
-                                        isCurrent
-                                          ? "bg-accent/30 ring-2 ring-accent/60"
-                                          : "bg-white/80"
-                                      }`}
-                                    >
-                                      <Avatar name={seat.name} size={48} />
-                                      {seat.isDealer && (
-                                        <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-300 text-[10px] font-bold text-amber-900 shadow-sm">
-                                          D
-                                        </span>
-                                      )}
-                                      {(isSmallBlind || isBigBlind) && (
-                                        <span className="absolute -right-2 -bottom-2 flex h-5 w-5 items-center justify-center rounded-full bg-ink/80 text-[9px] font-bold text-white shadow-sm">
-                                          {isSmallBlind ? "SB" : "BB"}
-                                        </span>
-                                      )}
-                                      {pokerWinnerIds.has(seat.userId) && (
-                                        <span className="absolute -left-2 -top-3 text-lg drop-shadow">
-                                          👑
-                                        </span>
-                                      )}
-                                    </div>
-                                    {(() => {
-                                      const isViewerSeat = seat.userId === user?.id;
-                                      const revealToTable =
-                                        !pokerHandActive && Boolean(seat.showCards);
-                                      const shouldRenderCards =
-                                        isViewerSeat ||
-                                        (pokerHandActive && seat.status !== "out") ||
-                                        revealToTable;
-                                      if (!shouldRenderCards) {
-                                        return null;
-                                      }
-                                      const shouldShowFaces = isViewerSeat
-                                        ? !hidePokerCards
-                                        : revealToTable;
-                                      const rawCards = seat.cards?.length
-                                        ? seat.cards
-                                        : [undefined, undefined];
-                                      const cardsToRender =
-                                        rawCards.length >= 2
-                                          ? rawCards.slice(0, 2)
-                                          : [...rawCards, undefined].slice(0, 2);
-                                      const canTapToShow =
-                                        isViewerSeat && pokerCanRevealCards;
-                                      return (
-                                        <div
-                                          className={`flex items-center gap-1 ${
-                                            canTapToShow ? "cursor-pointer" : ""
-                                          }`}
-                                          onClick={
-                                            canTapToShow ? handlePokerShowCards : undefined
-                                          }
-                                          role={canTapToShow ? "button" : undefined}
-                                          title={
-                                            canTapToShow
-                                              ? "Tap to show your cards"
-                                              : undefined
-                                          }
-                                        >
-                                          {cardsToRender.map((card, index) => (
-                                            <div key={`seat-card-${seat.userId}-${index}`}>
+                                  {(() => {
+                                    const isViewerSeat = seat.userId === user?.id;
+                                    const revealToTable =
+                                      !pokerHandActive && Boolean(seat.showCards);
+                                    const shouldRenderCards =
+                                      isViewerSeat ||
+                                      (pokerHandActive && seat.status !== "out") ||
+                                      revealToTable;
+                                    const shouldShowFaces = isViewerSeat
+                                      ? !hidePokerCards
+                                      : revealToTable;
+                                    const rawCards = seat.cards?.length
+                                      ? seat.cards
+                                      : [undefined, undefined];
+                                    const cardsToRender =
+                                      rawCards.length >= 2
+                                        ? rawCards.slice(0, 2)
+                                        : [...rawCards, undefined].slice(0, 2);
+                                    const canTapToShow =
+                                      isViewerSeat && pokerCanRevealCards;
+                                    const cardWrapperProps = canTapToShow
+                                      ? {
+                                          onClick: handlePokerShowCards,
+                                          role: "button" as const,
+                                          title: "Tap to show your cards",
+                                        }
+                                      : {};
+
+                                    return (
+                                      <div className="flex items-center gap-2">
+                                        {shouldRenderCards && (
+                                          <div
+                                            className={`flex items-center gap-1 ${
+                                              canTapToShow ? "cursor-pointer" : ""
+                                            }`}
+                                            {...cardWrapperProps}
+                                          >
+                                            <div key={`seat-card-left-${seat.userId}`}>
                                               {renderPokerCard(
-                                                card,
-                                                !shouldShowFaces || !card
+                                                cardsToRender[0],
+                                                !shouldShowFaces || !cardsToRender[0]
                                               )}
                                             </div>
-                                          ))}
+                                          </div>
+                                        )}
+                                        <div
+                                          className={`relative rounded-full p-[3px] ${
+                                            isCurrent
+                                              ? "bg-accent/30 ring-2 ring-accent/60"
+                                              : "bg-white/80"
+                                          }`}
+                                        >
+                                          <Avatar name={seat.name} size={48} />
+                                          {seat.isDealer && (
+                                            <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-300 text-[10px] font-bold text-amber-900 shadow-sm">
+                                              D
+                                            </span>
+                                          )}
+                                          {(isSmallBlind || isBigBlind) && (
+                                            <span className="absolute -right-2 -bottom-2 flex h-5 w-5 items-center justify-center rounded-full bg-ink/80 text-[9px] font-bold text-white shadow-sm">
+                                              {isSmallBlind ? "SB" : "BB"}
+                                            </span>
+                                          )}
+                                          {pokerWinnerIds.has(seat.userId) && (
+                                            <span className="absolute -left-2 -top-3 text-lg drop-shadow">
+                                              👑
+                                            </span>
+                                          )}
                                         </div>
-                                      );
-                                    })()}
-                                  </div>
+                                        {shouldRenderCards && (
+                                          <div
+                                            className={`flex items-center gap-1 ${
+                                              canTapToShow ? "cursor-pointer" : ""
+                                            }`}
+                                            {...cardWrapperProps}
+                                          >
+                                            <div key={`seat-card-right-${seat.userId}`}>
+                                              {renderPokerCard(
+                                                cardsToRender[1],
+                                                !shouldShowFaces || !cardsToRender[1]
+                                              )}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                   <div className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold text-ink shadow-sm">
                                     {seat.name}
                                   </div>
