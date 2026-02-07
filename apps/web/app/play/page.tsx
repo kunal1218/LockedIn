@@ -538,8 +538,8 @@ export default function RankedPlayPage() {
       : Array.from({ length: pokerSeatCount }, () => null);
   const pokerSeatPositions = useMemo(() => {
     const totalSeats = pokerSeatCount;
-    const rx = 48;
-    const ry = 36;
+    const rx = 52;
+    const ry = 40;
     const startAngle = -90;
     return Array.from({ length: totalSeats }, (_, index) => {
       const angle = ((startAngle + (360 / totalSeats) * index) * Math.PI) / 180;
@@ -2786,8 +2786,8 @@ export default function RankedPlayPage() {
                     <div className="absolute inset-0 origin-top-center scale-[0.92] sm:scale-100">
                       <div className="relative h-full w-full">
                         <div className="absolute inset-0">
-                          <div className="absolute inset-[26px] rounded-[999px] border border-emerald-200/70 bg-emerald-100/60 shadow-[inset_0_0_40px_rgba(16,185,129,0.18)]" />
-                          <div className="absolute inset-[38px] rounded-[999px] border border-emerald-200/40 bg-emerald-50/80" />
+                          <div className="absolute inset-[32px] rounded-[999px] border border-emerald-200/70 bg-emerald-100/60 shadow-[inset_0_0_40px_rgba(16,185,129,0.18)]" />
+                          <div className="absolute inset-[50px] rounded-[999px] border border-emerald-200/40 bg-emerald-50/80" />
                         </div>
 
                         <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3">
@@ -2853,30 +2853,25 @@ export default function RankedPlayPage() {
                                     return (
                                       <div className="relative flex items-center justify-center">
                                         {shouldRenderCards && (
-                                          <>
-                                            <div
-                                              className={`absolute left-1/2 top-0 -translate-x-[120%] -translate-y-[85%] -rotate-12 ${
-                                                canTapToShow ? "cursor-pointer" : ""
-                                              }`}
-                                              {...cardWrapperProps}
-                                            >
+                                          <div
+                                            className={`absolute left-1/2 top-0 flex -translate-x-1/2 -translate-y-[90%] items-center gap-1 ${
+                                              canTapToShow ? "cursor-pointer" : ""
+                                            }`}
+                                            {...cardWrapperProps}
+                                          >
+                                            <div className="-rotate-10">
                                               {renderPokerCard(
                                                 cardsToRender[0],
                                                 !shouldShowFaces || !cardsToRender[0]
                                               )}
                                             </div>
-                                            <div
-                                              className={`absolute left-1/2 top-0 translate-x-[20%] -translate-y-[85%] rotate-12 ${
-                                                canTapToShow ? "cursor-pointer" : ""
-                                              }`}
-                                              {...cardWrapperProps}
-                                            >
+                                            <div className="rotate-10">
                                               {renderPokerCard(
                                                 cardsToRender[1],
                                                 !shouldShowFaces || !cardsToRender[1]
                                               )}
                                             </div>
-                                          </>
+                                          </div>
                                         )}
                                         <div
                                           className={`relative z-10 rounded-full p-[3px] ${
