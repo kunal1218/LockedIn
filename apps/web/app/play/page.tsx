@@ -62,6 +62,7 @@ type RankedStatus =
 
 type PokerClientState = {
   tableId: string;
+  maxSeats: number;
   status: "waiting" | "in_hand" | "showdown";
   street: "preflop" | "flop" | "turn" | "river" | "showdown";
   pot: number;
@@ -530,10 +531,29 @@ export default function RankedPlayPage() {
     Boolean(pokerState && pokerYouSeat?.cards?.length) &&
     !pokerHandActive &&
     !pokerYouSeat?.showCards;
+  const pokerSeatCount = pokerState?.maxSeats ?? 10;
   const pokerSeatSlots =
     pokerSeats.length > 0
       ? pokerSeats
-      : Array.from({ length: 8 }, () => null);
+      : Array.from({ length: pokerSeatCount }, () => null);
+  const pokerSeatPositions = useMemo(() => {
+    const totalSeats = pokerSeatCount;
+    const rx = 48;
+    const ry = 36;
+    const startAngle = -90;
+    return Array.from({ length: totalSeats }, (_, index) => {
+      const angle = ((startAngle + (360 / totalSeats) * index) * Math.PI) / 180;
+      const x = Math.cos(angle) * rx;
+      const y = Math.sin(angle) * ry;
+      return {
+        seatIndex: index,
+        style: {
+          left: `calc(50% + ${x}%)`,
+          top: `calc(50% + ${y}%)`,
+        },
+      };
+    });
+  }, [pokerSeatCount]);
   const pokerIsQueued = pokerQueuePosition !== null;
   const showPokerLeave = Boolean(pokerYouSeat || pokerIsQueued);
   const pokerWinnerIds = useMemo(() => {
@@ -2766,8 +2786,8 @@ export default function RankedPlayPage() {
                     <div className="absolute inset-0 origin-top-center scale-[0.92] sm:scale-100">
                       <div className="relative h-full w-full">
                         <div className="absolute inset-0">
-                          <div className="absolute inset-14 rounded-[999px] border border-emerald-200/70 bg-emerald-100/60 shadow-[inset_0_0_40px_rgba(16,185,129,0.18)]" />
-                          <div className="absolute inset-24 rounded-[999px] border border-emerald-200/40 bg-emerald-50/80" />
+                          <div className="absolute inset-[18px] rounded-[999px] border border-emerald-200/70 bg-emerald-100/60 shadow-[inset_0_0_40px_rgba(16,185,129,0.18)]" />
+                          <div className="absolute inset-[28px] rounded-[999px] border border-emerald-200/40 bg-emerald-50/80" />
                         </div>
 
                         <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3">
@@ -2786,22 +2806,7 @@ export default function RankedPlayPage() {
                           </div>
                         </div>
 
-                        {[
-                          { seatIndex: 0, className: "left-1/2 -translate-x-1/2 -top-4" },
-                          { seatIndex: 1, className: "right-6 top-4" },
-                          {
-                            seatIndex: 2,
-                            className: "right-0 top-1/2 -translate-y-1/2",
-                          },
-                          { seatIndex: 3, className: "right-6 bottom-4" },
-                          {
-                            seatIndex: 4,
-                            className: "left-1/2 -translate-x-1/2 bottom-0",
-                          },
-                          { seatIndex: 5, className: "left-6 bottom-4" },
-                          { seatIndex: 6, className: "left-0 top-1/2 -translate-y-1/2" },
-                          { seatIndex: 7, className: "left-6 top-4" },
-                        ].map((position) => {
+                        {pokerSeatPositions.map((position) => {
                           const seat = pokerSeatSlots[position.seatIndex];
                           const isCurrent =
                             pokerState?.currentPlayerIndex === position.seatIndex;
@@ -2812,7 +2817,8 @@ export default function RankedPlayPage() {
                           return (
                             <div
                               key={`seat-${position.seatIndex}`}
-                              className={`absolute ${position.className} flex flex-col items-center gap-1`}
+                              className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1"
+                              style={position.style}
                             >
                               {seat ? (
                                 <>
@@ -2849,7 +2855,7 @@ export default function RankedPlayPage() {
                                         {shouldRenderCards && (
                                           <>
                                             <div
-                                              className={`absolute left-1/2 top-1/2 -translate-x-[120%] -translate-y-1/2 -rotate-12 ${
+                                              className={`absolute left-1/2 top-0 -translate-x-[120%] -translate-y-[85%] -rotate-12 ${
                                                 canTapToShow ? "cursor-pointer" : ""
                                               }`}
                                               {...cardWrapperProps}
@@ -2860,7 +2866,7 @@ export default function RankedPlayPage() {
                                               )}
                                             </div>
                                             <div
-                                              className={`absolute left-1/2 top-1/2 translate-x-[20%] -translate-y-1/2 rotate-12 ${
+                                              className={`absolute left-1/2 top-0 translate-x-[20%] -translate-y-[85%] rotate-12 ${
                                                 canTapToShow ? "cursor-pointer" : ""
                                               }`}
                                               {...cardWrapperProps}

@@ -142,7 +142,7 @@ type PokerQueueEntry = {
   enqueuedAt: number;
 };
 
-const MAX_SEATS = 8;
+const MAX_SEATS = 10;
 const MIN_PLAYERS = 2;
 const MAX_TABLES = 25;
 const MIN_BUYIN = 25;
@@ -196,12 +196,35 @@ const loadTable = async (id: string): Promise<PokerTable | null> => {
       return null;
     }
     try {
-      return JSON.parse(raw) as PokerTable;
+      const table = JSON.parse(raw) as PokerTable;
+      if (table.maxSeats < MAX_SEATS) {
+        table.maxSeats = MAX_SEATS;
+        if (table.seats.length < MAX_SEATS) {
+          table.seats = [
+            ...table.seats,
+            ...Array.from({ length: MAX_SEATS - table.seats.length }, () => null),
+          ];
+        }
+      }
+      return table;
     } catch {
       return null;
     }
   }
-  return memoryTables.get(id) ?? null;
+  const table = memoryTables.get(id) ?? null;
+  if (!table) {
+    return null;
+  }
+  if (table.maxSeats < MAX_SEATS) {
+    table.maxSeats = MAX_SEATS;
+    if (table.seats.length < MAX_SEATS) {
+      table.seats = [
+        ...table.seats,
+        ...Array.from({ length: MAX_SEATS - table.seats.length }, () => null),
+      ];
+    }
+  }
+  return table;
 };
 
 const loadActiveTables = async () => {
@@ -1328,6 +1351,7 @@ const buildClientState = (table: PokerTable, userId: string): PokerClientState =
 
   return {
     tableId: table.id,
+    maxSeats: table.maxSeats,
     status: table.status,
     street: table.street,
     pot: table.pot,
