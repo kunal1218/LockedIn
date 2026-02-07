@@ -2854,7 +2854,7 @@ export default function RankedPlayPage() {
                                       <div className="relative flex items-center justify-center">
                                         {shouldRenderCards && (
                                           <div
-                                            className={`absolute left-1/2 top-0 z-20 flex -translate-x-1/2 translate-y-[calc(-45%+10px)] items-center gap-1 ${
+                                            className={`absolute left-1/2 top-0 z-20 flex -translate-x-1/2 translate-y-[calc(-45%+17px)] items-center gap-1 ${
                                               canTapToShow ? "cursor-pointer" : ""
                                             }`}
                                             {...cardWrapperProps}
