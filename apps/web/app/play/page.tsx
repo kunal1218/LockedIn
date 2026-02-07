@@ -538,8 +538,8 @@ export default function RankedPlayPage() {
       : Array.from({ length: pokerSeatCount }, () => null);
   const pokerSeatPositions = useMemo(() => {
     const totalSeats = pokerSeatCount;
-    const rx = 62;
-    const ry = 48;
+    const rx = 48;
+    const ry = 36;
     const startAngle = -90;
     return Array.from({ length: totalSeats }, (_, index) => {
       const angle = ((startAngle + (360 / totalSeats) * index) * Math.PI) / 180;
@@ -2786,8 +2786,8 @@ export default function RankedPlayPage() {
                     <div className="absolute inset-0 origin-top-center scale-[0.92] sm:scale-100">
                       <div className="relative h-full w-full">
                         <div className="absolute inset-0">
-                          <div className="absolute inset-[44px] rounded-[999px] border border-emerald-200/70 bg-emerald-100/60 shadow-[inset_0_0_40px_rgba(16,185,129,0.18)]" />
-                          <div className="absolute inset-[70px] rounded-[999px] border border-emerald-200/40 bg-emerald-50/80" />
+                          <div className="absolute inset-[56px] rounded-[999px] border border-emerald-200/70 bg-emerald-100/60 shadow-[inset_0_0_40px_rgba(16,185,129,0.18)]" />
+                          <div className="absolute inset-[90px] rounded-[999px] border border-emerald-200/40 bg-emerald-50/80" />
                         </div>
 
                         <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3">
@@ -2854,7 +2854,7 @@ export default function RankedPlayPage() {
                                       <div className="relative flex items-center justify-center">
                                         {shouldRenderCards && (
                                           <div
-                                            className={`absolute left-1/2 top-0 flex -translate-x-1/2 -translate-y-[125%] items-center gap-1 ${
+                                            className={`absolute left-1/2 top-0 flex -translate-x-1/2 -translate-y-[140%] items-center gap-1 ${
                                               canTapToShow ? "cursor-pointer" : ""
                                             }`}
                                             {...cardWrapperProps}
