@@ -2766,8 +2766,8 @@ export default function RankedPlayPage() {
                     <div className="absolute inset-0 origin-top-center scale-[0.92] sm:scale-100">
                       <div className="relative h-full w-full">
                         <div className="absolute inset-0">
-                          <div className="absolute inset-8 rounded-[999px] border border-emerald-200/70 bg-emerald-100/60 shadow-[inset_0_0_40px_rgba(16,185,129,0.18)]" />
-                          <div className="absolute inset-16 rounded-[999px] border border-emerald-200/40 bg-emerald-50/80" />
+                          <div className="absolute inset-12 rounded-[999px] border border-emerald-200/70 bg-emerald-100/60 shadow-[inset_0_0_40px_rgba(16,185,129,0.18)]" />
+                          <div className="absolute inset-20 rounded-[999px] border border-emerald-200/40 bg-emerald-50/80" />
                         </div>
 
                         <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3">
@@ -2845,24 +2845,35 @@ export default function RankedPlayPage() {
                                       : {};
 
                                     return (
-                                      <div className="flex items-center gap-2">
+                                      <div className="relative flex items-center justify-center">
                                         {shouldRenderCards && (
-                                          <div
-                                            className={`flex items-center gap-1 ${
-                                              canTapToShow ? "cursor-pointer" : ""
-                                            }`}
-                                            {...cardWrapperProps}
-                                          >
-                                            <div key={`seat-card-left-${seat.userId}`}>
+                                          <>
+                                            <div
+                                              className={`absolute left-1/2 top-1/2 -translate-x-[120%] -translate-y-1/2 -rotate-12 ${
+                                                canTapToShow ? "cursor-pointer" : ""
+                                              }`}
+                                              {...cardWrapperProps}
+                                            >
                                               {renderPokerCard(
                                                 cardsToRender[0],
                                                 !shouldShowFaces || !cardsToRender[0]
                                               )}
                                             </div>
-                                          </div>
+                                            <div
+                                              className={`absolute left-1/2 top-1/2 translate-x-[20%] -translate-y-1/2 rotate-12 ${
+                                                canTapToShow ? "cursor-pointer" : ""
+                                              }`}
+                                              {...cardWrapperProps}
+                                            >
+                                              {renderPokerCard(
+                                                cardsToRender[1],
+                                                !shouldShowFaces || !cardsToRender[1]
+                                              )}
+                                            </div>
+                                          </>
                                         )}
                                         <div
-                                          className={`relative rounded-full p-[3px] ${
+                                          className={`relative z-10 rounded-full p-[3px] ${
                                             isCurrent
                                               ? "bg-accent/30 ring-2 ring-accent/60"
                                               : "bg-white/80"
@@ -2885,21 +2896,6 @@ export default function RankedPlayPage() {
                                             </span>
                                           )}
                                         </div>
-                                        {shouldRenderCards && (
-                                          <div
-                                            className={`flex items-center gap-1 ${
-                                              canTapToShow ? "cursor-pointer" : ""
-                                            }`}
-                                            {...cardWrapperProps}
-                                          >
-                                            <div key={`seat-card-right-${seat.userId}`}>
-                                              {renderPokerCard(
-                                                cardsToRender[1],
-                                                !shouldShowFaces || !cardsToRender[1]
-                                              )}
-                                            </div>
-                                          </div>
-                                        )}
                                       </div>
                                     );
                                   })()}
