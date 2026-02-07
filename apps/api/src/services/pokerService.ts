@@ -92,6 +92,7 @@ type PokerClientSeat = {
 
 export type PokerClientState = {
   tableId: string;
+  maxSeats: number;
   status: PokerTableStatus;
   street: PokerStreet;
   pot: number;
