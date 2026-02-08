@@ -129,6 +129,9 @@ const pokerDockButtonSuccess = `${pokerDockButtonBase} border-emerald-400/70 bg-
 const pokerDockButtonWarn = `${pokerDockButtonBase} border-amber-400/70 bg-amber-400 text-amber-950 hover:border-amber-400`;
 const pokerDockButtonDanger = `${pokerDockButtonBase} border-rose-500/80 bg-rose-500 text-white hover:border-rose-400`;
 
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4001";
+
 const TURN_SECONDS = 15;
 const POKER_TURN_SECONDS = 20;
 const TYPING_TEST_MODAL_SECONDS = 3;
@@ -218,6 +221,9 @@ export default function RankedPlayPage() {
   >(null);
   const lastPokerResultRef = useRef<string | null>(null);
   const pokerWinnerTimerRef = useRef<number | null>(null);
+  const tokenRef = useRef<string | null>(token ?? null);
+  const rankedStatusRef = useRef<RankedStatus>(rankedStatus);
+  const pokerQueuePositionRef = useRef<number | null>(pokerQueuePosition);
   const lives =
     rankedStatus.status === "matched"
       ? rankedStatus.lives ?? { me: 3, opponents: [3, 3] }
@@ -525,8 +531,10 @@ export default function RankedPlayPage() {
           : "Waiting for next hand.";
   const pokerHandActive = pokerState?.status === "in_hand";
   const pokerIsBroke = Boolean(pokerYouSeat && pokerYouSeat.chips <= 0);
+  const pokerIsQueued = pokerQueuePosition !== null;
   const showPokerActionDock = pokerHandActive && pokerIsPlayerTurn;
-  const showPokerBuyInDock = !pokerHandActive && (!pokerYouSeat || pokerIsBroke);
+  const showPokerBuyInDock =
+    !pokerHandActive && !pokerIsQueued && (!pokerYouSeat || pokerIsBroke);
   const pokerCanRevealCards =
     Boolean(pokerState && pokerYouSeat?.cards?.length) &&
     !pokerHandActive &&
@@ -554,7 +562,6 @@ export default function RankedPlayPage() {
       };
     });
   }, [pokerSeatCount]);
-  const pokerIsQueued = pokerQueuePosition !== null;
   const showPokerLeave = Boolean(pokerYouSeat || pokerIsQueued);
   const pokerWinnerIds = useMemo(() => {
     if (!pokerWinnerBanner?.winners?.length) {
@@ -562,6 +569,54 @@ export default function RankedPlayPage() {
     }
     return new Set(pokerWinnerBanner.winners.map((winner) => winner.userId));
   }, [pokerWinnerBanner]);
+
+  useEffect(() => {
+    tokenRef.current = token ?? null;
+  }, [token]);
+
+  useEffect(() => {
+    rankedStatusRef.current = rankedStatus;
+  }, [rankedStatus]);
+
+  useEffect(() => {
+    pokerQueuePositionRef.current = pokerQueuePosition;
+  }, [pokerQueuePosition]);
+
+  useEffect(() => {
+    return () => {
+      const authToken = tokenRef.current;
+      if (!authToken) {
+        return;
+      }
+      const shouldCancelRanked = rankedStatusRef.current.status === "waiting";
+      const shouldLeavePokerQueue = pokerQueuePositionRef.current !== null;
+      if (!shouldCancelRanked && !shouldLeavePokerQueue) {
+        return;
+      }
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
+      };
+      if (shouldCancelRanked) {
+        void fetch(`${API_BASE_URL}/ranked/cancel`, {
+          method: "POST",
+          headers,
+          body: "{}",
+          cache: "no-store",
+          keepalive: true,
+        }).catch(() => {});
+      }
+      if (shouldLeavePokerQueue) {
+        void fetch(`${API_BASE_URL}/poker/leave`, {
+          method: "POST",
+          headers,
+          body: "{}",
+          cache: "no-store",
+          keepalive: true,
+        }).catch(() => {});
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setHidePokerCards(false);
