@@ -2824,7 +2824,12 @@ export default function RankedPlayPage() {
                         ? "Queue"
                         : "--"}
                   </span>
-                  <span>Pot: {pokerState?.pot ?? 0}</span>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-amber-200/80 bg-amber-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-900 shadow-sm">
+                    Pot
+                    <span className="text-xs font-bold tracking-[0.2em]">
+                      {pokerState?.pot ?? 0}
+                    </span>
+                  </span>
                   <span>
                     {pokerState ? `Street: ${pokerState.street}` : "Waiting for players"}
                   </span>
@@ -2845,13 +2850,7 @@ export default function RankedPlayPage() {
                           <div className="absolute inset-[90px] rounded-[999px] border border-emerald-200/40 bg-emerald-50/80" />
                         </div>
 
-                        <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3">
-                          <div className="rounded-full bg-white/90 px-4 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-muted shadow-sm">
-                            Pot
-                          </div>
-                          <div className="text-xl font-semibold text-ink">
-                            {pokerState?.pot ?? 0}
-                          </div>
+                        <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2">
                           <div className="flex flex-wrap justify-center gap-2">
                             {Array.from({ length: 5 }).map((_, index) => (
                               <div key={`community-${index}`}>
