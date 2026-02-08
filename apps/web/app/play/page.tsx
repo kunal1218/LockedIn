@@ -2815,8 +2815,8 @@ export default function RankedPlayPage() {
           ) : (
             <div className="flex flex-col gap-6">
               <div className="relative rounded-3xl border border-card-border/70 bg-white/80 p-4 pb-32 sm:p-6 sm:pb-28">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-                  <span>
+                <div className="grid grid-cols-3 items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                  <span className="justify-self-start">
                     Table:{" "}
                     {pokerState?.tableId
                       ? pokerState.tableId.slice(0, 6)
@@ -2824,13 +2824,13 @@ export default function RankedPlayPage() {
                         ? "Queue"
                         : "--"}
                   </span>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-amber-200/80 bg-amber-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-900 shadow-sm">
+                  <span className="inline-flex items-center justify-self-center gap-2 rounded-full border border-amber-200/80 bg-amber-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-900 shadow-sm">
                     Pot
                     <span className="text-xs font-bold tracking-[0.2em]">
                       {pokerState?.pot ?? 0}
                     </span>
                   </span>
-                  <span>
+                  <span className="justify-self-end text-right">
                     {pokerState ? `Street: ${pokerState.street}` : "Waiting for players"}
                   </span>
                 </div>
