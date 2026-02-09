@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { API_BASE_URL } from "@/lib/api";
+import { IMAGE_BASE_URL } from "@/lib/api";
 
 const resolveImageUrl = (url: string) => {
   if (!url) return "";
@@ -10,7 +10,7 @@ const resolveImageUrl = (url: string) => {
     return url;
   }
   const normalized = url.startsWith("/") ? url : `/${url}`;
-  return `${API_BASE_URL}${normalized}`;
+  return `${IMAGE_BASE_URL}${normalized}`;
 };
 
 type ImageCarouselProps = {

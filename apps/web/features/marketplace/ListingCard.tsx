@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import { Armchair, Book, Cpu, Package, Shirt } from "lucide-react";
-import { API_BASE_URL } from "@/lib/api";
+import { IMAGE_BASE_URL } from "@/lib/api";
 import type { Listing } from "./types";
 
 function formatTimeAgo(dateString: string): string {
@@ -61,7 +62,7 @@ const resolveImageUrl = (url: string) => {
     return url;
   }
   const normalized = url.startsWith("/") ? url : `/${url}`;
-  return `${API_BASE_URL}${normalized}`;
+  return `${IMAGE_BASE_URL}${normalized}`;
 };
 
 type ListingCardProps = {
@@ -74,13 +75,27 @@ export const ListingCard = ({ listing }: ListingCardProps) => {
   const initial = listing.seller.username
     ? listing.seller.username.charAt(0).toUpperCase()
     : listing.seller.name.charAt(0).toUpperCase();
+  const imageUrl =
+    listing.images && listing.images.length > 0
+      ? resolveImageUrl(listing.images[0])
+      : "";
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[Marketplace] Listing card images", {
+        id: listing.id,
+        images: listing.images,
+        imageUrl,
+      });
+    }
+  }, [listing.id, listing.images, imageUrl]);
 
   return (
     <div className="cursor-pointer overflow-hidden rounded-lg border border-gray-200 bg-white transition-shadow duration-200 hover:shadow-lg">
       <div className="relative h-48">
-        {listing.images && listing.images.length > 0 ? (
+        {imageUrl ? (
           <img
-            src={resolveImageUrl(listing.images[0])}
+            src={imageUrl}
             alt={listing.title}
             className="h-full w-full object-cover"
             loading="lazy"

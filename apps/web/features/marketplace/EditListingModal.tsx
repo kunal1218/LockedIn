@@ -9,7 +9,7 @@ import {
   updateListing,
   uploadListingImages,
 } from "@/lib/api/marketplace";
-import { API_BASE_URL } from "@/lib/api";
+import { IMAGE_BASE_URL } from "@/lib/api";
 import type { Listing } from "./types";
 
 const inputClasses =
@@ -48,7 +48,7 @@ const resolveImageUrl = (url: string) => {
     return url;
   }
   const normalized = url.startsWith("/") ? url : `/${url}`;
-  return `${API_BASE_URL}${normalized}`;
+  return `${IMAGE_BASE_URL}${normalized}`;
 };
 
 export const EditListingModal = ({

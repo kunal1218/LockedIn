@@ -4,6 +4,12 @@ export const API_BASE_URL = (
   "http://localhost:4001"
 ).replace(/\/$/, "");
 
+export const IMAGE_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL ??
+  API_BASE_URL ??
+  "http://localhost:4001"
+).replace(/\/$/, "");
+
 type ApiRequestOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;

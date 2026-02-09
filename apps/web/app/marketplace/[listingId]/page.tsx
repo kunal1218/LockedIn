@@ -10,6 +10,7 @@ import { Tag } from "@/components/Tag";
 import { useAuth } from "@/features/auth";
 import { EditListingModal } from "@/features/marketplace/EditListingModal";
 import type { Listing } from "@/features/marketplace/types";
+import { IMAGE_BASE_URL } from "@/lib/api";
 import { deleteListing, fetchListingById } from "@/lib/api/marketplace";
 import { formatRelativeTime } from "@/lib/time";
 
@@ -40,6 +41,15 @@ const categoryStyles = {
     Icon: Package,
   },
 } as const;
+
+const resolveImageUrl = (url: string) => {
+  if (!url) return url;
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  const normalized = url.startsWith("/") ? url : `/${url}`;
+  return `${IMAGE_BASE_URL}${normalized}`;
+};
 
 export default function ListingDetailPage() {
   const params = useParams();
@@ -89,6 +99,15 @@ export default function ListingDetailPage() {
       isActive = false;
     };
   }, [listingId]);
+
+  useEffect(() => {
+    if (!listing || process.env.NODE_ENV === "production") {
+      return;
+    }
+    console.log("[Marketplace] Listing images", listing.images);
+    const resolved = (listing.images ?? []).map((image) => resolveImageUrl(image));
+    console.log("[Marketplace] Resolved image URLs", resolved);
+  }, [listing]);
 
   if (isLoading) {
     return (

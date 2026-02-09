@@ -58,6 +58,25 @@ const handleError = (res: Response, error: unknown) => {
 const buildImageUrl = (_req: Request, filename: string) =>
   `/uploads/marketplace/${filename}`;
 
+const resolveImageUrl = (req: Request, url: string) => {
+  if (!url) return url;
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  const normalized = url.startsWith("/") ? url : `/${url}`;
+  const host = req.get("x-forwarded-host") ?? req.get("host");
+  const protocol = req.get("x-forwarded-proto") ?? req.protocol;
+  if (!host) {
+    return normalized;
+  }
+  return `${protocol}://${host}${normalized}`;
+};
+
+const withAbsoluteImages = <T extends { images?: string[] }>(req: Request, listing: T) => ({
+  ...listing,
+  images: (listing.images ?? []).map((image) => resolveImageUrl(req, image)),
+});
+
 export const getListings = async (req: Request, res: Response) => {
   try {
     const category = typeof req.query.category === "string" ? req.query.category : null;
@@ -72,7 +91,7 @@ export const getListings = async (req: Request, res: Response) => {
       offset: Number.isFinite(offset) ? offset : undefined,
     });
 
-    res.json({ listings });
+    res.json({ listings: listings.map((listing) => withAbsoluteImages(req, listing)) });
   } catch (error) {
     handleError(res, error);
   }
@@ -86,7 +105,7 @@ export const getListing = async (req: Request, res: Response) => {
     }
 
     const listing = await getListingById(listingId);
-    res.json({ listing });
+    res.json({ listing: withAbsoluteImages(req, listing) });
   } catch (error) {
     handleError(res, error);
   }
@@ -107,7 +126,7 @@ export const postListing = async (req: Request, res: Response) => {
       images: req.body?.images,
     });
 
-    res.status(201).json({ listing });
+    res.status(201).json({ listing: withAbsoluteImages(req, listing) });
   } catch (error) {
     handleError(res, error);
   }
@@ -133,7 +152,7 @@ export const putListing = async (req: Request, res: Response) => {
       images: req.body?.images,
     });
 
-    res.json({ listing });
+    res.json({ listing: withAbsoluteImages(req, listing) });
   } catch (error) {
     handleError(res, error);
   }
@@ -174,7 +193,9 @@ export const postListingImages = async (req: Request, res: Response) => {
       imageUrls,
     });
 
-    res.status(201).json({ images: listing.images });
+    res.status(201).json({
+      images: (listing.images ?? []).map((image) => resolveImageUrl(req, image)),
+    });
   } catch (error) {
     handleError(res, error);
   }
@@ -214,7 +235,9 @@ export const deleteListingImageById = async (req: Request, res: Response) => {
       }
     }
 
-    res.json({ images: listing.images });
+    res.json({
+      images: (listing.images ?? []).map((image) => resolveImageUrl(req, image)),
+    });
   } catch (error) {
     handleError(res, error);
   }
