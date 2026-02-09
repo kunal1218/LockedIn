@@ -5,6 +5,8 @@ import type { Club } from "./types";
 type ClubCardProps = {
   club: Club;
   onJoin?: (club: Club) => void | Promise<void>;
+  onOpen?: (club: Club) => void | Promise<void>;
+  isClickable?: boolean;
   isJoining?: boolean;
   hasJoined?: boolean;
   isOwnClub?: boolean;
@@ -13,11 +15,14 @@ type ClubCardProps = {
 export const ClubCard = ({
   club,
   onJoin,
+  onOpen,
+  isClickable = false,
   isJoining = false,
   hasJoined,
   isOwnClub = false,
 }: ClubCardProps) => {
   const joined = typeof hasJoined === "boolean" ? hasJoined : Boolean(club.joinedByUser);
+  const isCardClickable = Boolean(onOpen) && isClickable;
   const isApplication = club.joinPolicy === "application";
   const applicationStatus = club.applicationStatus ?? null;
   const isPending = isApplication && applicationStatus === "pending";
@@ -33,7 +38,30 @@ export const ClubCard = ({
       : null;
 
   return (
-    <Card className="overflow-hidden p-0">
+    <Card
+      className={`overflow-hidden p-0 ${
+        isCardClickable
+          ? "cursor-pointer transition hover:-translate-y-0.5 hover:border-accent/50"
+          : ""
+      }`}
+      onClick={() => {
+        if (!isCardClickable) {
+          return;
+        }
+        onOpen?.(club);
+      }}
+      role={isCardClickable ? "button" : undefined}
+      tabIndex={isCardClickable ? 0 : undefined}
+      onKeyDown={(event) => {
+        if (!isCardClickable) {
+          return;
+        }
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen?.(club);
+        }
+      }}
+    >
       {club.imageUrl ? (
         <div className="relative h-40 w-full overflow-hidden">
           <img
@@ -66,7 +94,7 @@ export const ClubCard = ({
           {!isOwnClub && (
             <button
               type="button"
-              aria-label={joined ? "Leave club" : "Join club"}
+              aria-label={joined ? "Leave group" : "Join group"}
               className={`inline-flex items-center justify-center rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold transition ${
                 joined
                   ? "border-emerald-500 bg-emerald-500 text-white"

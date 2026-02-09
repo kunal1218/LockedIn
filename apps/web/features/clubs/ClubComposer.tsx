@@ -74,7 +74,7 @@ export const ClubComposer = ({
       setImageUrl(null);
       setImageName(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to create club.");
+      setError(err instanceof Error ? err.message : "Unable to create group.");
     }
   };
 
@@ -106,7 +106,7 @@ export const ClubComposer = ({
     <Card className="space-y-4 border border-card-border/70 bg-white/80 shadow-sm">
       <div className="flex flex-col gap-1">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-          Start a club
+          Start a group
         </p>
         <p className="text-sm text-muted">
           Make it official. Share the vibe and let people join instantly.
@@ -114,12 +114,12 @@ export const ClubComposer = ({
       </div>
       <form className="space-y-4" onSubmit={handleSubmit}>
         <label className="block space-y-2">
-          <span className={labelClasses}>Club name</span>
+          <span className={labelClasses}>Group name</span>
           <input
             className={inputClasses}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            placeholder="Late-night chess club"
+            placeholder="Late-night chess group"
             disabled={disabled}
             required
           />
@@ -170,7 +170,7 @@ export const ClubComposer = ({
                 onChange={(event) => setIsRemote(event.target.checked)}
                 disabled={disabled}
               />
-              Remote club
+              Remote group
             </label>
           </label>
         </div>
@@ -191,7 +191,7 @@ export const ClubComposer = ({
         </label>
 
         <label className="block space-y-2">
-          <span className={labelClasses}>Club image</span>
+          <span className={labelClasses}>Group image</span>
           <div className="flex flex-col gap-3">
             {imageUrl ? (
               <div className="flex items-center gap-3">
@@ -218,7 +218,7 @@ export const ClubComposer = ({
               </div>
             ) : (
               <div className="flex items-center justify-between rounded-2xl border border-dashed border-card-border/70 bg-white/90 px-4 py-3 text-xs text-muted">
-                <span>Upload a club banner</span>
+                <span>Upload a group banner</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -239,7 +239,7 @@ export const ClubComposer = ({
 
         <div className="flex justify-end">
           <Button type="submit" disabled={!canSubmit || isSaving} requiresAuth={false}>
-            {isSaving ? "Creating..." : "Create club"}
+            {isSaving ? "Creating..." : "Create group"}
           </Button>
         </div>
       </form>

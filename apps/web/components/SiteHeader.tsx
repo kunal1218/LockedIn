@@ -15,7 +15,7 @@ const baseNavItems = [
   { href: "/map", label: "Map" },
   { href: "/requests", label: "Requests" },
   { href: "/play", label: "Play" },
-  { href: "/clubs", label: "Clubs" },
+  { href: "/clubs", label: "Groups" },
 ];
 
 export const SiteHeader = () => {

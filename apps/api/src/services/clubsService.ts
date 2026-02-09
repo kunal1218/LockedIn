@@ -224,6 +224,46 @@ export const fetchClubs = async (params: {
   return (result.rows as ClubRow[]).map(mapClub);
 };
 
+export const fetchClubById = async (params: {
+  clubId: string;
+  viewerId?: string | null;
+}): Promise<ClubSummary | null> => {
+  await ensureClubsTable();
+  await ensureClubMembersTable();
+  await ensureClubApplicationsTable();
+
+  const viewerId = params.viewerId ?? null;
+
+  const result = await db.query(
+    `SELECT c.id,
+            c.title,
+            c.description,
+            c.category,
+            c.location,
+            c.city,
+            c.is_remote,
+            c.join_policy,
+            c.image_url,
+            c.created_at,
+            u.id AS creator_id,
+            u.name AS creator_name,
+            u.handle AS creator_handle,
+            COUNT(DISTINCT m.user_id)::int AS member_count,
+            BOOL_OR(m.user_id = $2) AS joined_by_user,
+            MAX(a.status) FILTER (WHERE a.applicant_id = $2) AS application_status
+     FROM clubs c
+     JOIN users u ON u.id = c.creator_id
+     LEFT JOIN club_members m ON m.club_id = c.id
+     LEFT JOIN club_applications a ON a.club_id = c.id AND a.applicant_id = $2
+     WHERE c.id = $1
+     GROUP BY c.id, u.id`,
+    [params.clubId, viewerId]
+  );
+
+  const row = result.rows[0] as ClubRow | undefined;
+  return row ? mapClub(row) : null;
+};
+
 export const createClub = async (params: {
   creatorId: string;
   title: string;

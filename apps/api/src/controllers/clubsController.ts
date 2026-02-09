@@ -4,10 +4,17 @@ import {
   ClubError,
   createClub,
   decideClubApplication,
+  fetchClubById,
   fetchClubs,
   joinClub,
   leaveClub,
 } from "../services/clubsService";
+import {
+  addClubChatMessage,
+  generateGuestName,
+  getClubChatHistory,
+  normalizeClubChannel,
+} from "../services/clubChatService";
 
 const getToken = (req: Request) => {
   const header = req.header("authorization");
@@ -74,6 +81,23 @@ export const getClubs = async (req: Request, res: Response) => {
   }
 };
 
+export const getClub = async (req: Request, res: Response) => {
+  try {
+    const user = await getOptionalUser(req);
+    const clubId = String(req.params.clubId ?? "");
+    if (!clubId) {
+      throw new ClubError("Club id is required.", 400);
+    }
+    const club = await fetchClubById({ clubId, viewerId: user?.id ?? null });
+    if (!club) {
+      throw new ClubError("Club not found.", 404);
+    }
+    res.json({ club });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
 export const postClub = async (req: Request, res: Response) => {
   try {
     const user = await requireUser(req);
@@ -90,6 +114,67 @@ export const postClub = async (req: Request, res: Response) => {
       imageUrl: payload.imageUrl ?? payload.image_url,
     });
     res.json({ club });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const getClubChat = async (req: Request, res: Response) => {
+  try {
+    const clubId = String(req.params.clubId ?? "");
+    if (!clubId) {
+      throw new ClubError("Club id is required.", 400);
+    }
+    const channel = normalizeClubChannel(
+      typeof req.query?.channel === "string" ? req.query.channel : null
+    );
+    const club = await fetchClubById({ clubId });
+    if (!club) {
+      throw new ClubError("Club not found.", 404);
+    }
+    const messages = getClubChatHistory(clubId, channel);
+    res.json({ clubId, channel, messages });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const postClubChat = async (req: Request, res: Response) => {
+  try {
+    const clubId = String(req.params.clubId ?? "");
+    if (!clubId) {
+      throw new ClubError("Club id is required.", 400);
+    }
+    const club = await fetchClubById({ clubId });
+    if (!club) {
+      throw new ClubError("Club not found.", 404);
+    }
+    const channel = normalizeClubChannel(
+      (req.body?.channel as string | undefined) ?? null
+    );
+    const message = String(req.body?.message ?? "").trim();
+    if (!message) {
+      throw new ClubError("Message is required.", 400);
+    }
+
+    const user = await getOptionalUser(req);
+    const guestNameRaw = String(req.body?.guestName ?? "").trim();
+    const guestName = guestNameRaw.slice(0, 40);
+    const sender = user
+      ? { id: user.id, name: user.name, handle: user.handle }
+      : {
+          id: `guest-${Date.now()}`,
+          name: guestName || generateGuestName(),
+          isGuest: true,
+        };
+
+    const chatMessage = addClubChatMessage({
+      clubId,
+      channel,
+      message,
+      sender,
+    });
+    res.json({ message: chatMessage });
   } catch (error) {
     handleError(res, error);
   }

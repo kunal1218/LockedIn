@@ -2,6 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { useAuth } from "@/features/auth";
@@ -25,6 +26,7 @@ const recencyToHours: Record<Exclude<ClubRecencyFilter, "all">, number> = {
 
 export default function ClubsPage() {
   const { token, isAuthenticated, openAuthModal, user } = useAuth();
+  const router = useRouter();
   const [clubs, setClubs] = useState<Club[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [recency, setRecency] = useState<ClubRecencyFilter>("24h");
@@ -101,7 +103,7 @@ export default function ClubsPage() {
       setClubs(response.clubs ?? []);
     } catch (loadError) {
       setError(
-        loadError instanceof Error ? loadError.message : "Unable to load clubs."
+        loadError instanceof Error ? loadError.message : "Unable to load groups."
       );
       setClubs([]);
     } finally {
@@ -135,13 +137,23 @@ export default function ClubsPage() {
         setError(
           postError instanceof Error
             ? postError.message
-            : "Unable to create club."
+            : "Unable to create group."
         );
       } finally {
         setIsPosting(false);
       }
     },
     [openAuthModal, token]
+  );
+
+  const handleOpenClub = useCallback(
+    (club: Club) => {
+      if (!club.joinedByUser) {
+        return;
+      }
+      router.push(`/clubs/${encodeURIComponent(club.id)}`);
+    },
+    [router]
   );
 
   const handleJoin = useCallback(
@@ -182,7 +194,7 @@ export default function ClubsPage() {
         }
       } catch (joinError) {
         setError(
-          joinError instanceof Error ? joinError.message : "Unable to join club."
+          joinError instanceof Error ? joinError.message : "Unable to join group."
         );
       } finally {
         setJoiningIds((prev) => {
@@ -200,9 +212,9 @@ export default function ClubsPage() {
       <div className="space-y-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="font-display text-3xl font-semibold">Clubs</h1>
+            <h1 className="font-display text-3xl font-semibold">Groups</h1>
             <p className="text-sm text-muted">
-              Discover nearby clubs and join with a single tap.
+              Discover nearby groups and join with a single tap.
             </p>
           </div>
           <Button
@@ -215,7 +227,7 @@ export default function ClubsPage() {
               setComposerOpen(true);
             }}
           >
-            Create a club
+            Create a group
           </Button>
         </div>
 
@@ -238,11 +250,11 @@ export default function ClubsPage() {
             )}
             {isLoading ? (
               <Card className="py-10 text-center text-sm text-muted">
-                Loading clubs...
+                Loading groups...
               </Card>
             ) : sortedClubs.length === 0 ? (
               <Card className="py-10 text-center text-sm text-muted">
-                No clubs match those filters yet. Start the first one.
+                No groups match those filters yet. Start the first one.
               </Card>
             ) : (
               <div className="grid gap-6 md:grid-cols-2">
@@ -251,6 +263,8 @@ export default function ClubsPage() {
                     key={club.id}
                     club={club}
                     onJoin={handleJoin}
+                    onOpen={handleOpenClub}
+                    isClickable={Boolean(club.joinedByUser)}
                     isJoining={joiningIds.has(club.id)}
                     hasJoined={club.joinedByUser}
                     isOwnClub={club.creator.id === user?.id}
@@ -275,10 +289,10 @@ export default function ClubsPage() {
               <div className="flex items-center justify-between rounded-t-[24px] border border-card-border/70 bg-white/90 px-4 py-3 md:px-6">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-                    Clubs
+                    Groups
                   </p>
                   <h2 className="font-display text-xl font-semibold text-ink">
-                    Create a club
+                    Create a group
                   </h2>
                 </div>
                 <button
