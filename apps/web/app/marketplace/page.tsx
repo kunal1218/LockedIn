@@ -84,9 +84,17 @@ export default function MarketplacePage() {
             Buy and sell with ease
           </p>
         </div>
-        <Button requiresAuth={false} onClick={() => setIsModalOpen(true)}>
-          Post Listing
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/marketplace/my-listings"
+            className="inline-flex items-center justify-center rounded-full border border-card-border bg-white/80 px-4 py-2 text-sm font-semibold text-ink transition hover:border-accent/60"
+          >
+            My Listings
+          </Link>
+          <Button requiresAuth={false} onClick={() => setIsModalOpen(true)}>
+            Post Listing
+          </Button>
+        </div>
       </div>
 
       <div className="mb-6">

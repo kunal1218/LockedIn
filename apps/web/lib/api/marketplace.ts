@@ -46,6 +46,16 @@ export const fetchListingById = async (listingId: string): Promise<Listing> => {
   return response.listing;
 };
 
+export const fetchMyListings = async (
+  token?: string | null
+): Promise<Listing[]> => {
+  const response = await apiGet<{ listings: Listing[] }>(
+    "/marketplace/my-listings",
+    token ?? undefined
+  );
+  return response.listings ?? [];
+};
+
 export const updateListing = async (
   listingId: string,
   data: {

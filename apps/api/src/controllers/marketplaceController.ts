@@ -8,6 +8,7 @@ import {
   deleteListing,
   deleteListingImage,
   getListingById,
+  getUserListings,
   listListings,
   uploadListingImages,
   updateListing,
@@ -106,6 +107,16 @@ export const getListing = async (req: Request, res: Response) => {
 
     const listing = await getListingById(listingId);
     res.json({ listing: withAbsoluteImages(req, listing) });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const getMyListings = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const listings = await getUserListings(user.id);
+    res.json({ listings: listings.map((listing) => withAbsoluteImages(req, listing)) });
   } catch (error) {
     handleError(res, error);
   }

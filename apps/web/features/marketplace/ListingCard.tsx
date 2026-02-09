@@ -23,22 +23,27 @@ function formatTimeAgo(dateString: string): string {
 const categoryStyles = {
   Textbooks: {
     gradient: "bg-gradient-to-br from-blue-400 to-blue-600",
+    badge: "bg-blue-100 text-blue-700",
     Icon: Book,
   },
   Electronics: {
     gradient: "bg-gradient-to-br from-purple-400 to-purple-600",
+    badge: "bg-purple-100 text-purple-700",
     Icon: Cpu,
   },
   Furniture: {
     gradient: "bg-gradient-to-br from-green-400 to-green-600",
+    badge: "bg-green-100 text-green-700",
     Icon: Armchair,
   },
   Clothing: {
     gradient: "bg-gradient-to-br from-pink-400 to-pink-600",
+    badge: "bg-pink-100 text-pink-700",
     Icon: Shirt,
   },
   Other: {
     gradient: "bg-gradient-to-br from-gray-400 to-gray-600",
+    badge: "bg-gray-100 text-gray-700",
     Icon: Package,
   },
 } as const;
@@ -112,6 +117,9 @@ export const ListingCard = ({ listing }: ListingCardProps) => {
             IMG {listing.images.length}
           </div>
         )}
+        <div className={`absolute left-2 bottom-2 rounded-full px-2 py-1 text-xs font-semibold ${styles.badge}`}>
+          {listing.category}
+        </div>
         <div className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-xs font-medium shadow-sm backdrop-blur">
           {listing.condition}
         </div>

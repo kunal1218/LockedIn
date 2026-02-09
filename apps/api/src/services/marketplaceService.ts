@@ -220,6 +220,27 @@ export const listListings = async (params: {
   );
 };
 
+export const getUserListings = async (userId: string): Promise<Listing[]> => {
+  await ensureListingsTable();
+
+  if (!userId) {
+    throw new MarketplaceError("User id is required", 400);
+  }
+
+  const result = await db.query(
+    `SELECT l.*, u.name AS seller_name, u.handle AS seller_handle
+     FROM listings l
+     JOIN users u ON u.id = l.user_id
+     WHERE l.user_id = $1 AND l.status != 'deleted'
+     ORDER BY l.created_at DESC`,
+    [userId]
+  );
+
+  return result.rows.map((row) =>
+    mapListing(row as Parameters<typeof mapListing>[0])
+  );
+};
+
 export const getListingById = async (id: string): Promise<Listing> => {
   await ensureListingsTable();
 

@@ -4,6 +4,7 @@ import {
   deleteListingById,
   getListing,
   getListings,
+  getMyListings,
   postListingImages,
   postListing,
   putListing,
@@ -25,6 +26,7 @@ const handleListingImageUpload = (req: Request, res: Response, next: NextFunctio
 
 router.get("/listings", getListings);
 router.get("/listings/:id", getListing);
+router.get("/my-listings", getMyListings);
 router.post("/listings", postListing);
 router.put("/listings/:id", putListing);
 router.delete("/listings/:id", deleteListingById);
