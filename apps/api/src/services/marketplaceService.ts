@@ -9,6 +9,7 @@ export type ListingCategory =
   | "Other";
 export type ListingCondition = "New" | "Like New" | "Good" | "Fair";
 export type ListingStatus = "active" | "sold" | "deleted";
+const MAX_LISTING_IMAGES = 5;
 
 export type Listing = {
   id: string;
@@ -89,6 +90,11 @@ const ensureListingsTable = async () => {
     await db.query(`
       ALTER TABLE listings
       ADD COLUMN IF NOT EXISTS location TEXT;
+    `);
+
+    await db.query(`
+      ALTER TABLE listings
+      ADD COLUMN IF NOT EXISTS images TEXT[] DEFAULT '{}';
     `);
 
     await db.query(
@@ -280,6 +286,9 @@ export const createListing = async (params: {
     params.location != null ? params.location.trim() || null : null;
 
   const images = Array.isArray(params.images) ? params.images : [];
+  if (images.length > MAX_LISTING_IMAGES) {
+    throw new MarketplaceError(`Max ${MAX_LISTING_IMAGES} images allowed`, 400);
+  }
 
   const result = await db.query(
     `INSERT INTO listings (user_id, title, description, location, price, category, condition, images, status)
@@ -400,6 +409,9 @@ export const updateListing = async (params: {
       : existing.location ?? null;
 
   const images = Array.isArray(params.images) ? params.images : existing.images ?? [];
+  if (images.length > MAX_LISTING_IMAGES) {
+    throw new MarketplaceError(`Max ${MAX_LISTING_IMAGES} images allowed`, 400);
+  }
 
   const result = await db.query(
     `UPDATE listings
@@ -452,4 +464,141 @@ export const deleteListing = async (params: {
   await db.query("DELETE FROM listings WHERE id = $1", [params.id]);
 
   return { status: "deleted" };
+};
+
+export const uploadListingImages = async (params: {
+  id: string;
+  userId: string;
+  imageUrls: string[];
+}): Promise<Listing> => {
+  await ensureListingsTable();
+
+  const existingResult = await db.query(
+    "SELECT * FROM listings WHERE id = $1 AND status != 'deleted' LIMIT 1",
+    [params.id]
+  );
+
+  if ((existingResult.rowCount ?? 0) === 0) {
+    throw new MarketplaceError("Listing not found", 404);
+  }
+
+  const existing = existingResult.rows[0] as {
+    id: string;
+    user_id: string;
+    title: string;
+    description: string;
+    location?: string | null;
+    price: string | number;
+    category: ListingCategory;
+    condition: ListingCondition;
+    images: string[] | null;
+    status: ListingStatus;
+    created_at: string | Date;
+    updated_at: string | Date;
+  };
+
+  if (existing.user_id !== params.userId) {
+    throw new MarketplaceError("Not authorized to update this listing", 403);
+  }
+
+  const images = Array.isArray(existing.images) ? existing.images : [];
+  const additions = params.imageUrls.filter(Boolean);
+  if (!additions.length) {
+    throw new MarketplaceError("No images provided", 400);
+  }
+
+  const nextImages = [...images, ...additions];
+  if (nextImages.length > MAX_LISTING_IMAGES) {
+    throw new MarketplaceError(`Max ${MAX_LISTING_IMAGES} images allowed`, 400);
+  }
+
+  const result = await db.query(
+    `UPDATE listings
+     SET images = $1,
+         updated_at = NOW()
+     WHERE id = $2
+     RETURNING *`,
+    [nextImages, params.id]
+  );
+
+  const sellerResult = await db.query(
+    "SELECT name, handle FROM users WHERE id = $1",
+    [params.userId]
+  );
+  const sellerRow = sellerResult.rows[0] as { name: string; handle: string } | undefined;
+
+  return mapListing({
+    ...(result.rows[0] as Parameters<typeof mapListing>[0]),
+    seller_name: sellerRow?.name ?? "",
+    seller_handle: sellerRow?.handle ?? "",
+  });
+};
+
+export const deleteListingImage = async (params: {
+  id: string;
+  userId: string;
+  imageUrl: string;
+}): Promise<Listing> => {
+  await ensureListingsTable();
+
+  const existingResult = await db.query(
+    "SELECT * FROM listings WHERE id = $1 AND status != 'deleted' LIMIT 1",
+    [params.id]
+  );
+
+  if ((existingResult.rowCount ?? 0) === 0) {
+    throw new MarketplaceError("Listing not found", 404);
+  }
+
+  const existing = existingResult.rows[0] as {
+    id: string;
+    user_id: string;
+    title: string;
+    description: string;
+    location?: string | null;
+    price: string | number;
+    category: ListingCategory;
+    condition: ListingCondition;
+    images: string[] | null;
+    status: ListingStatus;
+    created_at: string | Date;
+    updated_at: string | Date;
+  };
+
+  if (existing.user_id !== params.userId) {
+    throw new MarketplaceError("Not authorized to update this listing", 403);
+  }
+
+  const imageUrl = params.imageUrl?.trim();
+  if (!imageUrl) {
+    throw new MarketplaceError("Image URL is required", 400);
+  }
+
+  const images = Array.isArray(existing.images) ? existing.images : [];
+  const nextImages = images.filter((image) => image !== imageUrl);
+
+  if (nextImages.length === images.length) {
+    throw new MarketplaceError("Image not found", 404);
+  }
+
+  const result = await db.query(
+    `UPDATE listings
+     SET images = $1,
+         updated_at = NOW()
+     WHERE id = $2
+     RETURNING *`,
+    [nextImages, params.id]
+  );
+
+  const sellerResult = await db.query(
+    "SELECT name, handle FROM users WHERE id = $1",
+    [params.userId]
+  );
+  const sellerRow = sellerResult.rows[0] as { name: string; handle: string } | undefined;
+
+  return mapListing({
+    ...(result.rows[0] as Parameters<typeof mapListing>[0]),
+    seller_name: sellerRow?.name ?? "",
+    seller_handle: sellerRow?.handle ?? "",
+  });
 };

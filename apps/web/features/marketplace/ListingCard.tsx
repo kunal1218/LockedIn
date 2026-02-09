@@ -1,6 +1,7 @@
 "use client";
 
 import { Armchair, Book, Cpu, Package, Shirt } from "lucide-react";
+import { API_BASE_URL } from "@/lib/api";
 import type { Listing } from "./types";
 
 function formatTimeAgo(dateString: string): string {
@@ -54,6 +55,15 @@ const getAvatarStyle = (username: string) => {
   return avatarStyles[index];
 };
 
+const resolveImageUrl = (url: string) => {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  const normalized = url.startsWith("/") ? url : `/${url}`;
+  return `${API_BASE_URL}${normalized}`;
+};
+
 type ListingCardProps = {
   listing: Listing;
 };
@@ -70,16 +80,21 @@ export const ListingCard = ({ listing }: ListingCardProps) => {
       <div className="relative h-48">
         {listing.images && listing.images.length > 0 ? (
           <img
-            src={listing.images[0]}
+            src={resolveImageUrl(listing.images[0])}
             alt={listing.title}
             className="h-full w-full object-cover"
             loading="lazy"
           />
         ) : (
           <div
-            className={`flex h-full w-full items-center justify-center ${styles.gradient}`}
+            className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-400 to-blue-600"
           >
             <styles.Icon className="h-12 w-12 text-white" />
+          </div>
+        )}
+        {listing.images && listing.images.length > 1 && (
+          <div className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-1 text-xs font-semibold text-white">
+            IMG {listing.images.length}
           </div>
         )}
         <div className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-xs font-medium shadow-sm backdrop-blur">

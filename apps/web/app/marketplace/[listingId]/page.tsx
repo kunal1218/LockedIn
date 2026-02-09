@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Armchair, Book, Cpu, Package, Shirt } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
+import { ImageCarousel } from "@/components/ImageCarousel";
 import { Tag } from "@/components/Tag";
 import { useAuth } from "@/features/auth";
 import { EditListingModal } from "@/features/marketplace/EditListingModal";
@@ -164,11 +165,7 @@ export default function ListingDetailPage() {
           <div className="overflow-hidden rounded-3xl border border-card-border/70 bg-white/90 shadow-[0_20px_60px_rgba(30,26,22,0.08)]">
             <div className="relative h-[360px] w-full">
               {listing.images?.length ? (
-                <img
-                  src={listing.images[0]}
-                  alt={listing.title}
-                  className="h-full w-full object-cover"
-                />
+                <ImageCarousel images={listing.images} alt={listing.title} />
               ) : (
                 <div
                   className={`flex h-full w-full items-center justify-center ${styles.gradient}`}

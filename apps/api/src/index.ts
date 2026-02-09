@@ -2,6 +2,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
 import http from "http";
+import path from "path";
 import { initializeSocketServer } from "./services/socketService";
 import { registerRoutes } from "./routes";
 
@@ -44,6 +45,10 @@ app.use(
   })
 );
 app.use(express.json({ limit: "6mb" }));
+app.use(
+  "/uploads",
+  express.static(path.resolve(__dirname, "../public/uploads"))
+);
 
 registerRoutes(app);
 

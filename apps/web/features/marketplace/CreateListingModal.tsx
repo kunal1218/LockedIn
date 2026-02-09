@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { Button } from "@/components/Button";
-import { createListing } from "@/lib/api/marketplace";
+import { createListing, uploadListingImages } from "@/lib/api/marketplace";
 import { useAuth } from "@/features/auth";
 import type { Listing } from "./types";
 
@@ -26,8 +26,15 @@ type FieldErrors = Partial<{
   condition: string;
 }>;
 
+type PendingImage = {
+  id: string;
+  file: File;
+  previewUrl: string;
+};
+
 const categories = ["Textbooks", "Electronics", "Furniture", "Clothing", "Other"];
 const conditions = ["New", "Like New", "Good", "Fair"];
+const MAX_IMAGES = 5;
 
 export const CreateListingModal = ({
   isOpen,
@@ -40,23 +47,30 @@ export const CreateListingModal = ({
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("");
   const [condition, setCondition] = useState("");
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
 
   const canSubmit = useMemo(() => !isSubmitting, [isSubmitting]);
 
   const resetForm = () => {
+    pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
     setTitle("");
     setDescription("");
     setPrice("");
     setCategory("");
     setCondition("");
+    setPendingImages([]);
     setErrors({});
+    setUploadError(null);
     setSubmitError(null);
     setSuccessMessage(null);
     setIsSubmitting(false);
+    setIsUploadingImages(false);
   };
 
   const handleClose = () => {
@@ -129,8 +143,27 @@ export const CreateListingModal = ({
         },
         token
       );
+      let updatedListing = listing;
+
+      if (pendingImages.length > 0) {
+        setIsUploadingImages(true);
+        try {
+          const uploaded = await uploadListingImages(
+            listing.id,
+            pendingImages.map((image) => image.file),
+            token
+          );
+          updatedListing = { ...listing, images: uploaded };
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : "Failed to upload images.";
+          setUploadError(message);
+        } finally {
+          setIsUploadingImages(false);
+        }
+      }
       setSuccessMessage("Listing posted!");
-      onSuccess?.(listing);
+      onSuccess?.(updatedListing);
       resetForm();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to create listing";
@@ -138,6 +171,64 @@ export const CreateListingModal = ({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleImagesSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (!files.length) {
+      return;
+    }
+
+    setUploadError(null);
+
+    const remainingSlots = Math.max(MAX_IMAGES - pendingImages.length, 0);
+    if (remainingSlots === 0) {
+      setUploadError(`You can upload up to ${MAX_IMAGES} images.`);
+      return;
+    }
+
+    const allowedTypes = new Set([
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/jpg",
+    ]);
+
+    const validFiles = files.filter((file) => allowedTypes.has(file.type));
+    if (validFiles.length !== files.length) {
+      setUploadError("Only .jpg, .jpeg, .png, .webp images are allowed.");
+    }
+
+    const maxSize = 5 * 1024 * 1024;
+    const sizeFiltered = validFiles.filter((file) => file.size <= maxSize);
+    if (sizeFiltered.length !== validFiles.length) {
+      setUploadError("Each image must be 5MB or less.");
+    }
+
+    const limitedFiles = sizeFiltered.slice(0, remainingSlots);
+    if (!limitedFiles.length) {
+      return;
+    }
+
+    const nextImages = limitedFiles.map((file) => ({
+      id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2)}`,
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
+
+    setPendingImages((prev) => [...prev, ...nextImages]);
+  };
+
+  const removePendingImage = (id: string) => {
+    setPendingImages((prev) => {
+      const next = prev.filter((image) => image.id !== id);
+      const removed = prev.find((image) => image.id === id);
+      if (removed) {
+        URL.revokeObjectURL(removed.previewUrl);
+      }
+      return next;
+    });
   };
 
   if (!isOpen) {
@@ -265,10 +356,55 @@ export const CreateListingModal = ({
 
             <label className="block">
               <span className={labelClasses}>Images</span>
-              <input className={inputClasses} type="file" multiple disabled />
-              <p className="mt-2 text-xs text-gray-500">
-                Image uploads coming soon.
-              </p>
+              <div className="mt-2 space-y-3">
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 px-4 py-6 text-sm text-gray-500 transition hover:border-orange-300 hover:text-orange-500">
+                  <input
+                    className="hidden"
+                    type="file"
+                    multiple
+                    accept=".jpg,.jpeg,.png,.webp"
+                    onChange={handleImagesSelected}
+                    disabled={isSubmitting}
+                  />
+                  <span>Upload up to {MAX_IMAGES} images</span>
+                  <span className="mt-1 text-xs text-gray-400">
+                    {pendingImages.length} selected
+                  </span>
+                </label>
+
+                {pendingImages.length > 0 && (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {pendingImages.map((image) => (
+                      <div
+                        key={image.id}
+                        className="relative overflow-hidden rounded-lg border border-gray-200 shadow-sm"
+                      >
+                        <img
+                          src={image.previewUrl}
+                          alt={image.file.name}
+                          className="h-24 w-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removePendingImage(image.id)}
+                          className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-gray-700 shadow"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {uploadError && (
+                  <p className="text-xs font-semibold text-rose-500">{uploadError}</p>
+                )}
+                {isUploadingImages && (
+                  <p className="text-xs font-semibold text-gray-500">
+                    Uploading images...
+                  </p>
+                )}
+              </div>
             </label>
           </div>
 

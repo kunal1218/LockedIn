@@ -11,3 +11,5 @@ yarn-error.log*
 .vercel
 .turbo
 dist
+apps/api/public/uploads/*
+!apps/api/public/uploads/marketplace/.gitkeep

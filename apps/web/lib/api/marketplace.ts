@@ -1,5 +1,5 @@
 import type { Listing } from "@/features/marketplace/types";
-import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
+import { API_BASE_URL, apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
 
 export const createListing = async (
   data: {
@@ -72,4 +72,70 @@ export const deleteListing = async (
   token?: string | null
 ): Promise<void> => {
   await apiDelete(`/marketplace/listings/${encodeURIComponent(listingId)}`, token ?? undefined);
+};
+
+const resolveErrorMessage = async (response: Response) => {
+  if (response.ok) return "";
+  try {
+    const data = (await response.json()) as { error?: string };
+    if (data?.error) return data.error;
+  } catch {
+    // ignore JSON parsing errors
+  }
+  return `API error: ${response.status}`;
+};
+
+export const uploadListingImages = async (
+  listingId: string,
+  files: File[],
+  token?: string | null
+): Promise<string[]> => {
+  if (!files.length) {
+    return [];
+  }
+  const formData = new FormData();
+  files.forEach((file) => formData.append("images", file));
+
+  const response = await fetch(
+    `${API_BASE_URL}/marketplace/listings/${encodeURIComponent(listingId)}/images`,
+    {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(await resolveErrorMessage(response));
+  }
+
+  const data = (await response.json()) as { images?: string[] };
+  return data.images ?? [];
+};
+
+export const deleteListingImage = async (
+  listingId: string,
+  imageUrl: string,
+  token?: string | null
+): Promise<string[]> => {
+  const response = await fetch(
+    `${API_BASE_URL}/marketplace/listings/${encodeURIComponent(listingId)}/images`,
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ imageUrl }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(await resolveErrorMessage(response));
+  }
+
+  const data = (await response.json()) as { images?: string[] };
+  return data.images ?? [];
 };

@@ -1,13 +1,18 @@
+import fs from "fs";
+import path from "path";
 import type { Request, Response } from "express";
 import { AuthError, getUserFromToken } from "../services/authService";
 import {
   MarketplaceError,
   createListing,
   deleteListing,
+  deleteListingImage,
   getListingById,
   listListings,
+  uploadListingImages,
   updateListing,
 } from "../services/marketplaceService";
+import { MARKETPLACE_UPLOAD_ROOT } from "../middleware/upload";
 
 const getToken = (req: Request) => {
   const header = req.header("authorization");
@@ -49,6 +54,9 @@ const handleError = (res: Response, error: unknown) => {
   console.error("Marketplace error:", error);
   res.status(500).json({ error: "Unable to process marketplace request" });
 };
+
+const buildImageUrl = (_req: Request, filename: string) =>
+  `/uploads/marketplace/${filename}`;
 
 export const getListings = async (req: Request, res: Response) => {
   try {
@@ -141,6 +149,72 @@ export const deleteListingById = async (req: Request, res: Response) => {
 
     await deleteListing({ id: listingId, userId: user.id });
     res.json({ status: "deleted" });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const postListingImages = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const listingId = String(req.params.id ?? "").trim();
+    if (!listingId) {
+      throw new MarketplaceError("Listing id is required", 400);
+    }
+
+    const files = (req.files as Express.Multer.File[]) ?? [];
+    if (!files.length) {
+      throw new MarketplaceError("No images uploaded", 400);
+    }
+
+    const imageUrls = files.map((file) => buildImageUrl(req, file.filename));
+    const listing = await uploadListingImages({
+      id: listingId,
+      userId: user.id,
+      imageUrls,
+    });
+
+    res.status(201).json({ images: listing.images });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const deleteListingImageById = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const listingId = String(req.params.id ?? "").trim();
+    if (!listingId) {
+      throw new MarketplaceError("Listing id is required", 400);
+    }
+
+    const imageUrl = typeof req.body?.imageUrl === "string" ? req.body.imageUrl : "";
+    const listing = await deleteListingImage({
+      id: listingId,
+      userId: user.id,
+      imageUrl,
+    });
+
+    if (imageUrl) {
+      const normalizedPath = (() => {
+        if (imageUrl.startsWith("/uploads/")) {
+          return imageUrl;
+        }
+        try {
+          return new URL(imageUrl).pathname;
+        } catch {
+          return "";
+        }
+      })();
+
+      if (normalizedPath.startsWith("/uploads/marketplace/")) {
+        const fileName = path.basename(normalizedPath);
+        const filePath = path.join(MARKETPLACE_UPLOAD_ROOT, fileName);
+        fs.promises.unlink(filePath).catch(() => null);
+      }
+    }
+
+    res.json({ images: listing.images });
   } catch (error) {
     handleError(res, error);
   }
