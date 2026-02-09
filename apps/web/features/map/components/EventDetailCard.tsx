@@ -58,6 +58,8 @@ export const EventDetailCard = ({
   const [chatError, setChatError] = useState<string | null>(null);
   const [isSendingChat, setIsSendingChat] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  const [modalHeight, setModalHeight] = useState<number | null>(null);
 
   const attendees = event.attendees ?? [];
   const isAtCapacity =
@@ -139,6 +141,29 @@ export const EventDetailCard = ({
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, currentView]);
 
+  useEffect(() => {
+    if (currentView !== "details") {
+      return;
+    }
+    const node = modalRef.current;
+    if (!node) {
+      return;
+    }
+    const measure = () => {
+      const nextHeight = node.getBoundingClientRect().height;
+      if (Number.isFinite(nextHeight) && nextHeight > 0) {
+        setModalHeight(nextHeight);
+      }
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const observer = new ResizeObserver(() => measure());
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [currentView, event.id]);
+
   const handleRSVP = async (status: "going" | "maybe" | "declined") => {
     setLoading(true);
     try {
@@ -215,7 +240,15 @@ export const EventDetailCard = ({
           onClick={onClose}
           aria-hidden="true"
         />
-        <div className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-card-border/60 bg-white shadow-[0_24px_60px_rgba(27,26,23,0.25)] max-h-[85vh] animate-scale-in">
+        <div
+          ref={modalRef}
+          style={
+            currentView === "chat" && modalHeight
+              ? { height: `${modalHeight}px` }
+              : undefined
+          }
+          className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-card-border/60 bg-white shadow-[0_24px_60px_rgba(27,26,23,0.25)] max-h-[85vh] animate-scale-in"
+        >
           {currentView === "details" ? (
             <>
               <div className="sticky top-0 z-10 flex items-start justify-between border-b border-card-border/60 bg-white px-6 py-4">
