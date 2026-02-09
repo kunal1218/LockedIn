@@ -335,24 +335,10 @@ export default function ClubDetailPage() {
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-2">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-            Group
-          </p>
           <h1 className="font-display text-3xl font-semibold text-ink">
             {club.title}
           </h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted">{club.description}</p>
-          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted">
-            <span>{club.location}</span>
-            <span className="h-1 w-1 rounded-full bg-card-border/70" />
-            <span>{club.memberCount} members</span>
-            {club.joinPolicy === "application" && (
-              <>
-                <span className="h-1 w-1 rounded-full bg-card-border/70" />
-                <span>Approval required</span>
-              </>
-            )}
-          </div>
+          <div className="mt-2 text-xs text-muted">{club.memberCount} members</div>
         </div>
         {isOwner && (
           <Button
