@@ -236,14 +236,14 @@ export const CreateListingModal = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 py-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div
-        className="w-full max-w-2xl rounded-xl bg-white shadow-2xl"
+        className="flex w-full max-w-2xl max-h-[90vh] flex-col rounded-xl bg-white shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-listing-title"
       >
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4">
           <h2
             id="create-listing-title"
             className="font-display text-2xl font-semibold text-ink"
@@ -259,167 +259,169 @@ export const CreateListingModal = ({
           </button>
         </div>
 
-        <form className="space-y-5 px-6 py-6" onSubmit={handleSubmit}>
-          <label className="block">
-            <span className={labelClasses}>Title</span>
-            <input
-              className={inputClasses}
-              type="text"
-              maxLength={200}
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="e.g. Calculus Textbook"
-            />
-            {errors.title && (
-              <p className="mt-2 text-xs font-semibold text-rose-500">{errors.title}</p>
-            )}
-          </label>
-
-          <label className="block">
-            <span className={labelClasses}>Description</span>
-            <textarea
-              className={`${inputClasses} min-h-[120px] resize-none`}
-              maxLength={2000}
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder="Describe the item and condition..."
-            />
-            {errors.description && (
-              <p className="mt-2 text-xs font-semibold text-rose-500">
-                {errors.description}
-              </p>
-            )}
-          </label>
-
-          <div className="grid gap-4 sm:grid-cols-2">
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
+          <div className="flex-1 space-y-5 overflow-y-auto px-6 py-6">
             <label className="block">
-              <span className={labelClasses}>Price</span>
+              <span className={labelClasses}>Title</span>
               <input
                 className={inputClasses}
-                type="number"
-                min={0}
-                step="0.01"
-                value={price}
-                onChange={(event) => setPrice(event.target.value)}
-                placeholder="0.00"
+                type="text"
+                maxLength={200}
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="e.g. Calculus Textbook"
               />
-              {errors.price && (
-                <p className="mt-2 text-xs font-semibold text-rose-500">
-                  {errors.price}
-                </p>
+              {errors.title && (
+                <p className="mt-2 text-xs font-semibold text-rose-500">{errors.title}</p>
               )}
             </label>
 
             <label className="block">
-              <span className={labelClasses}>Category</span>
-              <select
-                className={inputClasses}
-                value={category}
-                onChange={(event) => setCategory(event.target.value)}
-              >
-                <option value="">Select category</option>
-                {categories.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-              {errors.category && (
+              <span className={labelClasses}>Description</span>
+              <textarea
+                className={`${inputClasses} min-h-[120px] resize-none`}
+                maxLength={2000}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="Describe the item and condition..."
+              />
+              {errors.description && (
                 <p className="mt-2 text-xs font-semibold text-rose-500">
-                  {errors.category}
-                </p>
-              )}
-            </label>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className={labelClasses}>Condition</span>
-              <select
-                className={inputClasses}
-                value={condition}
-                onChange={(event) => setCondition(event.target.value)}
-              >
-                <option value="">Select condition</option>
-                {conditions.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-              {errors.condition && (
-                <p className="mt-2 text-xs font-semibold text-rose-500">
-                  {errors.condition}
+                  {errors.description}
                 </p>
               )}
             </label>
 
-            <label className="block">
-              <span className={labelClasses}>Images</span>
-              <div className="mt-2 space-y-3">
-                <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 px-4 py-6 text-sm text-gray-500 transition hover:border-orange-300 hover:text-orange-500">
-                  <input
-                    className="hidden"
-                    type="file"
-                    multiple
-                    accept=".jpg,.jpeg,.png,.webp"
-                    onChange={handleImagesSelected}
-                    disabled={isSubmitting}
-                  />
-                  <span>Upload up to {MAX_IMAGES} images</span>
-                  <span className="mt-1 text-xs text-gray-400">
-                    {pendingImages.length} selected
-                  </span>
-                </label>
-
-                {pendingImages.length > 0 && (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {pendingImages.map((image) => (
-                      <div
-                        key={image.id}
-                        className="relative overflow-hidden rounded-lg border border-gray-200 shadow-sm"
-                      >
-                        <img
-                          src={image.previewUrl}
-                          alt={image.file.name}
-                          className="h-24 w-full object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removePendingImage(image.id)}
-                          className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-gray-700 shadow"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {uploadError && (
-                  <p className="text-xs font-semibold text-rose-500">{uploadError}</p>
-                )}
-                {isUploadingImages && (
-                  <p className="text-xs font-semibold text-gray-500">
-                    Uploading images...
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className={labelClasses}>Price</span>
+                <input
+                  className={inputClasses}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={price}
+                  onChange={(event) => setPrice(event.target.value)}
+                  placeholder="0.00"
+                />
+                {errors.price && (
+                  <p className="mt-2 text-xs font-semibold text-rose-500">
+                    {errors.price}
                   </p>
                 )}
+              </label>
+
+              <label className="block">
+                <span className={labelClasses}>Category</span>
+                <select
+                  className={inputClasses}
+                  value={category}
+                  onChange={(event) => setCategory(event.target.value)}
+                >
+                  <option value="">Select category</option>
+                  {categories.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+                {errors.category && (
+                  <p className="mt-2 text-xs font-semibold text-rose-500">
+                    {errors.category}
+                  </p>
+                )}
+              </label>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className={labelClasses}>Condition</span>
+                <select
+                  className={inputClasses}
+                  value={condition}
+                  onChange={(event) => setCondition(event.target.value)}
+                >
+                  <option value="">Select condition</option>
+                  {conditions.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+                {errors.condition && (
+                  <p className="mt-2 text-xs font-semibold text-rose-500">
+                    {errors.condition}
+                  </p>
+                )}
+              </label>
+
+              <label className="block">
+                <span className={labelClasses}>Images</span>
+                <div className="mt-2 space-y-3">
+                  <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 px-4 py-6 text-sm text-gray-500 transition hover:border-orange-300 hover:text-orange-500">
+                    <input
+                      className="hidden"
+                      type="file"
+                      multiple
+                      accept=".jpg,.jpeg,.png,.webp"
+                      onChange={handleImagesSelected}
+                      disabled={isSubmitting}
+                    />
+                    <span>Upload up to {MAX_IMAGES} images</span>
+                    <span className="mt-1 text-xs text-gray-400">
+                      {pendingImages.length} selected
+                    </span>
+                  </label>
+
+                  {pendingImages.length > 0 && (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {pendingImages.map((image) => (
+                        <div
+                          key={image.id}
+                          className="relative overflow-hidden rounded-lg border border-gray-200 shadow-sm"
+                        >
+                          <img
+                            src={image.previewUrl}
+                            alt={image.file.name}
+                            className="h-24 w-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removePendingImage(image.id)}
+                            className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-gray-700 shadow"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {uploadError && (
+                    <p className="text-xs font-semibold text-rose-500">{uploadError}</p>
+                  )}
+                  {isUploadingImages && (
+                    <p className="text-xs font-semibold text-gray-500">
+                      Uploading images...
+                    </p>
+                  )}
+                </div>
+              </label>
+            </div>
+
+            {submitError && (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-600">
+                {submitError}
               </div>
-            </label>
+            )}
+            {successMessage && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-600">
+                {successMessage}
+              </div>
+            )}
           </div>
 
-          {submitError && (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-600">
-              {submitError}
-            </div>
-          )}
-          {successMessage && (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-600">
-              {successMessage}
-            </div>
-          )}
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <div className="sticky bottom-0 flex flex-col gap-3 border-t border-gray-100 bg-white px-6 py-4 sm:flex-row sm:justify-end">
             <Button variant="outline" requiresAuth={false} onClick={handleClose}>
               Cancel
             </Button>
