@@ -63,7 +63,7 @@ export default function MarketplacePage() {
       });
       setListings(next);
     } catch (error) {
-      console.error("[marketplace] failed to load listings", error);
+      console.error("Fetch error:", error);
       setListings([]);
     }
   }, [searchQuery, selectedCategory]);
