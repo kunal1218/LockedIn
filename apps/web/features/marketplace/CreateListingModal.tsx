@@ -236,7 +236,7 @@ export const CreateListingModal = ({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div
         className="flex w-full max-w-2xl max-h-[90vh] flex-col rounded-xl bg-white shadow-2xl"
         role="dialog"
