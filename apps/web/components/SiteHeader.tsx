@@ -1,6 +1,6 @@
 "use client";
 
-import type { MouseEvent } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -9,13 +9,41 @@ import { Avatar } from "@/components/Avatar";
 import { apiGet } from "@/lib/api";
 import { Button } from "./Button";
 
-const baseNavItems = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon?: ReactNode;
+};
+
+const ShoppingBagIcon = ({ className }: { className?: string }) => (
+  <svg
+    viewBox="0 0 24 24"
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M6 8V7a6 6 0 0 1 12 0v1" />
+    <path d="M4 8h16l-1.5 12.5a2 2 0 0 1-2 1.5H7.5a2 2 0 0 1-2-1.5L4 8Z" />
+    <path d="M9 11a3 3 0 0 0 6 0" />
+  </svg>
+);
+
+const baseNavItems: NavItem[] = [
   { href: "/", label: "Home" },
   { href: "/friends", label: "Friends" },
   { href: "/map", label: "Map" },
   { href: "/requests", label: "Requests" },
   { href: "/play", label: "Play" },
   { href: "/clubs", label: "Groups" },
+  {
+    href: "/marketplace",
+    label: "Marketplace",
+    icon: <ShoppingBagIcon className="h-4 w-4" />,
+  },
 ];
 
 export const SiteHeader = () => {
@@ -89,17 +117,28 @@ export const SiteHeader = () => {
             <p className="text-xs text-muted">Campus social, zero awkwardness</p>
           </div>
         </Link>
-        <nav className="hidden items-center gap-6 text-sm font-semibold text-muted md:flex md:justify-self-center">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="transition hover:text-ink"
-              onClick={handleNavClick(item.href)}
-            >
-              {item.label}
-            </Link>
-          ))}
+        <nav className="hidden items-center gap-6 text-sm font-semibold md:flex md:justify-self-center">
+          {navItems.map((item) => {
+            const isActive =
+              item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            const baseClasses =
+              "relative inline-flex items-center gap-2 transition after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-full after:origin-left after:scale-x-0 after:bg-accent after:transition-transform after:duration-200";
+            const stateClasses = isActive
+              ? "text-ink after:scale-x-100"
+              : "text-muted hover:text-ink hover:after:scale-x-100";
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={isActive ? "page" : undefined}
+                className={`${baseClasses} ${stateClasses}`}
+                onClick={handleNavClick(item.href)}
+              >
+                {item.icon}
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
         <div className="flex items-center justify-self-end gap-3">
           {!isAuthenticated ? (
