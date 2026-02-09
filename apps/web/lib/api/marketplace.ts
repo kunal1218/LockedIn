@@ -38,3 +38,10 @@ export const fetchListings = async (params?: {
   );
   return response.listings ?? [];
 };
+
+export const fetchListingById = async (listingId: string): Promise<Listing> => {
+  const response = await apiGet<{ listing: Listing }>(
+    `/marketplace/listings/${encodeURIComponent(listingId)}`
+  );
+  return response.listing;
+};
