@@ -18,8 +18,13 @@ import clubsRoutes from "./clubsRoutes";
 import marketplaceRoutes from "./marketplaceRoutes";
 
 export const registerRoutes = (app: Express) => {
+  const build =
+    process.env.RAILWAY_GIT_COMMIT_SHA ??
+    process.env.VERCEL_GIT_COMMIT_SHA ??
+    "local";
+
   app.get("/health", (_req, res) => {
-    res.json({ status: "ok" });
+    res.json({ status: "ok", build });
   });
 
   app.use("/auth", authRoutes);
