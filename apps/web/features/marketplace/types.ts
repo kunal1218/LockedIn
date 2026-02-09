@@ -7,6 +7,7 @@ export interface Listing {
   condition: "New" | "Like New" | "Good" | "Fair";
   location?: string | null;
   images: string[];
+  status: "active" | "sold";
   seller: {
     id: string;
     username: string;

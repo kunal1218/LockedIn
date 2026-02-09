@@ -1,5 +1,5 @@
 import type { Listing } from "@/features/marketplace/types";
-import { API_BASE_URL, apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
+import { API_BASE_URL, apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api";
 
 export const createListing = async (
   data: {
@@ -82,6 +82,19 @@ export const deleteListing = async (
   token?: string | null
 ): Promise<void> => {
   await apiDelete(`/marketplace/listings/${encodeURIComponent(listingId)}`, token ?? undefined);
+};
+
+export const updateListingStatus = async (
+  listingId: string,
+  status: "active" | "sold",
+  token?: string | null
+): Promise<Listing> => {
+  const response = await apiPatch<{ listing: Listing }>(
+    `/marketplace/listings/${encodeURIComponent(listingId)}/status`,
+    { status },
+    token ?? undefined
+  );
+  return response.listing;
 };
 
 const resolveErrorMessage = async (response: Response) => {

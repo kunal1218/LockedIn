@@ -10,6 +10,7 @@ import {
   getListingById,
   getUserListings,
   listListings,
+  updateListingStatus,
   uploadListingImages,
   updateListing,
 } from "../services/marketplaceService";
@@ -179,6 +180,27 @@ export const deleteListingById = async (req: Request, res: Response) => {
 
     await deleteListing({ id: listingId, userId: user.id });
     res.json({ status: "deleted" });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+export const patchListingStatus = async (req: Request, res: Response) => {
+  try {
+    const user = await requireUser(req);
+    const listingId = String(req.params.id ?? "").trim();
+    if (!listingId) {
+      throw new MarketplaceError("Listing id is required", 400);
+    }
+
+    const status = typeof req.body?.status === "string" ? req.body.status : "";
+    const listing = await updateListingStatus({
+      id: listingId,
+      userId: user.id,
+      status,
+    });
+
+    res.json({ listing: withAbsoluteImages(req, listing) });
   } catch (error) {
     handleError(res, error);
   }

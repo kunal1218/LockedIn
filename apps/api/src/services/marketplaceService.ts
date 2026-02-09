@@ -54,6 +54,8 @@ const VALID_CONDITIONS: ListingCondition[] = [
   "Fair",
 ];
 
+const VALID_STATUSES: ListingStatus[] = ["active", "sold"];
+
 
 const toIsoString = (value: string | Date) =>
   value instanceof Date ? value.toISOString() : new Date(value).toISOString();
@@ -127,6 +129,14 @@ const normalizeCondition = (value?: string | null): ListingCondition | null => {
   const trimmed = value.trim();
   return VALID_CONDITIONS.includes(trimmed as ListingCondition)
     ? (trimmed as ListingCondition)
+    : null;
+};
+
+const normalizeStatus = (value?: string | null): ListingStatus | null => {
+  if (!value) return null;
+  const trimmed = value.trim().toLowerCase();
+  return VALID_STATUSES.includes(trimmed as ListingStatus)
+    ? (trimmed as ListingStatus)
     : null;
 };
 
@@ -485,6 +495,66 @@ export const deleteListing = async (params: {
   await db.query("DELETE FROM listings WHERE id = $1", [params.id]);
 
   return { status: "deleted" };
+};
+
+export const updateListingStatus = async (params: {
+  id: string;
+  userId: string;
+  status: string;
+}): Promise<Listing> => {
+  await ensureListingsTable();
+
+  const status = normalizeStatus(params.status);
+  if (!status) {
+    throw new MarketplaceError("Invalid status", 400);
+  }
+
+  const existingResult = await db.query(
+    "SELECT * FROM listings WHERE id = $1 AND status != 'deleted' LIMIT 1",
+    [params.id]
+  );
+
+  if ((existingResult.rowCount ?? 0) === 0) {
+    throw new MarketplaceError("Listing not found", 404);
+  }
+
+  const existing = existingResult.rows[0] as {
+    id: string;
+    user_id: string;
+    title: string;
+    description: string;
+    location?: string | null;
+    price: string | number;
+    category: ListingCategory;
+    condition: ListingCondition;
+    images: string[] | null;
+    status: ListingStatus;
+  };
+
+  if (existing.user_id !== params.userId) {
+    throw new MarketplaceError("Not authorized to update this listing", 403);
+  }
+
+  const result = await db.query(
+    `UPDATE listings
+     SET status = $1,
+         updated_at = NOW()
+     WHERE id = $2
+     RETURNING *`,
+    [status, params.id]
+  );
+
+  const sellerResult = await db.query(
+    "SELECT name, handle FROM users WHERE id = $1",
+    [params.userId]
+  );
+  const sellerRow = sellerResult.rows[0] as { name: string; handle: string } | undefined;
+
+  return mapListing({
+    ...(result.rows[0] as Parameters<typeof mapListing>[0]),
+    seller_name: sellerRow?.name ?? "",
+    seller_handle: sellerRow?.handle ?? "",
+  });
 };
 
 export const uploadListingImages = async (params: {

@@ -7,7 +7,7 @@ import { EditListingModal } from "@/features/marketplace/EditListingModal";
 import { ListingCard } from "@/features/marketplace/ListingCard";
 import { useAuth } from "@/features/auth";
 import type { Listing } from "@/features/marketplace/types";
-import { deleteListing, fetchMyListings } from "@/lib/api/marketplace";
+import { deleteListing, fetchMyListings, updateListingStatus } from "@/lib/api/marketplace";
 
 export default function MyListingsPage() {
   const { token, isAuthenticated, openAuthModal } = useAuth();
@@ -19,14 +19,32 @@ export default function MyListingsPage() {
   const [activeListing, setActiveListing] = useState<Listing | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Listing | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [activeTab, setActiveTab] = useState<"active" | "sold">("active");
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<Record<string, boolean>>({});
 
   const stats = useMemo(() => {
-    const totalValue = listings.reduce(
+    const activeListings = listings.filter((listing) => listing.status === "active");
+    const soldListings = listings.filter((listing) => listing.status === "sold");
+    const totalActive = activeListings.reduce(
       (sum, listing) => sum + Number(listing.price || 0),
       0
     );
-    return { count: listings.length, totalValue };
+    const totalSold = soldListings.reduce(
+      (sum, listing) => sum + Number(listing.price || 0),
+      0
+    );
+    return {
+      activeCount: activeListings.length,
+      soldCount: soldListings.length,
+      activeValue: totalActive,
+      soldValue: totalSold,
+    };
   }, [listings]);
+
+  const filteredListings = useMemo(
+    () => listings.filter((listing) => listing.status === activeTab),
+    [activeTab, listings]
+  );
 
   const loadListings = useCallback(async () => {
     if (!isAuthenticated || !token) {
@@ -82,6 +100,27 @@ export default function MyListingsPage() {
     setActiveListing(updated);
   };
 
+  const handleStatusChange = async (listing: Listing, nextStatus: "active" | "sold") => {
+    if (!token) {
+      return;
+    }
+    setIsUpdatingStatus((prev) => ({ ...prev, [listing.id]: true }));
+    try {
+      const updated = await updateListingStatus(listing.id, nextStatus, token);
+      setListings((prev) =>
+        prev.map((item) => (item.id === updated.id ? updated : item))
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update status.";
+      setError(message);
+    } finally {
+      setIsUpdatingStatus((prev) => {
+        const { [listing.id]: _, ...rest } = prev;
+        return rest;
+      });
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="mx-auto max-w-7xl px-6 py-8">
@@ -118,15 +157,42 @@ export default function MyListingsPage() {
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
         <div className="rounded-2xl border border-card-border/70 bg-white/80 px-5 py-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase text-gray-500">Total Listings</p>
-          <p className="mt-2 text-2xl font-semibold text-ink">{stats.count}</p>
-        </div>
-        <div className="rounded-2xl border border-card-border/70 bg-white/80 px-5 py-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase text-gray-500">Total Value</p>
+          <p className="text-xs font-semibold uppercase text-gray-500">Active Listings</p>
           <p className="mt-2 text-2xl font-semibold text-ink">
-            ${stats.totalValue.toFixed(2)}
+            {stats.activeCount} · ${stats.activeValue.toFixed(2)}
           </p>
         </div>
+        <div className="rounded-2xl border border-card-border/70 bg-white/80 px-5 py-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase text-gray-500">Sold Listings</p>
+          <p className="mt-2 text-2xl font-semibold text-ink">
+            {stats.soldCount} · ${stats.soldValue.toFixed(2)}
+          </p>
+        </div>
+      </div>
+
+      <div className="mb-6 flex gap-4 border-b border-gray-200">
+        <button
+          type="button"
+          onClick={() => setActiveTab("active")}
+          className={`pb-3 text-sm font-semibold transition ${
+            activeTab === "active"
+              ? "border-b-2 border-orange-500 text-orange-500"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Active ({stats.activeCount})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("sold")}
+          className={`pb-3 text-sm font-semibold transition ${
+            activeTab === "sold"
+              ? "border-b-2 border-orange-500 text-orange-500"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Sold ({stats.soldCount})
+        </button>
       </div>
 
       {error && (
@@ -139,9 +205,13 @@ export default function MyListingsPage() {
         <div className="rounded-2xl border border-card-border/70 bg-white/70 px-6 py-8 text-sm text-muted">
           Loading your listings...
         </div>
-      ) : listings.length === 0 ? (
+      ) : filteredListings.length === 0 ? (
         <div className="rounded-2xl border border-card-border/70 bg-white/70 px-6 py-12 text-center">
-          <p className="mb-4 text-gray-500">You haven't posted anything yet</p>
+          <p className="mb-4 text-gray-500">
+            {activeTab === "active"
+              ? "You haven't posted anything yet"
+              : "No sold listings yet"}
+          </p>
           <button
             type="button"
             onClick={() => setIsCreateOpen(true)}
@@ -152,17 +222,19 @@ export default function MyListingsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {listings.map((listing) => (
+          {filteredListings.map((listing) => (
             <div key={listing.id} className="group">
-              <ListingCard listing={listing} />
+              <ListingCard listing={listing} showSoldBadge />
               <div className="mt-3 flex flex-wrap gap-2 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100">
-                <button
-                  type="button"
-                  onClick={() => handleEdit(listing)}
-                  className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-4 py-2 text-xs font-semibold text-white shadow-[0_4px_12px_rgba(255,107,53,0.3)] transition hover:bg-orange-600"
-                >
-                  Edit
-                </button>
+                {listing.status === "active" && (
+                  <button
+                    type="button"
+                    onClick={() => handleEdit(listing)}
+                    className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-4 py-2 text-xs font-semibold text-white shadow-[0_4px_12px_rgba(255,107,53,0.3)] transition hover:bg-orange-600"
+                  >
+                    Edit
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setDeleteTarget(listing)}
@@ -170,13 +242,25 @@ export default function MyListingsPage() {
                 >
                   Delete
                 </button>
-                <button
-                  type="button"
-                  disabled
-                  className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-400"
-                >
-                  Mark as Sold
-                </button>
+                {listing.status === "active" ? (
+                  <button
+                    type="button"
+                    onClick={() => handleStatusChange(listing, "sold")}
+                    disabled={!!isUpdatingStatus[listing.id]}
+                    className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-4 py-2 text-xs font-semibold text-white shadow-[0_4px_12px_rgba(255,107,53,0.3)] transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isUpdatingStatus[listing.id] ? "Updating..." : "Mark as Sold"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleStatusChange(listing, "active")}
+                    disabled={!!isUpdatingStatus[listing.id]}
+                    className="inline-flex items-center justify-center rounded-lg border-2 border-gray-300 px-4 py-2 text-xs font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isUpdatingStatus[listing.id] ? "Updating..." : "Mark as Available"}
+                  </button>
+                )}
               </div>
             </div>
           ))}

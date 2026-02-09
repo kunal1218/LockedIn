@@ -72,9 +72,10 @@ const resolveImageUrl = (url: string) => {
 
 type ListingCardProps = {
   listing: Listing;
+  showSoldBadge?: boolean;
 };
 
-export const ListingCard = ({ listing }: ListingCardProps) => {
+export const ListingCard = ({ listing, showSoldBadge = false }: ListingCardProps) => {
   const styles = categoryStyles[listing.category] ?? categoryStyles.Other;
   const avatarStyle = getAvatarStyle(listing.seller.username);
   const initial = listing.seller.username
@@ -84,6 +85,7 @@ export const ListingCard = ({ listing }: ListingCardProps) => {
     listing.images && listing.images.length > 0
       ? resolveImageUrl(listing.images[0])
       : "";
+  const isSold = listing.status === "sold";
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
@@ -96,7 +98,11 @@ export const ListingCard = ({ listing }: ListingCardProps) => {
   }, [listing.id, listing.images, imageUrl]);
 
   return (
-    <div className="cursor-pointer overflow-hidden rounded-lg border border-gray-200 bg-white transition-shadow duration-200 hover:shadow-lg">
+    <div
+      className={`cursor-pointer overflow-hidden rounded-lg border border-gray-200 bg-white transition-shadow duration-200 hover:shadow-lg ${
+        showSoldBadge && isSold ? "opacity-60 grayscale-[0.3]" : ""
+      }`}
+    >
       <div className="relative h-48">
         {imageUrl ? (
           <img
@@ -117,10 +123,19 @@ export const ListingCard = ({ listing }: ListingCardProps) => {
             IMG {listing.images.length}
           </div>
         )}
+        {showSoldBadge && isSold && (
+          <div className="absolute right-2 top-2 rounded-lg bg-red-500 px-3 py-1 text-xs font-bold text-white shadow-lg">
+            SOLD
+          </div>
+        )}
         <div className={`absolute left-2 bottom-2 rounded-full px-2 py-1 text-xs font-semibold ${styles.badge}`}>
           {listing.category}
         </div>
-        <div className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-xs font-medium shadow-sm backdrop-blur">
+        <div
+          className={`absolute right-2 rounded-full bg-white/90 px-2 py-1 text-xs font-medium shadow-sm backdrop-blur ${
+            showSoldBadge && isSold ? "top-10" : "top-2"
+          }`}
+        >
           {listing.condition}
         </div>
       </div>

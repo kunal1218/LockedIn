@@ -11,7 +11,7 @@ import { useAuth } from "@/features/auth";
 import { EditListingModal } from "@/features/marketplace/EditListingModal";
 import type { Listing } from "@/features/marketplace/types";
 import { IMAGE_BASE_URL } from "@/lib/api";
-import { deleteListing, fetchListingById } from "@/lib/api/marketplace";
+import { deleteListing, fetchListingById, updateListingStatus } from "@/lib/api/marketplace";
 import { formatRelativeTime } from "@/lib/time";
 
 const categoryStyles = {
@@ -68,6 +68,7 @@ export default function ListingDetailPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   useEffect(() => {
     if (!listingId) {
@@ -131,6 +132,7 @@ export default function ListingDetailPage() {
 
   const styles = categoryStyles[listing.category] ?? categoryStyles.Other;
   const isSeller = user?.id === listing.seller.id;
+  const isSold = listing.status === "sold";
   const handleMessageSeller = () => {
     const handle = listing.seller.username.replace(/^@/, "");
     router.push(`/messages/${encodeURIComponent(handle)}`);
@@ -166,6 +168,32 @@ export default function ListingDetailPage() {
     }
   };
 
+  const handleStatusToggle = async () => {
+    if (!isAuthenticated || !token) {
+      openAuthModal("login");
+      return;
+    }
+    if (!listing) {
+      return;
+    }
+    setIsUpdatingStatus(true);
+    setNotice(null);
+    try {
+      const nextStatus = listing.status === "sold" ? "active" : "sold";
+      const updated = await updateListingStatus(listing.id, nextStatus, token);
+      setListing(updated);
+      setNotice({
+        type: "success",
+        message: nextStatus === "sold" ? "Listing marked as sold." : "Listing marked as available.",
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update listing status.";
+      setNotice({ type: "error", message });
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {notice && (
@@ -195,7 +223,16 @@ export default function ListingDetailPage() {
               <div className="absolute left-4 top-4">
                 <Tag className={styles.badge}>{listing.category}</Tag>
               </div>
-              <div className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-ink shadow-sm backdrop-blur">
+              {isSold && (
+                <div className="absolute right-4 top-4 rounded-lg bg-red-500 px-3 py-1 text-xs font-bold text-white shadow-lg">
+                  SOLD
+                </div>
+              )}
+              <div
+                className={`absolute right-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-ink shadow-sm backdrop-blur ${
+                  isSold ? "top-12" : "top-4"
+                }`}
+              >
                 {listing.condition}
               </div>
             </div>
@@ -231,11 +268,17 @@ export default function ListingDetailPage() {
             <div className="mt-6 flex flex-col gap-3">
               <button
                 type="button"
-                className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(255,107,53,0.3)] transition hover:bg-orange-600"
+                className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(255,107,53,0.3)] transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={handleMessageSeller}
+                disabled={!isSeller && isSold}
               >
                 Message Seller
               </button>
+              {!isSeller && isSold && (
+                <p className="text-xs font-semibold text-rose-500">
+                  This item has been sold.
+                </p>
+              )}
               {isSeller && (
                 <div className="flex gap-3">
                   <Button
@@ -254,6 +297,22 @@ export default function ListingDetailPage() {
                   >
                     Delete
                   </Button>
+                  <button
+                    type="button"
+                    onClick={handleStatusToggle}
+                    disabled={isUpdatingStatus}
+                    className={`inline-flex flex-1 items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
+                      isSold
+                        ? "border-2 border-gray-300 text-gray-600 hover:bg-gray-50"
+                        : "bg-orange-500 text-white hover:bg-orange-600 shadow-[0_4px_12px_rgba(255,107,53,0.3)]"
+                    }`}
+                  >
+                    {isUpdatingStatus
+                      ? "Updating..."
+                      : isSold
+                        ? "Mark as Available"
+                        : "Mark as Sold"}
+                  </button>
                 </div>
               )}
             </div>

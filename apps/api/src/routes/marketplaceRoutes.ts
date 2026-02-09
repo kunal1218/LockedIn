@@ -5,6 +5,7 @@ import {
   getListing,
   getListings,
   getMyListings,
+  patchListingStatus,
   postListingImages,
   postListing,
   putListing,
@@ -29,6 +30,7 @@ router.get("/listings/:id", getListing);
 router.get("/my-listings", getMyListings);
 router.post("/listings", postListing);
 router.put("/listings/:id", putListing);
+router.patch("/listings/:id/status", patchListingStatus);
 router.delete("/listings/:id", deleteListingById);
 router.post(
   "/listings/:id/images",
