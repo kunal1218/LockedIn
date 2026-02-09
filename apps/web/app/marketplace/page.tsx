@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/Button";
 import { CreateListingModal } from "@/features/marketplace/CreateListingModal";
 import { ListingCard } from "@/features/marketplace/ListingCard";
@@ -154,7 +155,15 @@ export default function MarketplacePage() {
           </div>
         ) : (
           listings.map((listing) => (
-            <ListingCard key={listing.id} listing={listing} />
+            <Link
+              key={listing.id}
+              href={`/marketplace/${listing.id}`}
+              className="block no-underline"
+            >
+              <div className="transition-all duration-200 hover:scale-[1.02]">
+                <ListingCard listing={listing} />
+              </div>
+            </Link>
           ))
         )}
       </div>
