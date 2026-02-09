@@ -14,6 +14,7 @@ export type Listing = {
   id: string;
   title: string;
   description: string;
+  location?: string | null;
   price: number;
   category: ListingCategory;
   condition: ListingCondition;
@@ -52,7 +53,6 @@ const VALID_CONDITIONS: ListingCondition[] = [
   "Fair",
 ];
 
-const VALID_STATUSES: ListingStatus[] = ["active", "sold", "deleted"];
 
 const toIsoString = (value: string | Date) =>
   value instanceof Date ? value.toISOString() : new Date(value).toISOString();
@@ -75,6 +75,7 @@ const ensureListingsTable = async () => {
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         title VARCHAR(200) NOT NULL,
         description TEXT NOT NULL,
+        location TEXT,
         price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
         category VARCHAR(50) NOT NULL CHECK (category IN ('Textbooks', 'Electronics', 'Furniture', 'Clothing', 'Other')),
         condition VARCHAR(50) NOT NULL CHECK (condition IN ('New', 'Like New', 'Good', 'Fair')),
@@ -83,6 +84,11 @@ const ensureListingsTable = async () => {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
+    `);
+
+    await db.query(`
+      ALTER TABLE listings
+      ADD COLUMN IF NOT EXISTS location TEXT;
     `);
 
     await db.query(
@@ -118,19 +124,12 @@ const normalizeCondition = (value?: string | null): ListingCondition | null => {
     : null;
 };
 
-const normalizeStatus = (value?: string | null): ListingStatus | null => {
-  if (!value) return null;
-  const trimmed = value.trim().toLowerCase();
-  return VALID_STATUSES.includes(trimmed as ListingStatus)
-    ? (trimmed as ListingStatus)
-    : null;
-};
-
 const mapListing = (row: {
   id: string;
   user_id: string;
   title: string;
   description: string;
+  location?: string | null;
   price: string | number;
   category: ListingCategory;
   condition: ListingCondition;
@@ -144,6 +143,7 @@ const mapListing = (row: {
   id: row.id,
   title: row.title,
   description: row.description,
+  location: row.location ?? null,
   price: Number(row.price),
   category: row.category,
   condition: row.condition,
@@ -240,6 +240,7 @@ export const createListing = async (params: {
   price: number;
   category: string;
   condition: string;
+  location?: string | null;
   images?: string[] | null;
 }): Promise<Listing> => {
   await ensureListingsTable();
@@ -275,13 +276,16 @@ export const createListing = async (params: {
     throw new MarketplaceError("Invalid condition", 400);
   }
 
+  const location =
+    params.location != null ? params.location.trim() || null : null;
+
   const images = Array.isArray(params.images) ? params.images : [];
 
   const result = await db.query(
-    `INSERT INTO listings (user_id, title, description, price, category, condition, images, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
+    `INSERT INTO listings (user_id, title, description, location, price, category, condition, images, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active')
      RETURNING *`,
-    [params.userId, title, description, price, category, condition, images]
+    [params.userId, title, description, location, price, category, condition, images]
   );
 
   const row = result.rows[0] as {
@@ -289,6 +293,7 @@ export const createListing = async (params: {
     user_id: string;
     title: string;
     description: string;
+    location?: string | null;
     price: string | number;
     category: ListingCategory;
     condition: ListingCondition;
@@ -319,8 +324,8 @@ export const updateListing = async (params: {
   price?: number;
   category?: string;
   condition?: string;
+  location?: string | null;
   images?: string[] | null;
-  status?: string;
 }): Promise<Listing> => {
   await ensureListingsTable();
 
@@ -338,6 +343,7 @@ export const updateListing = async (params: {
     user_id: string;
     title: string;
     description: string;
+    location?: string | null;
     price: string | number;
     category: ListingCategory;
     condition: ListingCondition;
@@ -388,11 +394,10 @@ export const updateListing = async (params: {
     throw new MarketplaceError("Invalid condition", 400);
   }
 
-  const status =
-    params.status != null ? normalizeStatus(params.status) : existing.status;
-  if (!status || status === "deleted") {
-    throw new MarketplaceError("Invalid status", 400);
-  }
+  const location =
+    params.location != null
+      ? params.location.trim() || null
+      : existing.location ?? null;
 
   const images = Array.isArray(params.images) ? params.images : existing.images ?? [];
 
@@ -400,15 +405,15 @@ export const updateListing = async (params: {
     `UPDATE listings
      SET title = $1,
          description = $2,
-         price = $3,
-         category = $4,
-         condition = $5,
-         images = $6,
-         status = $7,
+         location = $3,
+         price = $4,
+         category = $5,
+         condition = $6,
+         images = $7,
          updated_at = NOW()
      WHERE id = $8
      RETURNING *`,
-    [title, description, price, category, condition, images, status, params.id]
+    [title, description, location, price, category, condition, images, params.id]
   );
 
   const sellerResult = await db.query(
@@ -431,7 +436,7 @@ export const deleteListing = async (params: {
   await ensureListingsTable();
 
   const existingResult = await db.query(
-    "SELECT user_id FROM listings WHERE id = $1 AND status != 'deleted' LIMIT 1",
+    "SELECT user_id FROM listings WHERE id = $1 LIMIT 1",
     [params.id]
   );
 
@@ -444,10 +449,7 @@ export const deleteListing = async (params: {
     throw new MarketplaceError("Not authorized to delete this listing", 403);
   }
 
-  await db.query(
-    "UPDATE listings SET status = 'deleted', updated_at = NOW() WHERE id = $1",
-    [params.id]
-  );
+  await db.query("DELETE FROM listings WHERE id = $1", [params.id]);
 
   return { status: "deleted" };
 };

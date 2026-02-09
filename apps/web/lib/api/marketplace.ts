@@ -1,5 +1,5 @@
 import type { Listing } from "@/features/marketplace/types";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
 
 export const createListing = async (
   data: {
@@ -44,4 +44,32 @@ export const fetchListingById = async (listingId: string): Promise<Listing> => {
     `/marketplace/listings/${encodeURIComponent(listingId)}`
   );
   return response.listing;
+};
+
+export const updateListing = async (
+  listingId: string,
+  data: {
+    title: string;
+    description: string;
+    price: number;
+    category: string;
+    condition: string;
+    location?: string;
+    images?: string[];
+  },
+  token?: string | null
+): Promise<Listing> => {
+  const response = await apiPut<{ listing: Listing }>(
+    `/marketplace/listings/${encodeURIComponent(listingId)}`,
+    data,
+    token ?? undefined
+  );
+  return response.listing;
+};
+
+export const deleteListing = async (
+  listingId: string,
+  token?: string | null
+): Promise<void> => {
+  await apiDelete(`/marketplace/listings/${encodeURIComponent(listingId)}`, token ?? undefined);
 };

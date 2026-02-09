@@ -3,6 +3,7 @@ CREATE TABLE listings (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title VARCHAR(200) NOT NULL,
   description TEXT NOT NULL,
+  location TEXT,
   price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
   category VARCHAR(50) NOT NULL CHECK (category IN ('Textbooks', 'Electronics', 'Furniture', 'Clothing', 'Other')),
   condition VARCHAR(50) NOT NULL CHECK (condition IN ('New', 'Like New', 'Good', 'Fair')),

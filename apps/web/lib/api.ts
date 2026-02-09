@@ -66,5 +66,11 @@ export const apiPatch = async <T>(
   token?: string
 ): Promise<T> => apiRequest<T>(path, { method: "PATCH", body, token });
 
+export const apiPut = async <T>(
+  path: string,
+  body: unknown,
+  token?: string
+): Promise<T> => apiRequest<T>(path, { method: "PUT", body, token });
+
 export const apiDelete = async <T>(path: string, token?: string): Promise<T> =>
   apiRequest<T>(path, { method: "DELETE", token });

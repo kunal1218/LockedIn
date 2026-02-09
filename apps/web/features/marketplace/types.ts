@@ -5,6 +5,7 @@ export interface Listing {
   price: number;
   category: "Textbooks" | "Electronics" | "Furniture" | "Clothing" | "Other";
   condition: "New" | "Like New" | "Good" | "Fair";
+  location?: string | null;
   images: string[];
   seller: {
     id: string;

@@ -7,8 +7,9 @@ import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { Tag } from "@/components/Tag";
 import { useAuth } from "@/features/auth";
+import { EditListingModal } from "@/features/marketplace/EditListingModal";
 import type { Listing } from "@/features/marketplace/types";
-import { fetchListingById } from "@/lib/api/marketplace";
+import { deleteListing, fetchListingById } from "@/lib/api/marketplace";
 import { formatRelativeTime } from "@/lib/time";
 
 const categoryStyles = {
@@ -42,7 +43,7 @@ const categoryStyles = {
 export default function ListingDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, token, isAuthenticated, openAuthModal } = useAuth();
   const listingId = useMemo(() => {
     const raw = (params as { listingId?: string | string[] } | null)?.listingId;
     if (!raw) return "";
@@ -52,6 +53,10 @@ export default function ListingDetailPage() {
   const [listing, setListing] = useState<Listing | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!listingId) {
@@ -112,8 +117,48 @@ export default function ListingDetailPage() {
   };
   const memberSince = new Date(listing.createdAt).getFullYear();
 
+  const handleEditSuccess = (updated: Listing) => {
+    setListing(updated);
+    setNotice({ type: "success", message: "Listing updated." });
+    setIsEditOpen(false);
+  };
+
+  const handleDelete = async () => {
+    if (!isAuthenticated || !token) {
+      openAuthModal("login");
+      return;
+    }
+    if (!listing) {
+      return;
+    }
+    setIsDeleting(true);
+    setNotice(null);
+    try {
+      await deleteListing(listing.id, token);
+      setNotice({ type: "success", message: "Listing deleted." });
+      router.push("/marketplace");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to delete listing.";
+      setNotice({ type: "error", message });
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteOpen(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
+      {notice && (
+        <div
+          className={`mb-6 rounded-3xl border px-5 py-4 text-sm font-semibold ${
+            notice.type === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-rose-200 bg-rose-50 text-rose-600"
+          }`}
+        >
+          {notice.message}
+        </div>
+      )}
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)]">
         <div className="space-y-6">
           <div className="overflow-hidden rounded-3xl border border-card-border/70 bg-white/90 shadow-[0_20px_60px_rgba(30,26,22,0.08)]">
@@ -177,10 +222,20 @@ export default function ListingDetailPage() {
               </button>
               {isSeller && (
                 <div className="flex gap-3">
-                  <Button variant="outline" requiresAuth={false} className="flex-1">
+                  <Button
+                    variant="outline"
+                    requiresAuth={false}
+                    className="flex-1"
+                    onClick={() => setIsEditOpen(true)}
+                  >
                     Edit Listing
                   </Button>
-                  <Button variant="outline" requiresAuth={false} className="flex-1">
+                  <Button
+                    variant="outline"
+                    requiresAuth={false}
+                    className="flex-1 text-rose-500 hover:border-rose-200 hover:text-rose-600"
+                    onClick={() => setIsDeleteOpen(true)}
+                  >
                     Delete
                   </Button>
                 </div>
@@ -192,6 +247,43 @@ export default function ListingDetailPage() {
           </div>
         </div>
       </div>
+
+      {listing && (
+        <EditListingModal
+          isOpen={isEditOpen}
+          listing={listing}
+          onClose={() => setIsEditOpen(false)}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
+      {isDeleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 py-8">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
+            <div className="border-b border-gray-100 px-6 py-4">
+              <h3 className="font-display text-xl font-semibold text-ink">
+                Delete this listing?
+              </h3>
+              <p className="mt-2 text-sm text-muted">
+                This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 px-6 py-6 sm:flex-row sm:justify-end">
+              <Button variant="outline" requiresAuth={false} onClick={() => setIsDeleteOpen(false)}>
+                Cancel
+              </Button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleDelete}
+                className="inline-flex items-center justify-center rounded-lg bg-rose-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(244,63,94,0.3)] transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -95,6 +95,7 @@ export const postListing = async (req: Request, res: Response) => {
       price: req.body?.price,
       category: req.body?.category,
       condition: req.body?.condition,
+      location: req.body?.location,
       images: req.body?.images,
     });
 
@@ -120,8 +121,8 @@ export const putListing = async (req: Request, res: Response) => {
       price: req.body?.price,
       category: req.body?.category,
       condition: req.body?.condition,
+      location: req.body?.location,
       images: req.body?.images,
-      status: req.body?.status,
     });
 
     res.json({ listing });
