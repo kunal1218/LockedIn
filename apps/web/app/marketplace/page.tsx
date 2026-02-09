@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/Button";
 import { ListingCard } from "@/features/marketplace/ListingCard";
 import type { Listing } from "@/features/marketplace/types";
@@ -47,7 +48,7 @@ const categories = [
 ];
 
 export default function MarketplacePage() {
-  const activeCategory = "All";
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const mockListings: Listing[] = [
     {
       id: "1",
@@ -138,6 +139,10 @@ export default function MarketplacePage() {
       createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
     },
   ];
+  const filteredListings =
+    selectedCategory === "All"
+      ? mockListings
+      : mockListings.filter((listing) => listing.category === selectedCategory);
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-8">
@@ -170,18 +175,21 @@ export default function MarketplacePage() {
         </p>
         <div className="flex flex-wrap gap-2">
           {categories.map((category) => {
-            const isActive = category === activeCategory;
+            const isActive = category === selectedCategory;
             return (
               <button
                 key={category}
                 type="button"
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                onClick={() => setSelectedCategory(category)}
+                className={`cursor-pointer rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200 ${
                   isActive
                     ? "bg-orange-100 text-orange-600"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
-                {category}
+                {category === "All"
+                  ? `All (${mockListings.length})`
+                  : category}
               </button>
             );
           })}
@@ -189,12 +197,14 @@ export default function MarketplacePage() {
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {mockListings.length === 0 ? (
+        {filteredListings.length === 0 ? (
           <div className="col-span-full flex items-center justify-center py-16">
             <div className="text-center">
               <ShoppingBagIcon className="mx-auto mb-4 h-20 w-20 text-orange-500" />
               <h2 className="mb-2 text-xl font-semibold text-gray-900">
-                No listings yet
+                {selectedCategory === "All"
+                  ? "No listings yet"
+                  : `No ${selectedCategory} found`}
               </h2>
               <p className="mb-6 text-sm text-gray-600">
                 Be the first to sell something!
@@ -208,7 +218,7 @@ export default function MarketplacePage() {
             </div>
           </div>
         ) : (
-          mockListings.map((listing) => (
+          filteredListings.map((listing) => (
             <ListingCard key={listing.id} listing={listing} />
           ))
         )}
