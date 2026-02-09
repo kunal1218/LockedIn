@@ -49,6 +49,7 @@ const categories = [
 
 export default function MarketplacePage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const mockListings: Listing[] = [
     {
       id: "1",
@@ -139,10 +140,19 @@ export default function MarketplacePage() {
       createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
     },
   ];
-  const filteredListings =
-    selectedCategory === "All"
-      ? mockListings
-      : mockListings.filter((listing) => listing.category === selectedCategory);
+  const filteredListings = mockListings
+    .filter(
+      (listing) =>
+        selectedCategory === "All" || listing.category === selectedCategory
+    )
+    .filter((listing) => {
+      if (!searchQuery.trim()) return true;
+      const query = searchQuery.toLowerCase();
+      return (
+        listing.title.toLowerCase().includes(query) ||
+        listing.description.toLowerCase().includes(query)
+      );
+    });
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-8">
@@ -164,6 +174,8 @@ export default function MarketplacePage() {
           <input
             type="text"
             placeholder="Search for textbooks, furniture, electronics..."
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
             className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 pl-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
           />
         </div>
@@ -202,9 +214,13 @@ export default function MarketplacePage() {
             <div className="text-center">
               <ShoppingBagIcon className="mx-auto mb-4 h-20 w-20 text-orange-500" />
               <h2 className="mb-2 text-xl font-semibold text-gray-900">
-                {selectedCategory === "All"
-                  ? "No listings yet"
-                  : `No ${selectedCategory} found`}
+                {searchQuery.trim() && selectedCategory !== "All"
+                  ? `No ${selectedCategory} found matching '${searchQuery.trim()}'`
+                  : searchQuery.trim()
+                    ? `No results found for '${searchQuery.trim()}'`
+                    : selectedCategory === "All"
+                      ? "No listings yet"
+                      : `No ${selectedCategory} found`}
               </h2>
               <p className="mb-6 text-sm text-gray-600">
                 Be the first to sell something!
