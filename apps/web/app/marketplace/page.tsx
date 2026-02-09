@@ -1,6 +1,8 @@
 "use client";
 
 import { Button } from "@/components/Button";
+import { ListingCard } from "@/features/marketplace/ListingCard";
+import type { Listing } from "@/features/marketplace/types";
 
 const ShoppingBagIcon = ({ className }: { className?: string }) => (
   <svg
@@ -46,6 +48,96 @@ const categories = [
 
 export default function MarketplacePage() {
   const activeCategory = "All";
+  const mockListings: Listing[] = [
+    {
+      id: "1",
+      title: "Calculus Textbook - 8th Edition",
+      description: "Barely used calculus textbook",
+      price: 45,
+      category: "Textbooks",
+      condition: "Like New",
+      images: [],
+      seller: { id: "1", username: "john_doe", name: "John Doe" },
+      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: "2",
+      title: "Gaming Mouse - Logitech G502",
+      description: "Wireless gaming mouse, works perfectly",
+      price: 30,
+      category: "Electronics",
+      condition: "Good",
+      images: [],
+      seller: { id: "2", username: "jane_smith", name: "Jane Smith" },
+      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: "3",
+      title: "Desk Lamp - IKEA",
+      description: "White desk lamp, adjustable",
+      price: 15,
+      category: "Furniture",
+      condition: "Good",
+      images: [],
+      seller: { id: "3", username: "mike_wong", name: "Mike Wong" },
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: "4",
+      title: "UW-Madison Hoodie - Size M",
+      description: "Official UW hoodie, red",
+      price: 25,
+      category: "Clothing",
+      condition: "Like New",
+      images: [],
+      seller: { id: "4", username: "sarah_lee", name: "Sarah Lee" },
+      createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: "5",
+      title: "Mini Fridge - Compact",
+      description: "Perfect for dorm room",
+      price: 80,
+      category: "Furniture",
+      condition: "Good",
+      images: [],
+      seller: { id: "5", username: "tom_chen", name: "Tom Chen" },
+      createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: "6",
+      title: "Mechanical Keyboard",
+      description: "Cherry MX Blue switches",
+      price: 60,
+      category: "Electronics",
+      condition: "Like New",
+      images: [],
+      seller: { id: "6", username: "amy_park", name: "Amy Park" },
+      createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: "7",
+      title: "Chemistry Lab Goggles",
+      description: "Required for CHEM 103",
+      price: 10,
+      category: "Other",
+      condition: "New",
+      images: [],
+      seller: { id: "7", username: "alex_nguyen", name: "Alex Nguyen" },
+      createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: "8",
+      title: "Standing Desk Converter",
+      description: "Adjustable height, barely used",
+      price: 50,
+      category: "Furniture",
+      condition: "Like New",
+      images: [],
+      seller: { id: "8", username: "ben_taylor", name: "Ben Taylor" },
+      createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+    },
+  ];
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-8">
@@ -97,23 +189,29 @@ export default function MarketplacePage() {
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        <div className="col-span-full flex items-center justify-center py-16">
-          <div className="text-center">
-            <ShoppingBagIcon className="mx-auto mb-4 h-20 w-20 text-orange-500" />
-            <h2 className="mb-2 text-xl font-semibold text-gray-900">
-              No listings yet
-            </h2>
-            <p className="mb-6 text-sm text-gray-600">
-              Be the first to sell something!
-            </p>
-            <button
-              type="button"
-              className="inline-flex items-center justify-center rounded-lg border-2 border-orange-500 px-5 py-2.5 text-sm font-semibold text-orange-500 transition hover:bg-orange-50"
-            >
-              Post Listing
-            </button>
+        {mockListings.length === 0 ? (
+          <div className="col-span-full flex items-center justify-center py-16">
+            <div className="text-center">
+              <ShoppingBagIcon className="mx-auto mb-4 h-20 w-20 text-orange-500" />
+              <h2 className="mb-2 text-xl font-semibold text-gray-900">
+                No listings yet
+              </h2>
+              <p className="mb-6 text-sm text-gray-600">
+                Be the first to sell something!
+              </p>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-lg border-2 border-orange-500 px-5 py-2.5 text-sm font-semibold text-orange-500 transition hover:bg-orange-50"
+              >
+                Post Listing
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          mockListings.map((listing) => (
+            <ListingCard key={listing.id} listing={listing} />
+          ))
+        )}
       </div>
     </div>
   );
