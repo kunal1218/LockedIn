@@ -86,6 +86,13 @@ export default function NotificationsPage() {
     new Set()
   );
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [clubDecisionError, setClubDecisionError] = useState<string | null>(null);
+  const [clubDecisionLoading, setClubDecisionLoading] = useState<Set<string>>(
+    new Set()
+  );
+  const [clubDecisionByNotification, setClubDecisionByNotification] = useState<
+    Record<string, "approved" | "denied">
+  >({});
 
   const refreshFriendRequests = useCallback(async () => {
     if (!token) {
@@ -249,6 +256,49 @@ export default function NotificationsPage() {
     }
   };
 
+  const handleClubDecision = async (
+    notificationId: string,
+    clubId: string | null,
+    applicantId: string | null,
+    decision: "approve" | "deny"
+  ) => {
+    if (!token) {
+      openAuthModal("login");
+      return;
+    }
+    if (!clubId || !applicantId) {
+      setClubDecisionError("Missing club or applicant details.");
+      return;
+    }
+    setClubDecisionError(null);
+    setClubDecisionLoading((prev) => new Set(prev).add(notificationId));
+    try {
+      await apiPost(
+        `/clubs/${encodeURIComponent(clubId)}/applications/${encodeURIComponent(
+          applicantId
+        )}/${decision}`,
+        {},
+        token
+      );
+      setClubDecisionByNotification((prev) => ({
+        ...prev,
+        [notificationId]: decision === "approve" ? "approved" : "denied",
+      }));
+    } catch (decisionError) {
+      setClubDecisionError(
+        decisionError instanceof Error
+          ? decisionError.message
+          : "Unable to update that application."
+      );
+    } finally {
+      setClubDecisionLoading((prev) => {
+        const next = new Set(prev);
+        next.delete(notificationId);
+        return next;
+      });
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="mx-auto max-w-4xl px-4 pb-16 pt-2">
@@ -287,6 +337,12 @@ export default function NotificationsPage() {
         {connectError && (
           <Card className="border border-accent/30 bg-accent/10 py-4">
             <p className="text-sm font-semibold text-accent">{connectError}</p>
+          </Card>
+        )}
+
+        {clubDecisionError && (
+          <Card className="border border-accent/30 bg-accent/10 py-4">
+            <p className="text-sm font-semibold text-accent">{clubDecisionError}</p>
           </Card>
         )}
 
@@ -380,6 +436,16 @@ export default function NotificationsPage() {
                     : relationship === "incoming"
                       ? "They requested you"
                       : null;
+              const isClubApplication = notification.type === "club_application";
+              const clubTitle =
+                notification.messagePreview || "your club";
+              const clubDecision = clubDecisionByNotification[notification.id];
+              const canDecideClub =
+                isClubApplication &&
+                !clubDecision &&
+                Boolean(notification.contextId) &&
+                Boolean(notification.actor?.id);
+              const isDecidingClub = clubDecisionLoading.has(notification.id);
               return (
                 <div
                   key={notification.id}
@@ -391,6 +457,8 @@ export default function NotificationsPage() {
                         ? `New message from ${actorHandle || "someone"}`
                         : notification.type === "request_help"
                           ? `${notification.actor?.name ?? "Someone"} wants to help`
+                          : notification.type === "club_application"
+                            ? `${notification.actor?.name ?? "Someone"} wants to join`
                           : "New update"}
                     </p>
                     {notification.type === "message" && (
@@ -405,6 +473,12 @@ export default function NotificationsPage() {
                         .
                       </p>
                     )}
+                    {notification.type === "club_application" && (
+                      <p className="text-xs text-muted">
+                        {notification.actor?.name ?? "Someone"} applied to join{" "}
+                        {clubTitle}.
+                      </p>
+                    )}
                     <p className="text-xs text-muted">
                       {formatRelativeTime(notification.createdAt)}
                     </p>
@@ -413,6 +487,11 @@ export default function NotificationsPage() {
                     {isUnread && (
                       <span className="rounded-full bg-accent/20 px-3 py-1 text-xs font-semibold text-accent">
                         New
+                      </span>
+                    )}
+                    {notification.type === "club_application" && clubDecision && (
+                      <span className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted">
+                        {clubDecision === "approved" ? "Approved" : "Denied"}
                       </span>
                     )}
                     {notification.type === "message" && actorSlug && (
@@ -440,6 +519,40 @@ export default function NotificationsPage() {
                             {connectingHandles.has(actorSlug) ? "Sending..." : "Connect"}
                           </button>
                         )}
+                      </>
+                    )}
+                    {notification.type === "club_application" && canDecideClub && (
+                      <>
+                        <button
+                          type="button"
+                          className={acceptClasses}
+                          onClick={() =>
+                            handleClubDecision(
+                              notification.id,
+                              notification.contextId,
+                              notification.actor?.id ?? null,
+                              "approve"
+                            )
+                          }
+                          disabled={isDecidingClub}
+                        >
+                          {isDecidingClub ? "Saving..." : "Approve"}
+                        </button>
+                        <button
+                          type="button"
+                          className={declineClasses}
+                          onClick={() =>
+                            handleClubDecision(
+                              notification.id,
+                              notification.contextId,
+                              notification.actor?.id ?? null,
+                              "deny"
+                            )
+                          }
+                          disabled={isDecidingClub}
+                        >
+                          Decline
+                        </button>
                       </>
                     )}
                   </div>

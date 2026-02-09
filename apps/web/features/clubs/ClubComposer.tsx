@@ -35,6 +35,8 @@ export const ClubComposer = ({
   const [category, setCategory] = useState<ClubCategory>("social");
   const [city, setCity] = useState("");
   const [isRemote, setIsRemote] = useState(false);
+  const [joinPolicy, setJoinPolicy] =
+    useState<ClubComposerPayload["joinPolicy"]>("open");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageName, setImageName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,12 +63,14 @@ export const ClubComposer = ({
         city: isRemote ? null : city.trim(),
         isRemote,
         imageUrl,
+        joinPolicy,
       });
       setTitle("");
       setDescription("");
       setCategory("social");
       setCity("");
       setIsRemote(false);
+      setJoinPolicy("open");
       setImageUrl(null);
       setImageName(null);
     } catch (err) {
@@ -170,6 +174,21 @@ export const ClubComposer = ({
             </label>
           </label>
         </div>
+
+        <label className="block space-y-2">
+          <span className={labelClasses}>Join access</span>
+          <select
+            className={`${inputClasses} appearance-none`}
+            value={joinPolicy}
+            onChange={(event) =>
+              setJoinPolicy(event.target.value as ClubComposerPayload["joinPolicy"])
+            }
+            disabled={disabled}
+          >
+            <option value="open">Open to all</option>
+            <option value="application">Requires approval</option>
+          </select>
+        </label>
 
         <label className="block space-y-2">
           <span className={labelClasses}>Club image</span>

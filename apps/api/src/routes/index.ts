@@ -14,6 +14,7 @@ import profileRoutes from "./profileRoutes";
 import rankedRoutes from "./rankedRoutes";
 import requestsRoutes from "./requestsRoutes";
 import pokerRoutes from "./pokerRoutes";
+import clubsRoutes from "./clubsRoutes";
 
 export const registerRoutes = (app: Express) => {
   app.get("/health", (_req, res) => {
@@ -35,4 +36,5 @@ export const registerRoutes = (app: Express) => {
   app.use("/profile", profileRoutes);
   app.use("/ranked", rankedRoutes);
   app.use("/poker", pokerRoutes);
+  app.use("/clubs", clubsRoutes);
 };

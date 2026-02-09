@@ -14,6 +14,7 @@ export type Club = {
   city: string | null;
   location: string;
   isRemote: boolean;
+  joinPolicy: "open" | "application";
   distanceKm?: number | null;
   memberCount: number;
   createdAt: string;
@@ -24,6 +25,7 @@ export type Club = {
     handle: string;
   };
   joinedByUser?: boolean;
+  applicationStatus?: "pending" | "approved" | "denied" | null;
 };
 
 export type ClubComposerPayload = {
@@ -33,4 +35,5 @@ export type ClubComposerPayload = {
   city: string | null;
   isRemote: boolean;
   imageUrl?: string | null;
+  joinPolicy: "open" | "application";
 };

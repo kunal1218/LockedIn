@@ -1,15 +1,15 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { useAuth } from "@/features/auth";
+import { apiGet, apiPost } from "@/lib/api";
 import {
   ClubCard,
   ClubComposer,
   ClubFilters,
-  mockClubs,
   type Club,
   type ClubComposerPayload,
   type ClubRecencyFilter,
@@ -23,14 +23,10 @@ const recencyToHours: Record<Exclude<ClubRecencyFilter, "all">, number> = {
   "168h": 168,
 };
 
-const buildClubId = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `club-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-
 export default function ClubsPage() {
   const { token, isAuthenticated, openAuthModal, user } = useAuth();
-  const [clubs, setClubs] = useState<Club[]>(mockClubs);
+  const [clubs, setClubs] = useState<Club[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [recency, setRecency] = useState<ClubRecencyFilter>("24h");
   const [category, setCategory] = useState<ClubCategoryFilter>("all");
   const [sortBy, setSortBy] = useState<ClubSortOption>("distance");
@@ -38,9 +34,6 @@ export default function ClubsPage() {
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [joiningIds, setJoiningIds] = useState<Set<string>>(new Set());
-  const [joinedIds, setJoinedIds] = useState<Set<string>>(
-    new Set(mockClubs.filter((club) => club.joinedByUser).map((club) => club.id))
-  );
   const [error, setError] = useState<string | null>(null);
 
   const sortedClubs = useMemo(() => {
@@ -64,13 +57,9 @@ export default function ClubsPage() {
     const byProximity =
       proximity === "all"
         ? byCategory
-        : byCategory.filter((club) => {
-            if (proximity === "remote") {
-              return club.isRemote;
-            }
-            const distance = club.distanceKm ?? Number.POSITIVE_INFINITY;
-            return !club.isRemote && distance <= 10;
-          });
+        : byCategory.filter((club) =>
+            proximity === "remote" ? club.isRemote : !club.isRemote
+          );
 
     const compareRecency = (a: Club, b: Club) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -101,6 +90,29 @@ export default function ClubsPage() {
     return [...byProximity].sort(sorter);
   }, [category, clubs, proximity, recency, sortBy]);
 
+  const loadClubs = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await apiGet<{ clubs: Club[] }>(
+        "/clubs",
+        token ?? undefined
+      );
+      setClubs(response.clubs ?? []);
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error ? loadError.message : "Unable to load clubs."
+      );
+      setClubs([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadClubs();
+  }, [loadClubs]);
+
   const handleCreateClub = useCallback(
     async (payload: ClubComposerPayload) => {
       if (!token) {
@@ -110,29 +122,14 @@ export default function ClubsPage() {
       setIsPosting(true);
       setError(null);
       try {
-        const newClub: Club = {
-          id: buildClubId(),
-          title: payload.title,
-          description: payload.description,
-          category: payload.category,
-          city: payload.city,
-          location: payload.isRemote ? "Remote" : payload.city ?? "Campus",
-          isRemote: payload.isRemote,
-          distanceKm: payload.isRemote
-            ? null
-            : Math.max(0.5, Math.round((Math.random() * 6 + 0.5) * 10) / 10),
-          memberCount: 1,
-          createdAt: new Date().toISOString(),
-          imageUrl: payload.imageUrl ?? null,
-          creator: {
-            id: user?.id ?? "you",
-            name: user?.name ?? "You",
-            handle: user?.handle ?? "@you",
-          },
-          joinedByUser: true,
-        };
-        setClubs((prev) => [newClub, ...prev]);
-        setJoinedIds((prev) => new Set(prev).add(newClub.id));
+        const response = await apiPost<{ club: Club }>(
+          "/clubs",
+          payload,
+          token
+        );
+        if (response.club) {
+          setClubs((prev) => [response.club, ...prev]);
+        }
         setComposerOpen(false);
       } catch (postError) {
         setError(
@@ -144,7 +141,7 @@ export default function ClubsPage() {
         setIsPosting(false);
       }
     },
-    [openAuthModal, token, user?.handle, user?.id, user?.name]
+    [openAuthModal, token]
   );
 
   const handleJoin = useCallback(
@@ -154,39 +151,34 @@ export default function ClubsPage() {
         return;
       }
       setError(null);
-      const isJoined = joinedIds.has(club.id);
+      if (club.joinPolicy === "application" && club.applicationStatus === "pending") {
+        return;
+      }
+      const isJoined = Boolean(club.joinedByUser);
       setJoiningIds((prev) => new Set(prev).add(club.id));
       try {
         if (isJoined) {
-          setJoinedIds((prev) => {
-            const next = new Set(prev);
-            next.delete(club.id);
-            return next;
-          });
-          setClubs((prev) =>
-            prev.map((item) =>
-              item.id === club.id
-                ? {
-                    ...item,
-                    joinedByUser: false,
-                    memberCount: Math.max(0, item.memberCount - 1),
-                  }
-                : item
-            )
+          const response = await apiPost<{ club: Club }>(
+            `/clubs/${encodeURIComponent(club.id)}/leave`,
+            {},
+            token
           );
+          if (response.club) {
+            setClubs((prev) =>
+              prev.map((item) => (item.id === club.id ? response.club : item))
+            );
+          }
         } else {
-          setJoinedIds((prev) => new Set(prev).add(club.id));
-          setClubs((prev) =>
-            prev.map((item) =>
-              item.id === club.id
-                ? {
-                    ...item,
-                    joinedByUser: true,
-                    memberCount: item.memberCount + 1,
-                  }
-                : item
-            )
+          const response = await apiPost<{ club: Club }>(
+            `/clubs/${encodeURIComponent(club.id)}/join`,
+            {},
+            token
           );
+          if (response.club) {
+            setClubs((prev) =>
+              prev.map((item) => (item.id === club.id ? response.club : item))
+            );
+          }
         }
       } catch (joinError) {
         setError(
@@ -200,7 +192,7 @@ export default function ClubsPage() {
         });
       }
     },
-    [joinedIds, openAuthModal, token]
+    [openAuthModal, token]
   );
 
   return (
@@ -244,7 +236,11 @@ export default function ClubsPage() {
                 <p className="text-sm font-semibold text-accent">{error}</p>
               </Card>
             )}
-            {sortedClubs.length === 0 ? (
+            {isLoading ? (
+              <Card className="py-10 text-center text-sm text-muted">
+                Loading clubs...
+              </Card>
+            ) : sortedClubs.length === 0 ? (
               <Card className="py-10 text-center text-sm text-muted">
                 No clubs match those filters yet. Start the first one.
               </Card>
@@ -256,7 +252,7 @@ export default function ClubsPage() {
                     club={club}
                     onJoin={handleJoin}
                     isJoining={joiningIds.has(club.id)}
-                    hasJoined={joinedIds.has(club.id)}
+                    hasJoined={club.joinedByUser}
                     isOwnClub={club.creator.id === user?.id}
                   />
                 ))}

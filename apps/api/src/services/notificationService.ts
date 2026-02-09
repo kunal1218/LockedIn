@@ -173,6 +173,37 @@ export const createRequestHelpNotification = async (params: {
   );
 };
 
+export const createClubApplicationNotification = async (params: {
+  recipientId: string;
+  actorId: string;
+  clubId: string;
+  clubTitle: string;
+  applicationId: string;
+}) => {
+  if (params.recipientId === params.actorId) {
+    return;
+  }
+
+  await ensureNotificationsTable();
+  const id = randomUUID();
+  const preview = trimPreview(params.clubTitle);
+
+  await db.query(
+    `INSERT INTO notifications (
+      id, user_id, actor_id, type, message_id, message_preview, context_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      id,
+      params.recipientId,
+      params.actorId,
+      "club_application",
+      params.applicationId,
+      preview,
+      params.clubId,
+    ]
+  );
+};
+
 export const deleteRequestHelpNotification = async (params: {
   recipientId: string;
   actorId: string;

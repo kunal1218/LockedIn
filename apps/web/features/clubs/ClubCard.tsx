@@ -14,9 +14,14 @@ export const ClubCard = ({
   club,
   onJoin,
   isJoining = false,
-  hasJoined = false,
+  hasJoined,
   isOwnClub = false,
 }: ClubCardProps) => {
+  const joined = typeof hasJoined === "boolean" ? hasJoined : Boolean(club.joinedByUser);
+  const isApplication = club.joinPolicy === "application";
+  const applicationStatus = club.applicationStatus ?? null;
+  const isPending = isApplication && applicationStatus === "pending";
+  const isDenied = isApplication && applicationStatus === "denied";
   const locationLabel = club.isRemote
     ? "Remote"
     : club.city
@@ -51,23 +56,33 @@ export const ClubCard = ({
             <span>{club.category}</span>
             <span className="h-1 w-1 rounded-full bg-card-border/70" />
             <span>{club.memberCount} members</span>
+            {isApplication && (
+              <>
+                <span className="h-1 w-1 rounded-full bg-card-border/70" />
+                <span>Application</span>
+              </>
+            )}
           </div>
           {!isOwnClub && (
             <button
               type="button"
-              aria-label={hasJoined ? "Leave club" : "Join club"}
+              aria-label={joined ? "Leave club" : "Join club"}
               className={`inline-flex items-center justify-center rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold transition ${
-                hasJoined
+                joined
                   ? "border-emerald-500 bg-emerald-500 text-white"
+                  : isPending
+                    ? "border-amber-300 bg-amber-100 text-amber-800"
+                    : isDenied
+                      ? "border-rose-300 bg-rose-50 text-rose-700"
                   : "text-muted hover:border-emerald-400 hover:text-emerald-600"
               }`}
               onClick={(event) => {
                 event.stopPropagation();
                 onJoin?.(club);
               }}
-              disabled={isJoining}
+              disabled={isJoining || isPending}
             >
-              ✓
+              {joined ? "✓" : isPending ? "Pending" : isDenied ? "Reapply" : "✓"}
             </button>
           )}
         </div>
