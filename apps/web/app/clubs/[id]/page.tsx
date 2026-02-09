@@ -112,6 +112,7 @@ export default function ClubDetailPage() {
   const [shareUrl, setShareUrl] = useState("");
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const chatInputRef = useRef<HTMLInputElement | null>(null);
   const autoJoinRef = useRef(false);
 
   const isOwner = club?.creator?.id && user?.id === club.creator.id;
@@ -247,6 +248,10 @@ export default function ClubDetailPage() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, activeChannel]);
+
+  useEffect(() => {
+    chatInputRef.current?.focus();
+  }, [activeChannel]);
 
   const handleSend = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -424,11 +429,13 @@ export default function ClubDetailPage() {
             className="flex flex-wrap items-center gap-3 border-t border-card-border/60 px-6 py-4"
           >
             <input
+              ref={chatInputRef}
               className="flex-1 rounded-2xl border border-card-border/70 bg-white/90 px-4 py-3 text-sm text-ink placeholder:text-muted/60 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
               value={chatDraft}
               onChange={(event) => setChatDraft(event.target.value)}
               placeholder={`Message ${activeChannelMeta?.label ?? "the group"}`}
               disabled={isSending}
+              autoFocus
             />
             <Button type="submit" requiresAuth={false} disabled={isSending}>
               {isSending ? "Sending..." : "Send"}
