@@ -81,7 +81,7 @@ export default function MarketplacePage() {
             Marketplace
           </h1>
           <p className="mt-2 text-base text-gray-600">
-            Buy and sell with students at UW-Madison
+            Buy and sell with ease
           </p>
         </div>
         <Button requiresAuth={false} onClick={() => setIsModalOpen(true)}>
