@@ -44,7 +44,6 @@ const baseNavItems: NavItem[] = [
     label: "Marketplace",
     icon: <ShoppingBagIcon className="h-4 w-4" />,
   },
-  { href: "/marketplace/messages", label: "Marketplace Messages" },
 ];
 
 export const SiteHeader = () => {
