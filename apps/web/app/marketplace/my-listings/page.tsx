@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/Button";
 import { CreateListingModal } from "@/features/marketplace/CreateListingModal";
 import { EditListingModal } from "@/features/marketplace/EditListingModal";
@@ -150,9 +151,17 @@ export default function MyListingsPage() {
             Keep tabs on everything you have posted.
           </p>
         </div>
-        <Button requiresAuth={false} onClick={() => setIsCreateOpen(true)}>
-          Post Listing
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/marketplace/messages"
+            className="inline-flex items-center justify-center rounded-full border border-card-border bg-white/80 px-4 py-2 text-sm font-semibold text-ink transition hover:border-accent/60"
+          >
+            Marketplace Messages
+          </Link>
+          <Button requiresAuth={false} onClick={() => setIsCreateOpen(true)}>
+            Post Listing
+          </Button>
+        </div>
       </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2">

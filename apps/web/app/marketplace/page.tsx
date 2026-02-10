@@ -86,6 +86,12 @@ export default function MarketplacePage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <Link
+            href="/marketplace/messages"
+            className="inline-flex items-center justify-center rounded-full border border-card-border bg-white/80 px-4 py-2 text-sm font-semibold text-ink transition hover:border-accent/60"
+          >
+            Marketplace Messages
+          </Link>
+          <Link
             href="/marketplace/my-listings"
             className="inline-flex items-center justify-center rounded-full border border-card-border bg-white/80 px-4 py-2 text-sm font-semibold text-ink transition hover:border-accent/60"
           >

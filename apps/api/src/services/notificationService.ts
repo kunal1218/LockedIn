@@ -141,6 +141,41 @@ export const createMessageNotification = async (params: {
   );
 };
 
+export const createMarketplaceMessageNotification = async (params: {
+  recipientId: string;
+  actorId: string;
+  messageId: string;
+  messageBody: string;
+  conversationId: string;
+  listingTitle: string;
+}) => {
+  if (params.recipientId === params.actorId) {
+    return;
+  }
+
+  await ensureNotificationsTable();
+  const id = randomUUID();
+  const previewSource = params.listingTitle
+    ? `${params.listingTitle}: ${params.messageBody}`
+    : params.messageBody;
+  const preview = trimPreview(previewSource);
+
+  await db.query(
+    `INSERT INTO notifications (
+      id, user_id, actor_id, type, message_id, message_preview, context_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      id,
+      params.recipientId,
+      params.actorId,
+      "marketplace_message",
+      params.messageId,
+      preview,
+      params.conversationId,
+    ]
+  );
+};
+
 export const createRequestHelpNotification = async (params: {
   recipientId: string;
   actorId: string;
@@ -285,5 +320,21 @@ export const markMessageNotificationsRead = async (
        AND type = 'message'
        AND read_at IS NULL`,
     [userId, actorId]
+  );
+};
+
+export const markMarketplaceMessageNotificationsRead = async (
+  userId: string,
+  conversationId: string
+) => {
+  await ensureNotificationsTable();
+  await db.query(
+    `UPDATE notifications
+     SET read_at = now()
+     WHERE user_id = $1
+       AND type = 'marketplace_message'
+       AND context_id = $2
+       AND read_at IS NULL`,
+    [userId, conversationId]
   );
 };

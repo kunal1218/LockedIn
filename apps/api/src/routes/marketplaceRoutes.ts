@@ -10,6 +10,12 @@ import {
   postListing,
   putListing,
 } from "../controllers/marketplaceController";
+import {
+  getMarketplaceConversationMessages,
+  listMarketplaceConversations,
+  postMarketplaceConversationMessage,
+  startListingConversation,
+} from "../controllers/marketplaceConversationController";
 import type { NextFunction, Request, Response } from "express";
 import { marketplaceImageUpload, MAX_MARKETPLACE_IMAGES } from "../middleware/upload";
 
@@ -28,6 +34,16 @@ const handleListingImageUpload = (req: Request, res: Response, next: NextFunctio
 router.get("/listings", getListings);
 router.get("/listings/:id", getListing);
 router.get("/my-listings", getMyListings);
+router.post("/listings/:listingId/message", startListingConversation);
+router.get("/conversations", listMarketplaceConversations);
+router.get(
+  "/conversations/:conversationId/messages",
+  getMarketplaceConversationMessages
+);
+router.post(
+  "/conversations/:conversationId/messages",
+  postMarketplaceConversationMessage
+);
 router.post("/listings", postListing);
 router.put("/listings/:id", putListing);
 router.patch("/listings/:id/status", patchListingStatus);

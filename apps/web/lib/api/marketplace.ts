@@ -1,4 +1,8 @@
 import type { Listing } from "@/features/marketplace/types";
+import type {
+  MarketplaceConversation,
+  MarketplaceMessage,
+} from "@/features/marketplace/messages/types";
 import { API_BASE_URL, apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api";
 
 export const createListing = async (
@@ -95,6 +99,53 @@ export const updateListingStatus = async (
     token ?? undefined
   );
   return response.listing;
+};
+
+export const startMarketplaceConversation = async (
+  listingId: string,
+  content: string,
+  token?: string | null
+): Promise<{ conversationId: string; message: MarketplaceMessage }> => {
+  const response = await apiPost<{ conversationId: string; message: MarketplaceMessage }>(
+    `/marketplace/listings/${encodeURIComponent(listingId)}/message`,
+    { content },
+    token ?? undefined
+  );
+  return response;
+};
+
+export const getMarketplaceConversations = async (
+  token?: string | null
+): Promise<MarketplaceConversation[]> => {
+  const response = await apiGet<{ conversations: MarketplaceConversation[] }>(
+    "/marketplace/conversations",
+    token ?? undefined
+  );
+  return response.conversations ?? [];
+};
+
+export const getMarketplaceConversationMessages = async (
+  conversationId: string,
+  token?: string | null
+): Promise<{ conversation: MarketplaceConversation; messages: MarketplaceMessage[] }> => {
+  const response = await apiGet<{
+    conversation: MarketplaceConversation;
+    messages: MarketplaceMessage[];
+  }>(`/marketplace/conversations/${encodeURIComponent(conversationId)}/messages`, token ?? undefined);
+  return response;
+};
+
+export const sendMarketplaceMessage = async (
+  conversationId: string,
+  content: string,
+  token?: string | null
+): Promise<MarketplaceMessage> => {
+  const response = await apiPost<{ message: MarketplaceMessage }>(
+    `/marketplace/conversations/${encodeURIComponent(conversationId)}/messages`,
+    { content },
+    token ?? undefined
+  );
+  return response.message;
 };
 
 const resolveErrorMessage = async (response: Response) => {

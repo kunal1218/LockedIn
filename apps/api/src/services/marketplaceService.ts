@@ -62,7 +62,7 @@ const toIsoString = (value: string | Date) =>
 
 let listingsReady: Promise<void> | null = null;
 
-const ensureListingsTable = async () => {
+export const ensureListingsTable = async () => {
   if (listingsReady) {
     return listingsReady;
   }

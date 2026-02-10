@@ -11,7 +11,12 @@ import { useAuth } from "@/features/auth";
 import { EditListingModal } from "@/features/marketplace/EditListingModal";
 import type { Listing } from "@/features/marketplace/types";
 import { IMAGE_BASE_URL } from "@/lib/api";
-import { deleteListing, fetchListingById, updateListingStatus } from "@/lib/api/marketplace";
+import {
+  deleteListing,
+  fetchListingById,
+  startMarketplaceConversation,
+  updateListingStatus,
+} from "@/lib/api/marketplace";
 import { formatRelativeTime } from "@/lib/time";
 
 const categoryStyles = {
@@ -69,6 +74,7 @@ export default function ListingDetailPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isMessagingSeller, setIsMessagingSeller] = useState(false);
 
   useEffect(() => {
     if (!listingId) {
@@ -133,9 +139,33 @@ export default function ListingDetailPage() {
   const styles = categoryStyles[listing.category] ?? categoryStyles.Other;
   const isSeller = user?.id === listing.seller.id;
   const isSold = listing.status === "sold";
-  const handleMessageSeller = () => {
-    const handle = listing.seller.username.replace(/^@/, "");
-    router.push(`/messages/${encodeURIComponent(handle)}`);
+  const handleMessageSeller = async () => {
+    if (!isAuthenticated || !token) {
+      openAuthModal("login");
+      return;
+    }
+    if (!listing) {
+      return;
+    }
+    if (!isSeller && isSold) {
+      return;
+    }
+    setIsMessagingSeller(true);
+    setNotice(null);
+    try {
+      const response = await startMarketplaceConversation(
+        listing.id,
+        `Hi! I'm interested in your listing: ${listing.title}`,
+        token
+      );
+      router.push(`/marketplace/messages/${response.conversationId}`);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Unable to start conversation.";
+      setNotice({ type: "error", message });
+    } finally {
+      setIsMessagingSeller(false);
+    }
   };
   const memberSince = new Date(listing.createdAt).getFullYear();
 
@@ -270,9 +300,9 @@ export default function ListingDetailPage() {
                 type="button"
                 className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(255,107,53,0.3)] transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={handleMessageSeller}
-                disabled={!isSeller && isSold}
+                disabled={(!isSeller && isSold) || isMessagingSeller}
               >
-                Message Seller
+                {isMessagingSeller ? "Opening..." : "Message Seller"}
               </button>
               {!isSeller && isSold && (
                 <p className="text-xs font-semibold text-rose-500">

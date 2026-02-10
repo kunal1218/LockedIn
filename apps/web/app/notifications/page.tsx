@@ -416,9 +416,12 @@ export default function NotificationsPage() {
               const actorHandle = notification.actor?.handle ?? "";
               const actorSlug = actorHandle.replace(/^@/, "");
               const isUnread = !notification.readAt;
+              const isMarketplaceMessage = notification.type === "marketplace_message";
               const messageLabel = notification.messagePreview
                 ? `"${notification.messagePreview}"`
-                : "Open the chat to respond.";
+                : isMarketplaceMessage
+                  ? "Open the listing chat to respond."
+                  : "Open the chat to respond.";
               const relationship = actorSlug
                 ? relationshipByHandle[actorSlug] ?? "unknown"
                 : "unknown";
@@ -455,13 +458,18 @@ export default function NotificationsPage() {
                     <p className="text-sm font-semibold text-ink">
                       {notification.type === "message"
                         ? `New message from ${actorHandle || "someone"}`
-                        : notification.type === "request_help"
-                          ? `${notification.actor?.name ?? "Someone"} wants to help`
-                          : notification.type === "club_application"
-                            ? `${notification.actor?.name ?? "Someone"} wants to join`
-                          : "New update"}
+                        : notification.type === "marketplace_message"
+                          ? `New marketplace message from ${actorHandle || "someone"}`
+                          : notification.type === "request_help"
+                            ? `${notification.actor?.name ?? "Someone"} wants to help`
+                            : notification.type === "club_application"
+                              ? `${notification.actor?.name ?? "Someone"} wants to join`
+                              : "New update"}
                     </p>
                     {notification.type === "message" && (
+                      <p className="text-xs text-muted">{messageLabel}</p>
+                    )}
+                    {notification.type === "marketplace_message" && (
                       <p className="text-xs text-muted">{messageLabel}</p>
                     )}
                     {notification.type === "request_help" && (
@@ -500,6 +508,14 @@ export default function NotificationsPage() {
                         className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
                       >
                         View chat
+                      </Link>
+                    )}
+                    {notification.type === "marketplace_message" && notification.contextId && (
+                      <Link
+                        href={`/marketplace/messages/${encodeURIComponent(notification.contextId)}`}
+                        className="rounded-full border border-card-border/70 px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent/40 hover:text-ink"
+                      >
+                        View listing chat
                       </Link>
                     )}
                     {notification.type === "request_help" && actorSlug && (
