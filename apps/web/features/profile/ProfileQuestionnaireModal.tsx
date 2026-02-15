@@ -115,7 +115,7 @@ export const ProfileQuestionnaireModal = ({
             <label className="block">
               <span className={labelClasses}>Question 1</span>
               <p className="mt-2 text-sm font-semibold text-ink">
-                If you guaranteed success, what career would you chose?
+                If you're guaranteed success, what career would you choose?
               </p>
               <input
                 className={stackedInputClasses}

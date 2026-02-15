@@ -868,7 +868,7 @@ export const PublicProfileView = ({ handle }: { handle: string }) => {
       case "question-career":
         return (
           <ProfileQuestionCard
-            title="If you guaranteed success, what career would you chose?"
+            title="If you're guaranteed success, what career would you choose?"
             answer={answers?.career}
           />
         );
