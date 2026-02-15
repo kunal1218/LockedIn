@@ -1,6 +1,6 @@
 "use client";
 
-import type { MouseEvent, ReactNode } from "react";
+import type { MouseEvent } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -12,25 +12,7 @@ import { Button } from "./Button";
 type NavItem = {
   href: string;
   label: string;
-  icon?: ReactNode;
 };
-
-const ShoppingBagIcon = ({ className }: { className?: string }) => (
-  <svg
-    viewBox="0 0 24 24"
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.7"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <path d="M6 8V7a6 6 0 0 1 12 0v1" />
-    <path d="M4 8h16l-1.5 12.5a2 2 0 0 1-2 1.5H7.5a2 2 0 0 1-2-1.5L4 8Z" />
-    <path d="M9 11a3 3 0 0 0 6 0" />
-  </svg>
-);
 
 const baseNavItems: NavItem[] = [
   { href: "/", label: "Home" },
@@ -39,11 +21,7 @@ const baseNavItems: NavItem[] = [
   { href: "/requests", label: "Requests" },
   { href: "/play", label: "Play" },
   { href: "/clubs", label: "Groups" },
-  {
-    href: "/marketplace",
-    label: "Marketplace",
-    icon: <ShoppingBagIcon className="h-4 w-4" />,
-  },
+  { href: "/marketplace", label: "Marketplace" },
 ];
 
 export const SiteHeader = () => {
@@ -134,7 +112,6 @@ export const SiteHeader = () => {
                 className={`${baseClasses} ${stateClasses}`}
                 onClick={handleNavClick(item.href)}
               >
-                {item.icon}
                 {item.label}
               </Link>
             );

@@ -86,7 +86,7 @@ export const MapControls = ({
           <div>
             <p className="text-sm font-semibold text-[#1F2937]">Share my location</p>
             <p className="mt-1 text-[11px] text-[#6B7280]">
-              Your friends can see you for the next 30 minutes.
+              Your friends can see your latest shared location.
             </p>
           </div>
           <button

@@ -65,7 +65,6 @@ export class MapError extends Error {
   }
 }
 
-const LOCATION_TTL_MINUTES = 30;
 const EMIT_DISTANCE_METERS = 10;
 const TELEPORT_DISTANCE_METERS = 1000;
 const TELEPORT_WINDOW_MS = 10_000;
@@ -569,7 +568,6 @@ export const fetchFriendLocations = async (
        AND locations.ghost_mode = false
        AND locations.latitude IS NOT NULL
        AND locations.longitude IS NOT NULL
-       AND locations.updated_at >= now() - INTERVAL '${LOCATION_TTL_MINUTES} minutes'
      ORDER BY locations.updated_at DESC`,
     [userId]
   );
@@ -608,7 +606,6 @@ export const fetchFriendLocations = async (
        AND locations.ghost_mode = false
        AND locations.latitude IS NOT NULL
        AND locations.longitude IS NOT NULL
-       AND locations.updated_at >= now() - INTERVAL '${LOCATION_TTL_MINUTES} minutes'
      LIMIT 1`,
     [userId]
   );
