@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth";
 import { apiGet } from "@/lib/api";
 import { Card } from "@/components/Card";
@@ -14,8 +15,11 @@ type LeaderboardEntry = {
   coins: number;
 };
 
+const toHandleSlug = (handle: string) => handle.replace(/^@/, "").trim();
+
 export default function LeaderboardPage() {
-  const { token, isAuthenticated, openAuthModal } = useAuth();
+  const { token, isAuthenticated, openAuthModal, user } = useAuth();
+  const router = useRouter();
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +117,26 @@ export default function LeaderboardPage() {
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-ink/10 text-xs font-semibold text-ink">
                     {index + 1}
                   </div>
-                  <Avatar name={entry.name} size={36} />
+                  <button
+                    type="button"
+                    className="rounded-full"
+                    onClick={() => {
+                      const handleSlug = toHandleSlug(entry.handle ?? "");
+                      const profileIdentifier = handleSlug || entry.id;
+                      if (!profileIdentifier) {
+                        return;
+                      }
+                      if (user?.id === entry.id) {
+                        router.push("/profile");
+                        return;
+                      }
+                      router.push(`/profile/${encodeURIComponent(profileIdentifier)}`);
+                    }}
+                    aria-label={`View ${entry.name} profile`}
+                    data-profile-link
+                  >
+                    <Avatar name={entry.name} size={36} />
+                  </button>
                   <div>
                     <p className="text-sm font-semibold text-ink">{entry.name}</p>
                     <p className="text-xs text-muted">{entry.handle}</p>
