@@ -475,6 +475,7 @@ export const updateListing = async (params: {
 export const deleteListing = async (params: {
   id: string;
   userId: string;
+  isAdmin?: boolean;
 }) => {
   await ensureListingsTable();
 
@@ -488,7 +489,7 @@ export const deleteListing = async (params: {
   }
 
   const existing = existingResult.rows[0] as { user_id: string };
-  if (existing.user_id !== params.userId) {
+  if (existing.user_id !== params.userId && !params.isAdmin) {
     throw new MarketplaceError("Not authorized to delete this listing", 403);
   }
 

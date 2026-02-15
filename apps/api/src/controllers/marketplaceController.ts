@@ -178,7 +178,7 @@ export const deleteListingById = async (req: Request, res: Response) => {
       throw new MarketplaceError("Listing id is required", 400);
     }
 
-    await deleteListing({ id: listingId, userId: user.id });
+    await deleteListing({ id: listingId, userId: user.id, isAdmin: user.isAdmin });
     res.json({ status: "deleted" });
   } catch (error) {
     handleError(res, error);
