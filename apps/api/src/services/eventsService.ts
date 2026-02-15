@@ -1026,17 +1026,25 @@ export const updateEvent = async (
   return mapEventRow(updatedResult.rows[0]);
 };
 
-export const deleteEvent = async (eventId: number, userId: string) => {
+export const deleteEvent = async (
+  eventId: number,
+  userId: string,
+  isAdmin?: boolean
+) => {
   await ensureEventsTables();
 
   const result = await db.query(
     `DELETE FROM events
-     WHERE id = $1 AND creator_id = $2`,
-    [eventId, userId]
+     WHERE id = $1
+       AND (creator_id = $2 OR $3::boolean = true)`,
+    [eventId, userId, Boolean(isAdmin)]
   );
 
   if ((result.rowCount ?? 0) === 0) {
-    throw new EventError("Only the creator can delete this event", 403);
+    throw new EventError(
+      "Only the creator or an admin can delete this event",
+      403
+    );
   }
 
   return { status: "ok" };

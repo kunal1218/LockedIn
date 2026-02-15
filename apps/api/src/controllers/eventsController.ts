@@ -201,10 +201,9 @@ export const deleteEventById = async (req: Request, res: Response) => {
       throw new EventError("Invalid event id", 400);
     }
 
-    const result = await deleteEvent(eventId, user.id);
+    const result = await deleteEvent(eventId, user.id, user.isAdmin);
     res.json(result);
   } catch (error) {
     handleError(res, error);
   }
 };
-

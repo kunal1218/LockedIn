@@ -56,6 +56,8 @@ const resolveImageUrl = (url: string) => {
   return `${IMAGE_BASE_URL}${normalized}`;
 };
 
+const toHandleSlug = (handle: string) => handle.replace(/^@/, "").trim();
+
 export default function ListingDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -138,6 +140,7 @@ export default function ListingDetailPage() {
 
   const styles = categoryStyles[listing.category] ?? categoryStyles.Other;
   const isSeller = user?.id === listing.seller.id;
+  const canDeleteListing = isSeller || Boolean(user?.isAdmin);
   const isSold = listing.status === "sold";
   const handleMessageSeller = async () => {
     if (!isAuthenticated || !token) {
@@ -168,6 +171,26 @@ export default function ListingDetailPage() {
     }
   };
   const memberSince = new Date(listing.createdAt).getFullYear();
+  const sellerHandleSlug = toHandleSlug(listing.seller.username ?? "");
+  const sellerProfileIdentifier = sellerHandleSlug || listing.seller.id;
+
+  const handleSellerProfileClick = () => {
+    if (!isAuthenticated) {
+      openAuthModal("signup");
+      return;
+    }
+
+    if (user?.id === listing.seller.id) {
+      router.push("/profile");
+      return;
+    }
+
+    if (!sellerProfileIdentifier) {
+      return;
+    }
+
+    router.push(`/profile/${encodeURIComponent(sellerProfileIdentifier)}`);
+  };
 
   const handleEditSuccess = (updated: Listing) => {
     setListing(updated);
@@ -286,7 +309,15 @@ export default function ListingDetailPage() {
         <div className="space-y-4">
           <div className="rounded-3xl border border-card-border/70 bg-white/90 p-6 shadow-[0_20px_60px_rgba(30,26,22,0.08)]">
             <div className="flex items-center gap-4">
-              <Avatar name={listing.seller.name} size={48} />
+              <button
+                type="button"
+                onClick={handleSellerProfileClick}
+                className="rounded-full"
+                aria-label={`View ${listing.seller.name} profile`}
+                data-profile-link
+              >
+                <Avatar name={listing.seller.name} size={48} />
+              </button>
               <div>
                 <p className="text-base font-semibold text-ink">
                   {listing.seller.name}
@@ -309,40 +340,44 @@ export default function ListingDetailPage() {
                   This item has been sold.
                 </p>
               )}
-              {isSeller && (
+              {canDeleteListing && (
                 <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    requiresAuth={false}
-                    className="flex-1"
-                    onClick={() => setIsEditOpen(true)}
-                  >
-                    Edit Listing
-                  </Button>
+                  {isSeller && (
+                    <Button
+                      variant="outline"
+                      requiresAuth={false}
+                      className="flex-1"
+                      onClick={() => setIsEditOpen(true)}
+                    >
+                      Edit Listing
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     requiresAuth={false}
                     className="flex-1 text-rose-500 hover:border-rose-200 hover:text-rose-600"
                     onClick={() => setIsDeleteOpen(true)}
                   >
-                    Delete
+                    Delete Listing
                   </Button>
-                  <button
-                    type="button"
-                    onClick={handleStatusToggle}
-                    disabled={isUpdatingStatus}
-                    className={`inline-flex flex-1 items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
-                      isSold
-                        ? "border-2 border-gray-300 text-gray-600 hover:bg-gray-50"
-                        : "bg-orange-500 text-white hover:bg-orange-600 shadow-[0_4px_12px_rgba(255,107,53,0.3)]"
-                    }`}
-                  >
-                    {isUpdatingStatus
-                      ? "Updating..."
-                      : isSold
-                        ? "Mark as Available"
-                        : "Mark as Sold"}
-                  </button>
+                  {isSeller && (
+                    <button
+                      type="button"
+                      onClick={handleStatusToggle}
+                      disabled={isUpdatingStatus}
+                      className={`inline-flex flex-1 items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
+                        isSold
+                          ? "border-2 border-gray-300 text-gray-600 hover:bg-gray-50"
+                          : "bg-orange-500 text-white hover:bg-orange-600 shadow-[0_4px_12px_rgba(255,107,53,0.3)]"
+                      }`}
+                    >
+                      {isUpdatingStatus
+                        ? "Updating..."
+                        : isSold
+                          ? "Mark as Available"
+                          : "Mark as Sold"}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

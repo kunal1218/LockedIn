@@ -29,10 +29,10 @@ export default function ClubsPage() {
   const router = useRouter();
   const [clubs, setClubs] = useState<Club[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [recency, setRecency] = useState<ClubRecencyFilter>("24h");
+  const [recency, setRecency] = useState<ClubRecencyFilter>("all");
   const [category, setCategory] = useState<ClubCategoryFilter>("all");
-  const [sortBy, setSortBy] = useState<ClubSortOption>("distance");
-  const [proximity, setProximity] = useState<ClubProximityFilter>("nearby");
+  const [sortBy, setSortBy] = useState<ClubSortOption>("members");
+  const [proximity, setProximity] = useState<ClubProximityFilter>("all");
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [joiningIds, setJoiningIds] = useState<Set<string>>(new Set());
