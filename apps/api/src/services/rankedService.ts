@@ -2552,24 +2552,52 @@ export const leaveRankedGame = async (userId: string) => {
 export const getRankedLeaderboard = async (
   limit = 10
 ): Promise<RankedLeaderboardEntry[]> => {
-  await ensureUsersTable();
+  await ensureRankedTables();
   const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 50) : 10;
   const result = await db.query(
     `
+    WITH monthly_wins AS (
+      SELECT
+        winners.winner_id,
+        COUNT(DISTINCT winners.win_day) AS win_days
+      FROM (
+        SELECT
+          CASE
+            WHEN rm.user_a_lives > 0
+              AND rm.user_b_lives <= 0
+              AND (rm.user_c_id IS NULL OR COALESCE(rm.user_c_lives, 0) <= 0)
+              THEN rm.user_a_id
+            WHEN rm.user_b_lives > 0
+              AND rm.user_a_lives <= 0
+              AND (rm.user_c_id IS NULL OR COALESCE(rm.user_c_lives, 0) <= 0)
+              THEN rm.user_b_id
+            WHEN rm.user_c_id IS NOT NULL
+              AND COALESCE(rm.user_c_lives, 0) > 0
+              AND rm.user_a_lives <= 0
+              AND rm.user_b_lives <= 0
+              THEN rm.user_c_id
+            ELSE NULL
+          END AS winner_id,
+          rm.started_at::date AS win_day
+        FROM ranked_matches rm
+        WHERE rm.timed_out = true
+          AND rm.started_at >= date_trunc('month', now())
+          AND rm.started_at < date_trunc('month', now()) + interval '1 month'
+      ) winners
+      WHERE winners.winner_id IS NOT NULL
+      GROUP BY winners.winner_id
+    )
     SELECT
       u.id,
       u.name,
       u.handle,
-      CASE
-        WHEN u.monthly_coins_month = date_trunc('month', now())::date
-          THEN COALESCE(u.monthly_coins, 0)
-        ELSE 0
-      END AS coins
+      COALESCE(monthly_wins.win_days, 0) * $2 AS coins
     FROM users u
+    LEFT JOIN monthly_wins ON monthly_wins.winner_id = u.id
     ORDER BY coins DESC, u.handle ASC
     LIMIT $1
     `,
-    [safeLimit]
+    [safeLimit, WIN_REWARD_COINS]
   );
 
   return (result.rows as RankedLeaderboardEntry[]).map((row) => ({
