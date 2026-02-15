@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import type { FeedPost } from "@lockedin/shared";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/Card";
-import { Tag } from "@/components/Tag";
 import { useAuth } from "@/features/auth";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { PollCard } from "./PollCard";
@@ -13,7 +12,6 @@ import { PostComposerModal } from "./PostComposerModal";
 import type { PostComposerPayload, PostComposerMode } from "./PostComposerModal";
 import type { PollOption } from "@lockedin/shared";
 
-const filterTags = ["All", "Build", "Help", "Chaos", "Cofounder"];
 const sortOptions = [
   { id: "fresh", label: "Fresh" },
   { id: "top", label: "Top" },
@@ -272,31 +270,12 @@ export const Feed = () => {
 
   return (
     <section className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
           <h2 className="font-display text-2xl font-semibold">Global Feed</h2>
           <p className="text-sm text-muted">What your campus is up to right now.</p>
         </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Tag
-            tone="default"
-            className="h-7 px-3 py-0 text-[10px] uppercase tracking-[0.16em] text-muted"
-          >
-            Filter
-          </Tag>
-          {filterTags.map((tag) => (
-            <Tag
-              key={tag}
-              tone={tag === "All" ? "accent" : "default"}
-              className="h-7 px-3 py-0"
-            >
-              {tag}
-            </Tag>
-          ))}
-        </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
           <div className="flex items-center gap-1 rounded-full border border-card-border/70 bg-white/80 p-1">
             {sortOptions.map((option) => (
               <button
