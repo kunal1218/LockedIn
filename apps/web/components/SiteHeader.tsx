@@ -86,12 +86,11 @@ export const SiteHeader = () => {
   return (
     <header className="relative z-10 pointer-events-auto">
       <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-6">
-        <Link href="/" className="flex items-center gap-3" onClick={handleNavClick("/")}>
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent/20 text-lg font-bold text-accent">
-            L
-          </span>
+        <Link href="/" className="group flex items-center" onClick={handleNavClick("/")}>
           <div>
-            <p className="font-display text-xl font-semibold">QuadBlitz</p>
+            <p className="inline-block font-display text-xl font-semibold transition-transform duration-150 ease-out group-active:scale-[0.98]">
+              QuadBlitz
+            </p>
             <p className="text-xs text-muted">Campus social, zero awkwardness</p>
           </div>
         </Link>
