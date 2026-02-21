@@ -202,7 +202,7 @@ export const fetchRequests = async (params: {
             u.handle AS creator_handle,
             u.college_name AS creator_college_name,
             u.college_domain AS creator_college_domain,
-            COUNT(l.user_id)::int AS like_count,
+            COUNT(DISTINCT l.user_id)::int AS like_count,
             BOOL_OR(l.user_id = $${viewerPosition}) AS liked_by_user,
             BOOL_OR(h.helper_id = $${viewerPosition}) AS helped_by_user
      FROM requests r

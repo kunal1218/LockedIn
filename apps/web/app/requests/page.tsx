@@ -1,7 +1,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RequestCard as RequestCardType } from "@lockedin/shared";
 import {
   RequestCard,
@@ -37,6 +37,7 @@ export default function RequestsPage() {
   const [helpingIds, setHelpingIds] = useState<Set<string>>(new Set());
   const [helpedIds, setHelpedIds] = useState<Set<string>>(new Set());
   const [likingIds, setLikingIds] = useState<Set<string>>(new Set());
+  const likeInFlightRef = useRef<Set<string>>(new Set());
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [autoPruneActive, setAutoPruneActive] = useState(false);
   const hasActiveRequest = useMemo(
@@ -84,7 +85,7 @@ export default function RequestsPage() {
       sortBy === "likes" ? byLikes : sortBy === "urgency" ? byUrgency : byRecency;
 
     return [...filtered].sort(sorter);
-  }, [requests, urgencyFilter, sortBy]);
+  }, [requests, urgencyFilter, proximity, sortBy]);
 
   const loadRequests = useCallback(async () => {
     setIsLoading(true);
@@ -208,8 +209,28 @@ export default function RequestsPage() {
       openAuthModal("login");
       return;
     }
+    if (likeInFlightRef.current.has(request.id)) {
+      return;
+    }
+    likeInFlightRef.current.add(request.id);
+
+    const previousLiked = request.likedByUser;
+    const previousLikeCount = request.likeCount;
+    const optimisticLiked = !previousLiked;
+    const optimisticLikeCount = Math.max(
+      0,
+      previousLikeCount + (optimisticLiked ? 1 : -1)
+    );
+
     setError(null);
     setLikingIds((prev) => new Set(prev).add(request.id));
+    setRequests((prev) =>
+      prev.map((item) =>
+        item.id === request.id
+          ? { ...item, likeCount: optimisticLikeCount, likedByUser: optimisticLiked }
+          : item
+      )
+    );
     try {
       const response = await apiPost<{ likeCount: number; liked: boolean }>(
         `/requests/${encodeURIComponent(request.id)}/like`,
@@ -217,13 +238,28 @@ export default function RequestsPage() {
         token
       );
       setRequests((prev) =>
+        prev.map((item) => {
+          if (item.id !== request.id) {
+            return item;
+          }
+          if (item.likedByUser === response.liked) {
+            return item;
+          }
+          return {
+            ...item,
+            likedByUser: response.liked,
+            likeCount: Math.max(0, item.likeCount + (response.liked ? 1 : -1)),
+          };
+        })
+      );
+    } catch (likeError) {
+      setRequests((prev) =>
         prev.map((item) =>
           item.id === request.id
-            ? { ...item, likeCount: response.likeCount, likedByUser: response.liked }
+            ? { ...item, likeCount: previousLikeCount, likedByUser: previousLiked }
             : item
         )
       );
-    } catch (likeError) {
       setError(
         likeError instanceof Error
           ? likeError.message
@@ -235,6 +271,7 @@ export default function RequestsPage() {
         next.delete(request.id);
         return next;
       });
+      likeInFlightRef.current.delete(request.id);
     }
   };
 
