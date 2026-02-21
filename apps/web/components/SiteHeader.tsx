@@ -31,11 +31,13 @@ const BrandMark = ({ className }: { className?: string }) => (
     className={className}
     xmlns="http://www.w3.org/2000/svg"
   >
-    <path d="M8 6h32v27H28v9l-7-9H8V6Z" fill="#1B1A17" />
+    <path d="M8 7h32v24H28v8L22 31H8V7Z" fill="#1B1A17" />
     <path
-      d="M24 13c-5.5 0-9.2 3.7-9.2 9.4v5.4c0 5.7 3.7 9.4 9.2 9.4 1.5 0 2.9-.2 4.2-.8l2.2 3.2h5.1l-3.8-5.6c1.1-1.6 1.7-3.5 1.7-5.8v-5.4c0-5.7-3.8-9.4-9.4-9.4Zm0 4.5c2.6 0 4.2 1.7 4.2 4.8v5.4c0 .8-.1 1.6-.4 2.2l-1.4-2.1h-5.1l3.2 4.6H24c-2.6 0-4.2-1.7-4.2-4.8v-5.4c0-3.1 1.6-4.8 4.2-4.8Z"
+      d="M24 13.5c-5.1 0-8.4 3.2-8.4 8.3v4.3c0 5.1 3.3 8.3 8.4 8.3 5 0 8.3-3.2 8.3-8.3v-4.3c0-5.1-3.3-8.3-8.3-8.3Zm0 4.1c2.3 0 3.7 1.5 3.7 4.3v4.1c0 2.8-1.4 4.3-3.7 4.3s-3.8-1.5-3.8-4.3V22c0-2.8 1.5-4.3 3.8-4.3Z"
       fill="#FF8658"
     />
+    <path d="M24 27.5h6.1V31H24Z" fill="#1B1A17" />
+    <path d="M26.3 27.8 29.9 31h-4.4l-2.1-1.9Z" fill="#FF8658" />
   </svg>
 );
 
@@ -106,11 +108,9 @@ export const SiteHeader = () => {
           className="group flex items-center gap-3"
           onClick={handleNavClick("/")}
         >
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-card-border/70 bg-white/80 shadow-sm transition-transform duration-150 ease-out group-active:scale-[0.98]">
-            <BrandMark className="h-8 w-8" />
-          </span>
+          <BrandMark className="h-10 w-10 transition-transform duration-150 ease-out group-active:scale-[0.94]" />
           <div>
-            <p className="inline-block font-display text-xl font-semibold transition-colors duration-150 group-hover:text-accent">
+            <p className="inline-block font-display text-xl font-semibold text-accent transition-transform duration-150 ease-out group-active:scale-[0.94]">
               QuadBlitz
             </p>
           </div>
