@@ -91,7 +91,6 @@ export const SiteHeader = () => {
             <p className="inline-block font-display text-xl font-semibold transition-transform duration-150 ease-out group-active:scale-[0.98]">
               QuadBlitz
             </p>
-            <p className="text-xs text-muted">Campus social, zero awkwardness</p>
           </div>
         </Link>
         <nav className="hidden items-center gap-6 text-sm font-semibold md:flex md:justify-self-center">
