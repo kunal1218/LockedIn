@@ -24,6 +24,21 @@ const baseNavItems: NavItem[] = [
   { href: "/marketplace", label: "Marketplace" },
 ];
 
+const BrandMark = ({ className }: { className?: string }) => (
+  <svg
+    viewBox="0 0 48 48"
+    aria-hidden="true"
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M8 6h32v27H28v9l-7-9H8V6Z" fill="#1B1A17" />
+    <path
+      d="M24 13c-5.5 0-9.2 3.7-9.2 9.4v5.4c0 5.7 3.7 9.4 9.2 9.4 1.5 0 2.9-.2 4.2-.8l2.2 3.2h5.1l-3.8-5.6c1.1-1.6 1.7-3.5 1.7-5.8v-5.4c0-5.7-3.8-9.4-9.4-9.4Zm0 4.5c2.6 0 4.2 1.7 4.2 4.8v5.4c0 .8-.1 1.6-.4 2.2l-1.4-2.1h-5.1l3.2 4.6H24c-2.6 0-4.2-1.7-4.2-4.8v-5.4c0-3.1 1.6-4.8 4.2-4.8Z"
+      fill="#FF8658"
+    />
+  </svg>
+);
+
 export const SiteHeader = () => {
   const router = useRouter();
   const pathname = usePathname();
@@ -86,9 +101,16 @@ export const SiteHeader = () => {
   return (
     <header className="relative z-10 pointer-events-auto">
       <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-6">
-        <Link href="/" className="group flex items-center" onClick={handleNavClick("/")}>
+        <Link
+          href="/"
+          className="group flex items-center gap-3"
+          onClick={handleNavClick("/")}
+        >
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-card-border/70 bg-white/80 shadow-sm transition-transform duration-150 ease-out group-active:scale-[0.98]">
+            <BrandMark className="h-8 w-8" />
+          </span>
           <div>
-            <p className="inline-block font-display text-xl font-semibold transition-transform duration-150 ease-out group-active:scale-[0.98]">
+            <p className="inline-block font-display text-xl font-semibold transition-colors duration-150 group-hover:text-accent">
               QuadBlitz
             </p>
           </div>
