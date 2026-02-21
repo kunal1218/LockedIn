@@ -382,7 +382,7 @@ const sendPasswordResetEmail = async (params: {
     await transporter.sendMail({
       from,
       to: params.to,
-      subject: "Reset your LockedIn password",
+      subject: "Reset your QuadBlitz password",
       text: `${previewName}\n\nUse this link to reset your password: ${params.resetLink}\n\nThe link expires in ${RESET_TOKEN_TTL_MINUTES} minutes.`,
       html: `
         <p>${previewName}</p>

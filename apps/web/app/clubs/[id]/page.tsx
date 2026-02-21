@@ -293,7 +293,7 @@ export default function ClubDetailPage() {
       if (navigator.share) {
         await navigator.share({
           title: club?.title ?? "Join this group",
-          text: `Join ${club?.title ?? "this group"} on LockedIn`,
+          text: `Join ${club?.title ?? "this group"} on QuadBlitz`,
           url: shareUrl,
         });
         setShareStatus("Share sheet opened.");

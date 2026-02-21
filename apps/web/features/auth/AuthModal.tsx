@@ -178,7 +178,7 @@ export const AuthModal = () => {
           <div className="flex items-start justify-between gap-6">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.32em] text-muted">
-                LockedIn Access
+                QuadBlitz Access
               </p>
               <h2
                 id="auth-modal-title"

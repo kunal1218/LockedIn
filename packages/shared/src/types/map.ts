@@ -5,6 +5,7 @@ export type FriendLocation = {
   latitude: number;
   longitude: number;
   lastUpdated: string;
+  isLive?: boolean;
   profilePictureUrl?: string | null;
   bio?: string | null;
   previousLatitude?: number | null;

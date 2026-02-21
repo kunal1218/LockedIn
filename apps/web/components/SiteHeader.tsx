@@ -91,7 +91,7 @@ export const SiteHeader = () => {
             L
           </span>
           <div>
-            <p className="font-display text-xl font-semibold">LockedIn</p>
+            <p className="font-display text-xl font-semibold">QuadBlitz</p>
             <p className="text-xs text-muted">Campus social, zero awkwardness</p>
           </div>
         </Link>

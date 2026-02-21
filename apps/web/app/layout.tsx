@@ -17,7 +17,7 @@ const body = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "LockedIn",
+  title: "QuadBlitz",
   description:
     "Meet new friends, collaborators, and cofounders. Campus energy, no dating vibes.",
 };

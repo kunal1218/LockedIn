@@ -57,6 +57,7 @@ const MAP_STYLE = "mapbox://styles/mapbox/streets-v12";
 const DEFAULT_CENTER: [number, number] = [-89.4012, 43.0731];
 const DEFAULT_ZOOM = 14;
 const UPDATE_INTERVAL_MS = 60000;
+const LIVE_LOCATION_WINDOW_MINUTES = 30;
 const RING_RECENT = "#10b981";
 const RING_ACTIVE = "#f59e0b";
 const RING_IDLE = "#6b7280";
@@ -164,6 +165,7 @@ export const MapCanvas = () => {
       previous_latitude?: number | string | null;
       previous_longitude?: number | string | null;
       last_updated?: string;
+      is_live?: boolean;
     }): FriendLocation => {
       const profilePictureUrl =
         raw.profilePictureUrl ?? raw.profile_picture_url ?? null;
@@ -174,6 +176,12 @@ export const MapCanvas = () => {
         raw.previousLongitude ?? raw.previous_longitude ?? null;
       const lastUpdated =
         raw.lastUpdated ?? raw.last_updated ?? new Date().toISOString();
+      const isLive =
+        typeof raw.isLive === "boolean"
+          ? raw.isLive
+          : typeof raw.is_live === "boolean"
+            ? raw.is_live
+            : getMinutesAgo(lastUpdated) < LIVE_LOCATION_WINDOW_MINUTES;
 
       const friend: FriendLocation = {
         id: raw.id,
@@ -182,6 +190,7 @@ export const MapCanvas = () => {
         latitude: Number(raw.latitude),
         longitude: Number(raw.longitude),
         lastUpdated,
+        isLive,
         profilePictureUrl,
         bio,
         previousLatitude:
@@ -203,6 +212,9 @@ export const MapCanvas = () => {
         }
         if (!("previousLongitude" in raw) && !("previous_longitude" in raw)) {
           missing.push("previousLongitude");
+        }
+        if (!("isLive" in raw) && !("is_live" in raw)) {
+          missing.push("isLive");
         }
         if (
           missing.length > 0 &&
@@ -478,7 +490,10 @@ export const MapCanvas = () => {
         pulse.style.border = `4px solid ${ringColor}`;
       }
       if (label) {
-        label.textContent = formatRelativeTime(friend.lastUpdated);
+        label.textContent =
+          getMinutesAgo(friend.lastUpdated) < LIVE_LOCATION_WINDOW_MINUTES
+            ? "Live now"
+            : formatRelativeTime(friend.lastUpdated);
       }
 
       if (inner) {
@@ -584,7 +599,10 @@ export const MapCanvas = () => {
       label.dataset.role = "label";
       label.className =
         "absolute left-1/2 top-full mt-1 -translate-x-1/2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white shadow-[0_2px_6px_rgba(0,0,0,0.2)] backdrop-blur";
-      label.textContent = formatRelativeTime(friend.lastUpdated);
+      label.textContent =
+        getMinutesAgo(friend.lastUpdated) < LIVE_LOCATION_WINDOW_MINUTES
+          ? "Live now"
+          : formatRelativeTime(friend.lastUpdated);
       label.style.pointerEvents = "none";
       wrapper.appendChild(label);
 
@@ -808,7 +826,7 @@ export const MapCanvas = () => {
         markerMap.delete(id);
       }
     });
-  }, [animateMarkerTo, buildMarker, friends, isMapReady, updateMarkerElement]);
+  }, [animateMarkerTo, buildMarker, eventClock, friends, isMapReady, updateMarkerElement]);
 
   useEffect(() => {
     if (!mapRef.current || !isMapReady) {
@@ -1076,7 +1094,47 @@ export const MapCanvas = () => {
       const normalized = rawFriends.map(normalizeFriend).filter((friend) =>
         Number.isFinite(friend.latitude) && Number.isFinite(friend.longitude)
       );
-      setFriends(normalized);
+
+      // Keep one marker per user: prefer live entries, otherwise latest timestamp.
+      const dedupedById = new Map<string, FriendLocation>();
+      normalized.forEach((friend) => {
+        const existing = dedupedById.get(friend.id);
+        if (!existing) {
+          dedupedById.set(friend.id, friend);
+          return;
+        }
+
+        const existingIsLive =
+          getMinutesAgo(existing.lastUpdated) < LIVE_LOCATION_WINDOW_MINUTES;
+        const nextIsLive =
+          getMinutesAgo(friend.lastUpdated) < LIVE_LOCATION_WINDOW_MINUTES;
+        const existingTime = Date.parse(existing.lastUpdated);
+        const nextTime = Date.parse(friend.lastUpdated);
+        const safeExistingTime = Number.isFinite(existingTime) ? existingTime : 0;
+        const safeNextTime = Number.isFinite(nextTime) ? nextTime : 0;
+
+        if (
+          (nextIsLive && !existingIsLive) ||
+          (nextIsLive === existingIsLive && safeNextTime > safeExistingTime)
+        ) {
+          dedupedById.set(friend.id, friend);
+        }
+      });
+
+      const deduped = Array.from(dedupedById.values()).sort((a, b) => {
+        const aIsLive = getMinutesAgo(a.lastUpdated) < LIVE_LOCATION_WINDOW_MINUTES;
+        const bIsLive = getMinutesAgo(b.lastUpdated) < LIVE_LOCATION_WINDOW_MINUTES;
+        if (aIsLive !== bIsLive) {
+          return aIsLive ? -1 : 1;
+        }
+        const aTime = Date.parse(a.lastUpdated);
+        const bTime = Date.parse(b.lastUpdated);
+        const safeATime = Number.isFinite(aTime) ? aTime : 0;
+        const safeBTime = Number.isFinite(bTime) ? bTime : 0;
+        return safeBTime - safeATime;
+      });
+
+      setFriends(deduped);
       if (!Array.isArray(response)) {
         setSettings(
           response.settings ?? {
@@ -1526,21 +1584,23 @@ export const MapCanvas = () => {
 
     const unsubscribe = onFriendLocationUpdate((data) => {
       setFriends((prev) => {
-        const index = prev.findIndex((friend) => friend.id === data.userId);
-        if (index < 0) {
+        const hasFriend = prev.some((friend) => friend.id === data.userId);
+        if (!hasFriend) {
           return prev;
         }
-        const current = prev[index];
-        const next = [...prev];
-        next[index] = {
-          ...current,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          lastUpdated: data.timestamp,
-          previousLatitude: current.latitude,
-          previousLongitude: current.longitude,
-        };
-        return next;
+        return prev.map((friend) =>
+          friend.id === data.userId
+            ? {
+                ...friend,
+                latitude: data.latitude,
+                longitude: data.longitude,
+                lastUpdated: data.timestamp,
+                isLive: true,
+                previousLatitude: friend.latitude,
+                previousLongitude: friend.longitude,
+              }
+            : friend
+        );
       });
     });
 

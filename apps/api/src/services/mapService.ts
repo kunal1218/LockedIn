@@ -17,6 +17,7 @@ export type FriendLocation = {
   latitude: number;
   longitude: number;
   lastUpdated: string;
+  isLive?: boolean;
   profilePictureUrl?: string | null;
   bio?: string | null;
   previousLatitude?: number | null;
@@ -52,6 +53,7 @@ type FriendLocationRow = {
   latitude: number | string;
   longitude: number | string;
   updated_at: string | Date;
+  is_live?: boolean;
   previous_latitude?: number | string | null;
   previous_longitude?: number | string | null;
 };
@@ -68,6 +70,7 @@ export class MapError extends Error {
 const EMIT_DISTANCE_METERS = 10;
 const TELEPORT_DISTANCE_METERS = 1000;
 const TELEPORT_WINDOW_MS = 10_000;
+const LIVE_LOCATION_WINDOW_MINUTES = 30;
 const PUBLIC_SET_KEY = "locations:public";
 const PUBLIC_HASH_KEY = "locations:public:data";
 const PUBLIC_VISIBILITY_MAX_MS = 4 * 60 * 60 * 1000;
@@ -532,7 +535,7 @@ export const fetchFriendLocations = async (
 
   const result = await db.query(
     `WITH friend_ids AS (
-       SELECT
+       SELECT DISTINCT
          CASE
            WHEN fr.requester_id = $1 THEN fr.recipient_id
            ELSE fr.requester_id
@@ -558,6 +561,7 @@ export const fetchFriendLocations = async (
             locations.latitude,
             locations.longitude,
             locations.updated_at,
+            (locations.updated_at >= now() - INTERVAL '${LIVE_LOCATION_WINDOW_MINUTES} minutes') AS is_live,
             ${previousLatitudeSelect},
             ${previousLongitudeSelect}
      FROM unblocked
@@ -581,6 +585,7 @@ export const fetchFriendLocations = async (
     latitude: Number(row.latitude),
     longitude: Number(row.longitude),
     lastUpdated: toIsoString(row.updated_at),
+    isLive: Boolean(row.is_live),
     previousLatitude:
       row.previous_latitude != null ? Number(row.previous_latitude) : null,
     previousLongitude:
@@ -596,6 +601,7 @@ export const fetchFriendLocations = async (
             locations.latitude,
             locations.longitude,
             locations.updated_at,
+            (locations.updated_at >= now() - INTERVAL '${LIVE_LOCATION_WINDOW_MINUTES} minutes') AS is_live,
             ${previousLatitudeSelect},
             ${previousLongitudeSelect}
      FROM user_locations locations
@@ -623,6 +629,7 @@ export const fetchFriendLocations = async (
         latitude: Number(row.latitude),
         longitude: Number(row.longitude),
         lastUpdated: toIsoString(row.updated_at),
+        isLive: Boolean(row.is_live),
         previousLatitude:
           row.previous_latitude != null ? Number(row.previous_latitude) : null,
         previousLongitude:

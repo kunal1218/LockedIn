@@ -1,4 +1,4 @@
-# LockedIn
+# QuadBlitz
 
 MVP social campus app for meeting friends, collaborators, and cofounders (not dating-first). Built with Next.js App Router, Express, and Postgres-ready plumbing.
 
