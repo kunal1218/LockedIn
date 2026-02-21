@@ -226,13 +226,17 @@ const startPresenceSweep = () => {
 };
 
 const normalizeOrigin = (value: string) => value.replace(/\/$/, "");
-const allowedOrigins = (process.env.FRONTEND_URLS ??
-  process.env.FRONTEND_URL ??
-  "http://localhost:3000")
+const defaultAllowedOrigins = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "https://quadblitz.com",
+  "https://www.quadblitz.com",
+].map(normalizeOrigin);
+const configuredOrigins = (process.env.FRONTEND_URLS ?? process.env.FRONTEND_URL ?? "")
   .split(",")
   .map((value) => normalizeOrigin(value.trim()))
   .filter(Boolean);
-const allowedOriginSet = new Set(allowedOrigins);
+const allowedOriginSet = new Set([...defaultAllowedOrigins, ...configuredOrigins]);
 const isAllowedOrigin = (origin?: string) => {
   if (!origin) {
     return true;
