@@ -2259,7 +2259,7 @@ export default function RankedPlayPage() {
   }, [activeGame, loadPokerState, token]);
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-80px)] max-w-6xl flex-col gap-4 px-4 pb-8 pt-6">
+    <div className="mx-auto flex min-h-[calc(100vh-80px)] max-w-6xl flex-col gap-4 px-4 pb-8 pt-2">
       <div className="inline-flex w-fit self-start overflow-hidden rounded-2xl border border-card-border/70 bg-white/80 shadow-sm">
         <button
           type="button"

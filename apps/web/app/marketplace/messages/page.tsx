@@ -50,7 +50,7 @@ export default function MarketplaceMessagesPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="mx-auto max-w-5xl px-6 py-8">
+      <div className="mx-auto max-w-5xl px-6 pb-8 pt-2">
         <div className="rounded-3xl border border-card-border/70 bg-white/80 px-6 py-10 text-center shadow-[0_20px_60px_rgba(30,26,22,0.08)]">
           <h1 className="font-display text-3xl font-semibold text-ink">Marketplace Messages</h1>
           <p className="mt-3 text-sm text-muted">
@@ -69,7 +69,7 @@ export default function MarketplaceMessagesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8">
+    <div className="mx-auto max-w-5xl px-6 pb-8 pt-2">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="font-display text-4xl font-bold text-ink">Marketplace Messages</h1>

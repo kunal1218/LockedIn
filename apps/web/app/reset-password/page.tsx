@@ -74,7 +74,7 @@ const ResetPasswordInner = () => {
   };
 
   return (
-    <div className="mx-auto max-w-lg px-4 pb-16 pt-10">
+    <div className="mx-auto max-w-lg px-4 pb-16 pt-2">
       <h1 className="font-display text-3xl font-semibold text-ink">Reset password</h1>
       <p className="mt-2 text-sm text-muted">
         Set a new password to get back into your account.
@@ -152,7 +152,7 @@ const ResetPasswordInner = () => {
 const ResetPasswordShell = ({ children }: { children: ReactNode }) => (
   <Suspense
     fallback={
-      <div className="mx-auto max-w-lg px-4 pb-16 pt-10">
+      <div className="mx-auto max-w-lg px-4 pb-16 pt-2">
         <Card className="space-y-3 border border-card-border/70 bg-white/90 p-6 shadow-sm">
           <div className="h-6 w-40 rounded bg-card-border/70" />
           <div className="h-4 w-64 rounded bg-card-border/70" />

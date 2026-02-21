@@ -74,7 +74,7 @@ export default function MarketplacePage() {
   }, [loadListings]);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 pb-8 pt-2">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="font-display text-4xl font-bold text-ink">

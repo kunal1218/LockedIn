@@ -502,7 +502,7 @@ function FriendsPageContent() {
     ) ?? null;
 
   return (
-    <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-10">
+    <div className="mx-auto h-[calc(100vh-80px)] max-w-6xl overflow-hidden px-4 pb-6 pt-2">
       <div className="grid h-full min-h-0 grid-cols-[200px_minmax(0,_1fr)] items-start gap-4 lg:gap-6">
         <Card className="flex h-full min-h-[520px] flex-col overflow-hidden border border-card-border/70 bg-white/80 shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-card-border/60 pb-3">

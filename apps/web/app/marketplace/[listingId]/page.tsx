@@ -120,7 +120,7 @@ export default function ListingDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto max-w-6xl px-6 pb-8 pt-2">
         <div className="rounded-3xl border border-card-border/70 bg-white/90 p-6 shadow-[0_20px_60px_rgba(30,26,22,0.08)]">
           <p className="text-sm text-muted">Loading listing...</p>
         </div>
@@ -130,7 +130,7 @@ export default function ListingDetailPage() {
 
   if (error || !listing) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto max-w-6xl px-6 pb-8 pt-2">
         <div className="rounded-3xl border border-accent/30 bg-accent/10 p-6 text-sm font-semibold text-accent">
           {error ?? "Listing not found."}
         </div>
@@ -248,7 +248,7 @@ export default function ListingDetailPage() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-6 pb-8 pt-2">
       {notice && (
         <div
           className={`mb-6 rounded-3xl border px-5 py-4 text-sm font-semibold ${
