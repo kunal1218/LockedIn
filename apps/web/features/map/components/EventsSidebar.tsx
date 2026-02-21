@@ -146,7 +146,7 @@ export const EventsSidebar = ({
   );
 
   return (
-    <div className="fixed inset-0 left-0 z-40 w-full bg-white shadow-xl sm:inset-y-auto sm:top-[96px] sm:h-[calc(100vh-96px)] sm:w-[400px]">
+    <div className="fixed inset-0 left-0 z-40 w-full bg-white shadow-xl sm:absolute sm:inset-y-0 sm:left-0 sm:h-full sm:w-[400px]">
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between border-b border-ink/10 bg-white p-4">
           <div>
