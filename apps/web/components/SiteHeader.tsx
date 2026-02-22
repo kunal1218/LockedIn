@@ -1,7 +1,7 @@
 "use client";
 
 import type { MouseEvent } from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth";
@@ -67,9 +67,8 @@ export const SiteHeader = () => {
   const pathname = usePathname();
   const { isAuthenticated, user, token } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
-  const [brandLabel, setBrandLabel] = useState(() =>
-    pathname === "/" ? "" : BRAND_LABEL
-  );
+  const [brandLabel, setBrandLabel] = useState(BRAND_LABEL);
+  const brandTypingTimerRef = useRef<number | null>(null);
   const profileName = user?.name ?? "Profile";
   const navItems = user?.isAdmin
     ? [...baseNavItems, { href: "/admin", label: "Admin" }]
@@ -87,6 +86,26 @@ export const SiteHeader = () => {
         }, 50);
       }
     };
+
+  const stopBrandTyping = useCallback(() => {
+    if (brandTypingTimerRef.current !== null) {
+      window.clearInterval(brandTypingTimerRef.current);
+      brandTypingTimerRef.current = null;
+    }
+  }, []);
+
+  const startBrandTyping = useCallback(() => {
+    stopBrandTyping();
+    let index = 0;
+    setBrandLabel("");
+    brandTypingTimerRef.current = window.setInterval(() => {
+      index += 1;
+      setBrandLabel(BRAND_LABEL.slice(0, index));
+      if (index >= BRAND_LABEL.length) {
+        stopBrandTyping();
+      }
+    }, BRAND_TYPING_STEP_MS);
+  }, [stopBrandTyping]);
 
   useEffect(() => {
     if (!token) {
@@ -122,33 +141,18 @@ export const SiteHeader = () => {
   }, [pathname, token]);
 
   useEffect(() => {
-    if (pathname !== "/") {
-      const restoreTimer = window.setTimeout(() => {
-        setBrandLabel(BRAND_LABEL);
-      }, 0);
-      return () => {
-        window.clearTimeout(restoreTimer);
-      };
+    if (pathname === "/") {
+      startBrandTyping();
+    } else {
+      stopBrandTyping();
     }
 
-    let index = 0;
-    const startTimer = window.setTimeout(() => {
-      setBrandLabel("");
-    }, 0);
-    const typingTimer = window.setInterval(() => {
-      index += 1;
-      setBrandLabel(BRAND_LABEL.slice(0, index));
-      if (index >= BRAND_LABEL.length) {
-        window.clearInterval(typingTimer);
-      }
-    }, BRAND_TYPING_STEP_MS);
-
     return () => {
-      window.clearTimeout(startTimer);
-      window.clearInterval(typingTimer);
+      stopBrandTyping();
     };
-  }, [pathname]);
+  }, [pathname, startBrandTyping, stopBrandTyping]);
 
+  const displayBrandLabel = pathname === "/" ? brandLabel : BRAND_LABEL;
   const badgeCount = unreadCount > 99 ? "99+" : `${unreadCount}`;
   const coinCount = user?.coins ?? 0;
 
@@ -158,10 +162,15 @@ export const SiteHeader = () => {
         <Link
           href="/"
           className="group inline-flex items-center"
-          onClick={handleNavClick("/")}
+          onClick={(event) => {
+            if (pathname === "/") {
+              startBrandTyping();
+            }
+            handleNavClick("/")(event);
+          }}
         >
           <BrandMark
-            label={brandLabel}
+            label={displayBrandLabel}
             className="h-14 w-auto translate-y-1.5 transition-transform duration-150 ease-out group-active:scale-[0.94]"
           />
         </Link>
