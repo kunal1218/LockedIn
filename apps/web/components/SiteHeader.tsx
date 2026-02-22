@@ -24,7 +24,16 @@ const baseNavItems: NavItem[] = [
   { href: "/marketplace", label: "Marketplace" },
 ];
 
-const BrandMark = ({ className }: { className?: string }) => (
+const BRAND_LABEL = "Quad Blitz";
+const BRAND_TYPING_STEP_MS = 85;
+
+const BrandMark = ({
+  className,
+  label,
+}: {
+  className?: string;
+  label: string;
+}) => (
   <svg
     viewBox="0 0 176 56"
     aria-hidden="true"
@@ -48,7 +57,7 @@ const BrandMark = ({ className }: { className?: string }) => (
       fontSize="16"
       letterSpacing="0.4"
     >
-      Quad Blitz
+      {label}
     </text>
   </svg>
 );
@@ -58,6 +67,9 @@ export const SiteHeader = () => {
   const pathname = usePathname();
   const { isAuthenticated, user, token } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [brandLabel, setBrandLabel] = useState(() =>
+    pathname === "/" ? "" : BRAND_LABEL
+  );
   const profileName = user?.name ?? "Profile";
   const navItems = user?.isAdmin
     ? [...baseNavItems, { href: "/admin", label: "Admin" }]
@@ -109,6 +121,34 @@ export const SiteHeader = () => {
     };
   }, [pathname, token]);
 
+  useEffect(() => {
+    if (pathname !== "/") {
+      const restoreTimer = window.setTimeout(() => {
+        setBrandLabel(BRAND_LABEL);
+      }, 0);
+      return () => {
+        window.clearTimeout(restoreTimer);
+      };
+    }
+
+    let index = 0;
+    const startTimer = window.setTimeout(() => {
+      setBrandLabel("");
+    }, 0);
+    const typingTimer = window.setInterval(() => {
+      index += 1;
+      setBrandLabel(BRAND_LABEL.slice(0, index));
+      if (index >= BRAND_LABEL.length) {
+        window.clearInterval(typingTimer);
+      }
+    }, BRAND_TYPING_STEP_MS);
+
+    return () => {
+      window.clearTimeout(startTimer);
+      window.clearInterval(typingTimer);
+    };
+  }, [pathname]);
+
   const badgeCount = unreadCount > 99 ? "99+" : `${unreadCount}`;
   const coinCount = user?.coins ?? 0;
 
@@ -120,7 +160,10 @@ export const SiteHeader = () => {
           className="group inline-flex items-center"
           onClick={handleNavClick("/")}
         >
-          <BrandMark className="h-14 w-auto translate-y-1 transition-transform duration-150 ease-out group-active:scale-[0.94]" />
+          <BrandMark
+            label={brandLabel}
+            className="h-14 w-auto translate-y-1 transition-transform duration-150 ease-out group-active:scale-[0.94]"
+          />
         </Link>
         <nav className="hidden items-center gap-6 text-sm font-semibold md:flex md:justify-self-center">
           {navItems.map((item) => {
