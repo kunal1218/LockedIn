@@ -26,18 +26,26 @@ const baseNavItems: NavItem[] = [
 
 const BrandMark = ({ className }: { className?: string }) => (
   <svg
-    viewBox="0 0 48 48"
+    viewBox="0 0 176 56"
     aria-hidden="true"
     className={className}
     xmlns="http://www.w3.org/2000/svg"
   >
-    <path d="M8 7h32v24H28v8L22 31H8V7Z" fill="#1B1A17" />
-    <path
-      fillRule="evenodd"
-      d="M24 10c-4.7 0-7.8 3.1-7.8 7.8v3.3c0 4.7 3.1 7.8 7.8 7.8s7.8-3.1 7.8-7.8v-3.3c0-4.7-3.1-7.8-7.8-7.8Zm0 4c2.1 0 3.4 1.4 3.4 3.8V21c0 2.4-1.3 3.9-3.4 3.9s-3.5-1.5-3.5-3.9v-3.2c0-2.4 1.4-3.8 3.5-3.8Z"
+    <rect x="8" y="8" width="160" height="30" rx="8" fill="#1B1A17" />
+    <path d="M82 38h12l-6 8Z" fill="#1B1A17" />
+    <text
+      x="88"
+      y="23.5"
       fill="#FF8658"
-    />
-    <path d="M25.8 21.8 30.3 26.2h-4.5L23 23.5Z" fill="#FF8658" />
+      textAnchor="middle"
+      dominantBaseline="middle"
+      fontFamily="'Space Grotesk', 'Plus Jakarta Sans', system-ui, sans-serif"
+      fontWeight="700"
+      fontSize="16"
+      letterSpacing="0.4"
+    >
+      Quad Blitz
+    </text>
   </svg>
 );
 
@@ -105,15 +113,10 @@ export const SiteHeader = () => {
       <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-6">
         <Link
           href="/"
-          className="group flex items-center gap-3"
+          className="group inline-flex items-center"
           onClick={handleNavClick("/")}
         >
-          <span className="inline-flex items-center gap-3 transition-transform duration-150 ease-out group-active:scale-[0.94]">
-            <BrandMark className="h-10 w-10" />
-            <p className="inline-block font-display text-xl font-semibold text-accent">
-              QuadBlitz
-            </p>
-          </span>
+          <BrandMark className="h-9 w-auto transition-transform duration-150 ease-out group-active:scale-[0.94]" />
         </Link>
         <nav className="hidden items-center gap-6 text-sm font-semibold md:flex md:justify-self-center">
           {navItems.map((item) => {
