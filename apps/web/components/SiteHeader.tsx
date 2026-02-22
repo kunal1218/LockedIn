@@ -162,7 +162,7 @@ export const SiteHeader = () => {
         >
           <BrandMark
             label={brandLabel}
-            className="h-14 w-auto translate-y-1 transition-transform duration-150 ease-out group-active:scale-[0.94]"
+            className="h-14 w-auto translate-y-1.5 transition-transform duration-150 ease-out group-active:scale-[0.94]"
           />
         </Link>
         <nav className="hidden items-center gap-6 text-sm font-semibold md:flex md:justify-self-center">
