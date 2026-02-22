@@ -120,7 +120,7 @@ export const SiteHeader = () => {
           className="group inline-flex items-center"
           onClick={handleNavClick("/")}
         >
-          <BrandMark className="h-14 w-auto transition-transform duration-150 ease-out group-active:scale-[0.94]" />
+          <BrandMark className="h-14 w-auto translate-y-0.5 transition-transform duration-150 ease-out group-active:scale-[0.94]" />
         </Link>
         <nav className="hidden items-center gap-6 text-sm font-semibold md:flex md:justify-self-center">
           {navItems.map((item) => {
