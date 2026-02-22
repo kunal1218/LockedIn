@@ -148,9 +148,6 @@ export default function ClubsPage() {
 
   const handleOpenClub = useCallback(
     (club: Club) => {
-      if (!club.joinedByUser) {
-        return;
-      }
       router.push(`/clubs/${encodeURIComponent(club.id)}`);
     },
     [router]
@@ -264,7 +261,7 @@ export default function ClubsPage() {
                     club={club}
                     onJoin={handleJoin}
                     onOpen={handleOpenClub}
-                    isClickable={Boolean(club.joinedByUser)}
+                    isClickable
                     isJoining={joiningIds.has(club.id)}
                     hasJoined={club.joinedByUser}
                     isOwnClub={club.creator.id === user?.id}
