@@ -31,27 +31,16 @@ const BrandMark = ({ className }: { className?: string }) => (
     className={className}
     xmlns="http://www.w3.org/2000/svg"
   >
-    <rect
-      x="8"
-      y="8"
-      width="160"
-      height="30"
-      rx="8"
-      fill="#ffffff"
-      stroke="#1B1A17"
-      strokeWidth="2"
-    />
     <path
-      d="M28 38h12l-6 8Z"
-      fill="#ffffff"
-      stroke="#1B1A17"
+      d="M20 8h136c6.6 0 12 5.4 12 12v6c0 6.6-5.4 12-12 12H44l-8 10-7-10H20c-6.6 0-12-5.4-12-12v-6c0-6.6 5.4-12 12-12Z"
+      className="fill-accent stroke-accent transition-colors duration-200 group-hover:fill-white group-hover:stroke-ink"
       strokeWidth="2"
       strokeLinejoin="round"
     />
     <text
       x="88"
-      y="23.5"
-      fill="#1B1A17"
+      y="23"
+      className="fill-white transition-colors duration-200 group-hover:fill-ink"
       textAnchor="middle"
       dominantBaseline="middle"
       fontFamily="'Space Grotesk', 'Plus Jakarta Sans', system-ui, sans-serif"
@@ -131,7 +120,7 @@ export const SiteHeader = () => {
           className="group inline-flex items-center"
           onClick={handleNavClick("/")}
         >
-          <BrandMark className="h-9 w-auto transition-transform duration-150 ease-out group-active:scale-[0.94]" />
+          <BrandMark className="h-14 w-auto transition-transform duration-150 ease-out group-active:scale-[0.94]" />
         </Link>
         <nav className="hidden items-center gap-6 text-sm font-semibold md:flex md:justify-self-center">
           {navItems.map((item) => {
