@@ -33,14 +33,14 @@ const BrandMark = ({ className }: { className?: string }) => (
   >
     <path
       d="M20 8h136c6.6 0 12 5.4 12 12v6c0 6.6-5.4 12-12 12H44l-8 10-7-10H20c-6.6 0-12-5.4-12-12v-6c0-6.6 5.4-12 12-12Z"
-      className="fill-accent stroke-accent transition-colors duration-200 group-hover:fill-white group-hover:stroke-ink"
+      className="fill-accent stroke-accent"
       strokeWidth="2"
       strokeLinejoin="round"
     />
     <text
       x="88"
       y="23"
-      className="fill-white transition-colors duration-200 group-hover:fill-ink"
+      className="fill-white"
       textAnchor="middle"
       dominantBaseline="middle"
       fontFamily="'Space Grotesk', 'Plus Jakarta Sans', system-ui, sans-serif"
