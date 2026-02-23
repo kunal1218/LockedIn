@@ -428,7 +428,7 @@ export const EventDetailCard = ({
                     <button
                       type="button"
                       onClick={handleOpenChat}
-                      className="text-sm font-semibold text-ink/70 transition hover:text-ink"
+                      className="rounded-full border border-card-border/70 bg-white/90 px-3 py-1.5 text-sm font-semibold text-ink/80 transition hover:border-accent/40 hover:bg-accent/5 hover:text-ink"
                     >
                       Open chat
                     </button>
