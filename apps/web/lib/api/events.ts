@@ -1,5 +1,5 @@
 import type { CreateEventRequest, EventWithDetails } from "@lockedin/shared";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiDelete, apiGet, apiPost } from "@/lib/api";
 
 const STORAGE_KEY = "lockedin_auth";
 
@@ -58,3 +58,6 @@ export const createEvent = async (
   token?: string
 ): Promise<EventWithDetails> =>
   apiPost<EventWithDetails>("/events", payload, token ?? readToken());
+
+export const deleteEvent = async (eventId: number, token?: string) =>
+  apiDelete<{ status: string }>(`/events/${eventId}`, token ?? readToken());
