@@ -33,16 +33,19 @@ type EventDetailCardProps = {
   event: EventWithDetails;
   onClose: () => void;
   onRSVP: (status: "going" | "maybe" | "declined") => void;
+  onDelete?: () => Promise<void> | void;
 };
 
 export const EventDetailCard = ({
   event,
   onClose,
   onRSVP,
+  onDelete,
 }: EventDetailCardProps) => {
   const router = useRouter();
   const { isAuthenticated, token, user, openAuthModal } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [userStatus, setUserStatus] = useState(event.user_status ?? null);
   const [currentView, setCurrentView] = useState<"details" | "chat">("details");
   const [chatMessages, setChatMessages] = useState<
@@ -71,6 +74,10 @@ export const EventDetailCard = ({
     }
     return `${event.distance_km.toFixed(1)} km away`;
   }, [event.distance_km]);
+  const canDeleteEvent = Boolean(
+    user &&
+      (user.isAdmin || user.id === event.creator_id || user.id === event.creator.id)
+  );
 
   useEffect(() => {
     setUserStatus(event.user_status ?? null);
@@ -186,6 +193,36 @@ export const EventDetailCard = ({
       return;
     }
     setCurrentView("chat");
+  };
+
+  const handleDeleteEvent = async () => {
+    if (!canDeleteEvent || !onDelete || isDeleting) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Delete this event? This action cannot be undone."
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await onDelete();
+      onClose();
+    } catch (error) {
+      if (process.env.NODE_ENV !== "production") {
+        console.error("[map] delete event failed", error);
+      }
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to delete event. Please try again.";
+      window.alert(message);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleChatSubmit = async (formEvent: FormEvent<HTMLFormElement>) => {
@@ -391,11 +428,23 @@ export const EventDetailCard = ({
                     <button
                       type="button"
                       onClick={handleOpenChat}
-                      className="text-sm font-semibold text-ink/70 transition hover:text-ink"
+                      className="rounded-full border border-card-border/70 bg-white/90 px-3 py-1.5 text-sm font-semibold text-ink/80 transition hover:border-accent/40 hover:bg-accent/5 hover:text-ink"
                     >
                       Open chat
                     </button>
-                    <span className="text-xs text-muted">Chat is event-only</span>
+                    <div className="flex items-center gap-3">
+                      {canDeleteEvent && onDelete && (
+                        <button
+                          type="button"
+                          onClick={handleDeleteEvent}
+                          disabled={isDeleting}
+                          className="rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isDeleting ? "Deleting..." : "Delete event"}
+                        </button>
+                      )}
+                      <span className="text-xs text-muted">Chat is event-only</span>
+                    </div>
                   </div>
                   {userStatus && (
                     <p className="text-center text-xs text-muted">

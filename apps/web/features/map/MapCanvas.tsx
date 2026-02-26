@@ -20,7 +20,12 @@ import { MapControls } from "@/features/map/components/MapControls";
 import { EventsSidebar } from "@/features/map/components/EventsSidebar";
 import { PublicUserPopup } from "@/features/map/components/PublicUserPopup";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
-import { createEvent, getEventDetails, getNearbyEvents } from "@/lib/api/events";
+import {
+  createEvent,
+  deleteEvent,
+  getEventDetails,
+  getNearbyEvents,
+} from "@/lib/api/events";
 import {
   connectSocket,
   disconnectSocket,
@@ -367,6 +372,23 @@ export const MapCanvas = () => {
       });
     },
     []
+  );
+
+  const handleDeleteEvent = useCallback(
+    async (eventId: number) => {
+      if (!token) {
+        openAuthModal("login");
+        throw new Error("Please log in to delete events.");
+      }
+
+      await deleteEvent(eventId, token);
+
+      setEvents((prev) => prev.filter((event) => event.id !== eventId));
+      setSelectedEvent((current) =>
+        current?.id === eventId ? null : current
+      );
+    },
+    [openAuthModal, token]
   );
 
   const closeEventForm = useCallback(() => {
@@ -1866,6 +1888,7 @@ export const MapCanvas = () => {
           event={selectedEvent}
           onClose={() => setSelectedEvent(null)}
           onRSVP={(status) => handleEventRSVP(selectedEvent.id, status)}
+          onDelete={() => handleDeleteEvent(selectedEvent.id)}
         />
       )}
       {showEventForm && newEventLocation && (
