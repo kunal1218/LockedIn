@@ -152,27 +152,30 @@ export const MapTab = ({ token, user }: SessionProps) => {
               }
             });
 
-            var hiddenMapButtons = document.querySelectorAll(
-              'button[aria-label="Zoom in"], button[aria-label="Zoom out"]'
-            );
-            hiddenMapButtons.forEach(function(button) {
-              button.style.display = "none";
-              button.style.pointerEvents = "none";
-            });
-
-            var homeButton = document.querySelector(
-              'button[aria-label="Go to my location"], button[aria-label="Go to campus"]'
-            );
-            if (homeButton) {
-              homeButton.style.display = "";
-              homeButton.style.width = "40px";
-              homeButton.style.height = "40px";
-            }
-
             var mapDock = document.querySelector('div[class*="absolute"][class*="right-4"][class*="z-20"]');
             if (mapDock) {
               mapDock.style.right = "12px";
-              mapDock.style.bottom = "108px";
+              mapDock.style.bottom = "92px";
+              mapDock.style.gap = "0";
+              mapDock.style.height = "40px";
+              mapDock.style.width = "40px";
+              mapDock.style.overflow = "hidden";
+              mapDock.style.pointerEvents = "auto";
+
+              var dockButtons = mapDock.querySelectorAll("button");
+              dockButtons.forEach(function(button, index) {
+                if (index === 0) {
+                  button.style.display = "flex";
+                  button.style.visibility = "visible";
+                  button.style.opacity = "1";
+                  button.style.pointerEvents = "auto";
+                  button.style.width = "40px";
+                  button.style.height = "40px";
+                } else {
+                  button.style.display = "none";
+                  button.style.pointerEvents = "none";
+                }
+              });
             }
 
             window.dispatchEvent(new Event("resize"));

@@ -169,7 +169,10 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+    <SafeAreaView
+      style={styles.safeArea}
+      edges={activeTab === "map" ? ["left", "right"] : ["top", "left", "right"]}
+    >
       <StatusBar style="dark" />
       <View style={[styles.body, activeTab !== "map" ? styles.bodyWithBottomInset : null]}>
         {activeTab === "home" ? (
