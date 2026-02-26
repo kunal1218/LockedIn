@@ -70,15 +70,45 @@ export const MapTab = ({ token, user }: SessionProps) => {
               mapRoot.style.margin = "0";
               mapRoot.style.padding = "0";
               mapRoot.style.overflow = "hidden";
+
+              if (mapbox.parentElement) {
+                mapbox.parentElement.style.position = "absolute";
+                mapbox.parentElement.style.left = "0";
+                mapbox.parentElement.style.top = "0";
+                mapbox.parentElement.style.right = "0";
+                mapbox.parentElement.style.bottom = "0";
+                mapbox.parentElement.style.width = "100%";
+                mapbox.parentElement.style.height = "100%";
+              }
+
+              mapbox.style.position = "absolute";
+              mapbox.style.left = "0";
+              mapbox.style.top = "0";
+              mapbox.style.right = "0";
+              mapbox.style.bottom = "0";
+              mapbox.style.width = "100%";
+              mapbox.style.height = "100%";
+
+              var canvasWrap = mapbox.querySelector(".mapboxgl-canvas-container");
+              if (canvasWrap) {
+                canvasWrap.style.width = "100%";
+                canvasWrap.style.height = "100%";
+              }
+
+              var canvas = mapbox.querySelector(".mapboxgl-canvas");
+              if (canvas) {
+                canvas.style.width = "100%";
+                canvas.style.height = "100%";
+              }
             }
 
             var topControls = document.querySelector('div[class*="pointer-events-none"][class*="absolute"][class*="z-20"][class*="top-"]');
             if (topControls) {
               topControls.style.top = "10px";
               topControls.style.right = "10px";
-              topControls.style.width = "225px";
+              topControls.style.width = "186px";
               topControls.style.gap = "8px";
-              topControls.style.transform = "scale(0.86)";
+              topControls.style.transform = "scale(0.78)";
               topControls.style.transformOrigin = "top right";
             }
 
@@ -90,8 +120,8 @@ export const MapTab = ({ token, user }: SessionProps) => {
                 text.indexOf("Go ghost") !== -1 ||
                 text.indexOf("Go public") !== -1
               ) {
-                card.style.padding = "8px";
-                card.style.maxWidth = "225px";
+                card.style.padding = "7px";
+                card.style.maxWidth = "186px";
               }
             });
 
@@ -135,6 +165,8 @@ export const MapTab = ({ token, user }: SessionProps) => {
               mapDock.style.right = "12px";
               mapDock.style.bottom = "104px";
             }
+
+            window.dispatchEvent(new Event("resize"));
           } catch (error) {}
         };
 
@@ -159,11 +191,14 @@ export const MapTab = ({ token, user }: SessionProps) => {
     <View style={mapStyles.root}>
       <WebView
         key={`${reloadKey}-${token}`}
+        style={mapStyles.webview}
         source={{ uri: mapUrl }}
         javaScriptEnabled
         domStorageEnabled
         geolocationEnabled
         cacheEnabled={false}
+        contentInsetAdjustmentBehavior="never"
+        automaticallyAdjustContentInsets={false}
         setSupportMultipleWindows={false}
         injectedJavaScriptBeforeContentLoaded={injectedScript}
         onLoadStart={() => {
@@ -209,6 +244,10 @@ export const MapTab = ({ token, user }: SessionProps) => {
 
 const mapStyles = StyleSheet.create({
   root: {
+    flex: 1,
+    backgroundColor: "#0f172a",
+  },
+  webview: {
     flex: 1,
     backgroundColor: "#0f172a",
   },

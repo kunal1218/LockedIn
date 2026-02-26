@@ -74,10 +74,10 @@ export const MapControls = ({
         ? "Connecting..."
         : "Disconnected";
   const shellClass = isEmbedded
-    ? "pointer-events-none absolute right-3 top-3 z-20 flex w-[210px] flex-col gap-2 sm:w-[220px]"
+    ? "pointer-events-none absolute right-2.5 top-2.5 z-20 flex w-[190px] flex-col gap-1.5 sm:w-[196px]"
     : "pointer-events-none absolute right-4 top-4 z-20 flex w-[260px] flex-col gap-3";
   const cardClass = isEmbedded
-    ? "pointer-events-auto rounded-2xl border border-black/10 bg-white/95 p-3 text-[10px] text-[#6B7280] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur"
+    ? "pointer-events-auto rounded-2xl border border-black/10 bg-white/95 p-2.5 text-[10px] text-[#6B7280] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur"
     : "pointer-events-auto rounded-2xl border border-black/10 bg-white/95 p-4 text-xs text-[#6B7280] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur";
 
   return (
@@ -92,7 +92,7 @@ export const MapControls = ({
       <div className={cardClass}>
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className={isEmbedded ? "text-[13px] font-semibold text-[#1F2937]" : "text-sm font-semibold text-[#1F2937]"}>
+            <p className={isEmbedded ? "text-[11px] font-semibold text-[#1F2937]" : "text-sm font-semibold text-[#1F2937]"}>
               Share my location
             </p>
             <p className={isEmbedded ? "mt-0.5 text-[10px] text-[#6B7280]" : "mt-1 text-[11px] text-[#6B7280]"}>
@@ -103,7 +103,7 @@ export const MapControls = ({
             type="button"
             aria-pressed={shareLocation}
             className={`relative rounded-full transition ${
-              isEmbedded ? "h-8 w-12" : "h-11 w-16"
+              isEmbedded ? "h-7 w-11" : "h-11 w-16"
             } ${
               shareLocation ? "bg-accent" : "bg-ink/10"
             }`}
@@ -111,9 +111,9 @@ export const MapControls = ({
           >
             <span
               className={`absolute rounded-full bg-white transition ${
-                isEmbedded ? "top-1.5 h-5 w-5" : "top-2 h-7 w-7"
+                isEmbedded ? "top-1 h-5 w-5" : "top-2 h-7 w-7"
               } ${
-                shareLocation ? (isEmbedded ? "left-6" : "left-8") : (isEmbedded ? "left-1.5" : "left-2")
+                shareLocation ? (isEmbedded ? "left-5" : "left-8") : (isEmbedded ? "left-1" : "left-2")
               }`}
             />
           </button>
@@ -123,7 +123,7 @@ export const MapControls = ({
       <div className={cardClass}>
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className={isEmbedded ? "text-[13px] font-semibold text-[#1F2937]" : "text-sm font-semibold text-[#1F2937]"}>
+            <p className={isEmbedded ? "text-[11px] font-semibold text-[#1F2937]" : "text-sm font-semibold text-[#1F2937]"}>
               Go ghost 👻
             </p>
             <p className={isEmbedded ? "mt-0.5 text-[10px] text-[#6B7280]" : "mt-1 text-[11px] text-[#6B7280]"}>
@@ -133,7 +133,7 @@ export const MapControls = ({
           <button
             type="button"
             className={`rounded-full border font-semibold transition ${
-              isEmbedded ? "min-h-[34px] px-3 py-1 text-[10px]" : "min-h-[44px] px-4 py-2 text-[11px]"
+              isEmbedded ? "min-h-[28px] px-2.5 py-1 text-[10px]" : "min-h-[44px] px-4 py-2 text-[11px]"
             } ${
               ghostMode
                 ? "border-accent bg-accent/15 text-accent"
@@ -149,7 +149,7 @@ export const MapControls = ({
       <div className={cardClass}>
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className={isEmbedded ? "text-[13px] font-semibold text-[#1F2937]" : "text-sm font-semibold text-[#1F2937]"}>
+            <p className={isEmbedded ? "text-[11px] font-semibold text-[#1F2937]" : "text-sm font-semibold text-[#1F2937]"}>
               Go public 🌍
             </p>
             <p className={isEmbedded ? "mt-0.5 text-[10px] text-[#6B7280]" : "mt-1 text-[11px] text-[#6B7280]"}>
@@ -159,7 +159,7 @@ export const MapControls = ({
           <button
             type="button"
             className={`rounded-full border font-semibold transition ${
-              isEmbedded ? "min-h-[34px] px-3 py-1 text-[10px]" : "min-h-[44px] px-4 py-2 text-[11px]"
+              isEmbedded ? "min-h-[28px] px-2.5 py-1 text-[10px]" : "min-h-[44px] px-4 py-2 text-[11px]"
             } ${
               publicMode
                 ? "border-accent bg-accent/15 text-accent"

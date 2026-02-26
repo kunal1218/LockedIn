@@ -203,7 +203,12 @@ export default function App() {
         ) : null}
       </View>
 
-      <View style={styles.bottomNavOuter}>
+      <View
+        style={[
+          styles.bottomNavOuter,
+          activeTab === "map" ? styles.bottomNavOuterFloating : null,
+        ]}
+      >
         <View style={styles.bottomNav}>
           {appTabs.map((tab) => {
             const isActive = activeTab === tab.id;

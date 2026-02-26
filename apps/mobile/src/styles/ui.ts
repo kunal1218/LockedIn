@@ -132,6 +132,14 @@ export const styles = StyleSheet.create({
     paddingBottom: 10,
     backgroundColor: "#f3f4f6",
   },
+  bottomNavOuterFloating: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 40,
+    backgroundColor: "transparent",
+  },
   bottomNav: {
     flexDirection: "row",
     alignItems: "flex-end",
