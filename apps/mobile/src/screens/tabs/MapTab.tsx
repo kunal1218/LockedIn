@@ -106,38 +106,231 @@ export const MapTab = ({ token, user }: SessionProps) => {
             if (topControls) {
               topControls.style.top = "10px";
               topControls.style.right = "10px";
-              topControls.style.width = "186px";
+              topControls.style.width = "auto";
               topControls.style.gap = "8px";
-              topControls.style.transform = "scale(0.78)";
+              topControls.style.transform = "none";
               topControls.style.transformOrigin = "top right";
+              topControls.style.overflow = "visible";
+              topControls.style.height = "auto";
+              topControls.style.maxHeight = "none";
             }
 
+            var pickButtonByLabels = function(card, labels) {
+              if (!card) {
+                return null;
+              }
+              var buttons = card.querySelectorAll("button");
+              for (var i = 0; i < buttons.length; i += 1) {
+                var label = (buttons[i].textContent || "").trim().toLowerCase();
+                if (labels.indexOf(label) !== -1) {
+                  return buttons[i];
+                }
+              }
+              return buttons.length ? buttons[0] : null;
+            };
+
+            var hideCardVisually = function(card) {
+              if (!card) {
+                return;
+              }
+              card.style.position = "absolute";
+              card.style.left = "-10000px";
+              card.style.top = "-10000px";
+              card.style.width = "1px";
+              card.style.height = "1px";
+              card.style.maxWidth = "1px";
+              card.style.maxHeight = "1px";
+              card.style.opacity = "0";
+              card.style.pointerEvents = "none";
+              card.style.overflow = "hidden";
+              card.style.padding = "0";
+              card.style.margin = "0";
+            };
+
+            var shareCard = null;
+            var ghostCard = null;
+            var publicCard = null;
             var cards = document.querySelectorAll('div[class*="rounded-2xl"][class*="bg-white"]');
             cards.forEach(function(card) {
-              var text = card.textContent || "";
-              if (
-                text.indexOf("Share my location") !== -1 ||
-                text.indexOf("Go ghost") !== -1 ||
-                text.indexOf("Go public") !== -1
-              ) {
-                card.style.padding = "7px";
-                card.style.maxWidth = "186px";
+              var text = (card.textContent || "").trim();
+              if (text.indexOf("Share my location") !== -1) {
+                shareCard = card;
+              } else if (text.indexOf("Go ghost") !== -1) {
+                ghostCard = card;
+              } else if (text.indexOf("Go public") !== -1) {
+                publicCard = card;
               }
             });
+
+            var shareToggle = shareCard ? shareCard.querySelector("button") : null;
+            var ghostToggle = pickButtonByLabels(ghostCard, ["ghosted", "go ghost"]);
+            var publicToggle = pickButtonByLabels(publicCard, ["public", "private"]);
+
+            hideCardVisually(shareCard);
+            hideCardVisually(ghostCard);
+            hideCardVisually(publicCard);
+
+            var toggleRow = document.getElementById("lockedin-mobile-map-toggles");
+            if (!toggleRow) {
+              toggleRow = document.createElement("div");
+              toggleRow.id = "lockedin-mobile-map-toggles";
+              toggleRow.style.position = "fixed";
+              toggleRow.style.top = "52px";
+              toggleRow.style.left = "12px";
+              toggleRow.style.right = "12px";
+              toggleRow.style.zIndex = "45";
+              toggleRow.style.display = "flex";
+              toggleRow.style.gap = "8px";
+              toggleRow.style.pointerEvents = "auto";
+
+              var shareBtn = document.createElement("button");
+              shareBtn.id = "lockedin-mobile-toggle-share";
+              shareBtn.type = "button";
+              shareBtn.textContent = "Share";
+
+              var ghostBtn = document.createElement("button");
+              ghostBtn.id = "lockedin-mobile-toggle-ghost";
+              ghostBtn.type = "button";
+              ghostBtn.textContent = "Ghost";
+
+              var publicBtn = document.createElement("button");
+              publicBtn.id = "lockedin-mobile-toggle-public";
+              publicBtn.type = "button";
+              publicBtn.textContent = "Public";
+
+              [shareBtn, ghostBtn, publicBtn].forEach(function(btn) {
+                btn.style.flex = "1";
+                btn.style.height = "34px";
+                btn.style.borderRadius = "999px";
+                btn.style.border = "1px solid rgba(17,24,39,0.16)";
+                btn.style.background = "rgba(255,255,255,0.95)";
+                btn.style.color = "#111827";
+                btn.style.fontSize = "12px";
+                btn.style.fontWeight = "700";
+                btn.style.letterSpacing = "0.2px";
+                btn.style.cursor = "pointer";
+              });
+
+              toggleRow.appendChild(shareBtn);
+              toggleRow.appendChild(ghostBtn);
+              toggleRow.appendChild(publicBtn);
+              document.body.appendChild(toggleRow);
+            }
+
+            var shareToggleButton = document.getElementById("lockedin-mobile-toggle-share");
+            var ghostToggleButton = document.getElementById("lockedin-mobile-toggle-ghost");
+            var publicToggleButton = document.getElementById("lockedin-mobile-toggle-public");
+
+            var setButtonState = function(button, active) {
+              if (!button) {
+                return;
+              }
+              if (active) {
+                button.style.background = "#ff8557";
+                button.style.borderColor = "#ff8557";
+                button.style.color = "#ffffff";
+              } else {
+                button.style.background = "rgba(255,255,255,0.95)";
+                button.style.borderColor = "rgba(17,24,39,0.16)";
+                button.style.color = "#111827";
+              }
+            };
+
+            var isShareActive = function() {
+              if (!shareToggle) {
+                return toggleRow && toggleRow.getAttribute("data-share-active") === "1";
+              }
+              var ariaChecked = shareToggle.getAttribute("aria-checked");
+              if (ariaChecked === "true" || ariaChecked === "false") {
+                return ariaChecked === "true";
+              }
+              var dataState = shareToggle.getAttribute("data-state");
+              if (dataState === "checked" || dataState === "unchecked") {
+                return dataState === "checked";
+              }
+              return toggleRow && toggleRow.getAttribute("data-share-active") === "1";
+            };
+
+            var isGhostActive = function() {
+              if (!ghostToggle) {
+                return toggleRow && toggleRow.getAttribute("data-ghost-active") === "1";
+              }
+              var label = (ghostToggle.textContent || "").trim().toLowerCase();
+              if (label === "ghosted") {
+                return true;
+              }
+              if (label === "go ghost") {
+                return false;
+              }
+              return toggleRow && toggleRow.getAttribute("data-ghost-active") === "1";
+            };
+
+            var isPublicActive = function() {
+              if (!publicToggle) {
+                return toggleRow && toggleRow.getAttribute("data-public-active") === "1";
+              }
+              var label = (publicToggle.textContent || "").trim().toLowerCase();
+              if (label === "public") {
+                return true;
+              }
+              if (label === "private") {
+                return false;
+              }
+              return toggleRow && toggleRow.getAttribute("data-public-active") === "1";
+            };
+
+            var syncToggleButtons = function() {
+              var shareActive = isShareActive();
+              var ghostActive = isGhostActive();
+              var publicActive = isPublicActive();
+              if (toggleRow) {
+                toggleRow.setAttribute("data-share-active", shareActive ? "1" : "0");
+                toggleRow.setAttribute("data-ghost-active", ghostActive ? "1" : "0");
+                toggleRow.setAttribute("data-public-active", publicActive ? "1" : "0");
+              }
+              setButtonState(shareToggleButton, shareActive);
+              setButtonState(ghostToggleButton, ghostActive);
+              setButtonState(publicToggleButton, publicActive);
+            };
+
+            if (shareToggleButton) {
+              shareToggleButton.onclick = function() {
+                if (shareToggle) {
+                  shareToggle.click();
+                } else if (toggleRow) {
+                  var next = toggleRow.getAttribute("data-share-active") === "1" ? "0" : "1";
+                  toggleRow.setAttribute("data-share-active", next);
+                }
+                setTimeout(syncToggleButtons, 120);
+              };
+            }
+            if (ghostToggleButton) {
+              ghostToggleButton.onclick = function() {
+                if (ghostToggle) {
+                  ghostToggle.click();
+                } else if (toggleRow) {
+                  var next = toggleRow.getAttribute("data-ghost-active") === "1" ? "0" : "1";
+                  toggleRow.setAttribute("data-ghost-active", next);
+                }
+                setTimeout(syncToggleButtons, 120);
+              };
+            }
+            if (publicToggleButton) {
+              publicToggleButton.onclick = function() {
+                if (publicToggle) {
+                  publicToggle.click();
+                } else if (toggleRow) {
+                  var next = toggleRow.getAttribute("data-public-active") === "1" ? "0" : "1";
+                  toggleRow.setAttribute("data-public-active", next);
+                }
+                setTimeout(syncToggleButtons, 120);
+              };
+            }
+            syncToggleButtons();
 
             var actionButtons = document.querySelectorAll("button");
             actionButtons.forEach(function(button) {
               var label = (button.textContent || "").trim();
-              if (
-                label === "Ghosted" ||
-                label === "Go ghost" ||
-                label === "Public" ||
-                label === "Private"
-              ) {
-                button.style.minHeight = "34px";
-                button.style.padding = "4px 10px";
-                button.style.fontSize = "11px";
-              }
               if (label === "+" || label === "×") {
                 button.style.width = "48px";
                 button.style.height = "48px";
@@ -152,10 +345,18 @@ export const MapTab = ({ token, user }: SessionProps) => {
               }
             });
 
-            var mapDock = document.querySelector('div[class*="absolute"][class*="right-4"][class*="z-20"]');
+            var zoomInButton = document.querySelector('button[aria-label="Zoom in"]');
+            var homeButton = document.querySelector(
+              'button[aria-label="Go to my location"], button[aria-label="Go to campus"]'
+            );
+            var mapDock = zoomInButton
+              ? zoomInButton.closest('div[class*="absolute"]')
+              : homeButton
+              ? homeButton.closest('div[class*="absolute"]')
+              : null;
             if (mapDock) {
               mapDock.style.right = "12px";
-              mapDock.style.bottom = "92px";
+              mapDock.style.bottom = "98px";
               mapDock.style.gap = "0";
               mapDock.style.height = "40px";
               mapDock.style.width = "40px";
@@ -163,18 +364,9 @@ export const MapTab = ({ token, user }: SessionProps) => {
               mapDock.style.pointerEvents = "auto";
 
               var dockButtons = mapDock.querySelectorAll("button");
-              dockButtons.forEach(function(button, index) {
-                if (index === 0) {
-                  button.style.display = "flex";
-                  button.style.visibility = "visible";
-                  button.style.opacity = "1";
-                  button.style.pointerEvents = "auto";
-                  button.style.width = "40px";
-                  button.style.height = "40px";
-                } else {
-                  button.style.display = "none";
-                  button.style.pointerEvents = "none";
-                }
+              dockButtons.forEach(function(button) {
+                button.style.width = "40px";
+                button.style.height = "40px";
               });
             }
 
