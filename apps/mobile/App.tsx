@@ -1,5 +1,6 @@
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { type ComponentProps, useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { type AuthPayload, type AuthUser, getMe, login, signup } from "./src/api/actions";
@@ -13,12 +14,19 @@ import { formatError } from "./src/lib/errors";
 import { persistAuth, readStoredAuth } from "./src/lib/storage";
 import { styles } from "./src/styles/ui";
 
-const appTabs = [
-  { id: "home", label: "Home", icon: "⌂", iconActive: "⌂" },
-  { id: "friends", label: "Friends", icon: "☻", iconActive: "☻" },
-  { id: "map", label: "Map", icon: "⌖", iconActive: "⌖" },
-  { id: "requests", label: "Requests", icon: "✉", iconActive: "✉" },
-  { id: "profile", label: "Profile", icon: "◉", iconActive: "◉" },
+type TabIconName = ComponentProps<typeof Ionicons>["name"];
+
+const appTabs: ReadonlyArray<{
+  id: "home" | "friends" | "map" | "requests" | "profile";
+  label: string;
+  icon: TabIconName;
+  iconActive: TabIconName;
+}> = [
+  { id: "home", label: "Home", icon: "home-outline", iconActive: "home" },
+  { id: "friends", label: "Friends", icon: "people-outline", iconActive: "people" },
+  { id: "map", label: "Map", icon: "locate-outline", iconActive: "locate" },
+  { id: "requests", label: "Requests", icon: "mail-outline", iconActive: "mail" },
+  { id: "profile", label: "Profile", icon: "person-circle-outline", iconActive: "person-circle" },
 ] as const;
 
 type AppTab = (typeof appTabs)[number]["id"];
@@ -222,26 +230,19 @@ export default function App() {
                       isActive && styles.bottomCenterIconWrapActive,
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.bottomTabIcon,
-                        styles.bottomTabIconActive,
-                        styles.bottomCenterTabIcon,
-                      ]}
-                    >
-                      {isActive ? tab.iconActive : tab.icon}
-                    </Text>
+                    <Ionicons
+                      name={isActive ? tab.iconActive : tab.icon}
+                      size={18}
+                      color={isActive ? "#111827" : "#64748b"}
+                    />
                   </View>
                 ) : (
-                  <Text style={[styles.bottomTabIcon, isActive && styles.bottomTabIconActive]}>
-                    {isActive ? tab.iconActive : tab.icon}
-                  </Text>
+                  <Ionicons
+                    name={isActive ? tab.iconActive : tab.icon}
+                    size={30}
+                    color={isActive ? "#111827" : "#98a2b3"}
+                  />
                 )}
-                {!isCenterTab ? (
-                  <Text style={[styles.bottomTabLabel, isActive && styles.bottomTabLabelActive]}>
-                    {tab.label}
-                  </Text>
-                ) : null}
               </Pressable>
             );
           })}

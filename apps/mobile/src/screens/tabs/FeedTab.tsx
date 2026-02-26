@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   createFeedComment,
   createFeedPost,
@@ -146,6 +147,7 @@ const getTimeLeft = (endsAt: string) => {
 const pad2 = (value: number) => value.toString().padStart(2, "0");
 
 export const FeedTab = ({ token, user, onAuthExpired }: SessionProps) => {
+  const insets = useSafeAreaInsets();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [draft, setDraft] = useState("");
   const [sort, setSort] = useState<"fresh" | "top">("fresh");
@@ -499,8 +501,8 @@ export const FeedTab = ({ token, user, onAuthExpired }: SessionProps) => {
 
   return (
     <ScrollView
-      style={homeStyles.page}
-      contentContainerStyle={homeStyles.container}
+      style={[homeStyles.page, { marginTop: -insets.top }]}
+      contentContainerStyle={[homeStyles.container, { paddingTop: 14 + insets.top }]}
       keyboardShouldPersistTaps="handled"
     >
       <View style={homeStyles.backgroundWrap}>
@@ -853,10 +855,10 @@ const homeStyles = StyleSheet.create({
   },
   backgroundWrap: {
     position: "absolute",
-    top: 0,
+    top: -28,
     left: 0,
     right: 0,
-    height: 260,
+    height: 288,
     zIndex: -1,
   },
   orbA: {

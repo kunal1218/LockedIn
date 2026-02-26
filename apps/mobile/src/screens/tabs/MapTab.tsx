@@ -152,18 +152,27 @@ export const MapTab = ({ token, user }: SessionProps) => {
               }
             });
 
-            var mapButtons = document.querySelectorAll(
-              'button[aria-label="Go to my location"], button[aria-label="Go to campus"], button[aria-label="Zoom in"], button[aria-label="Zoom out"]'
+            var hiddenMapButtons = document.querySelectorAll(
+              'button[aria-label="Zoom in"], button[aria-label="Zoom out"]'
             );
-            mapButtons.forEach(function(button) {
-              button.style.width = "40px";
-              button.style.height = "40px";
+            hiddenMapButtons.forEach(function(button) {
+              button.style.display = "none";
+              button.style.pointerEvents = "none";
             });
+
+            var homeButton = document.querySelector(
+              'button[aria-label="Go to my location"], button[aria-label="Go to campus"]'
+            );
+            if (homeButton) {
+              homeButton.style.display = "";
+              homeButton.style.width = "40px";
+              homeButton.style.height = "40px";
+            }
 
             var mapDock = document.querySelector('div[class*="absolute"][class*="right-4"][class*="z-20"]');
             if (mapDock) {
               mapDock.style.right = "12px";
-              mapDock.style.bottom = "104px";
+              mapDock.style.bottom = "108px";
             }
 
             window.dispatchEvent(new Event("resize"));
