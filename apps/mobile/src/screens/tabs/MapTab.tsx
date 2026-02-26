@@ -146,7 +146,7 @@ export const MapTab = ({ token, user }: SessionProps) => {
               if (label.indexOf("View Events") === 0) {
                 button.style.position = "absolute";
                 button.style.left = "12px";
-                button.style.bottom = "104px";
+                button.style.bottom = "124px";
                 button.style.padding = "8px 14px";
                 button.style.fontSize = "12px";
               }
