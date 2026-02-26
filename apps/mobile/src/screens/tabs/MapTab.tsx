@@ -6,22 +6,111 @@ import type { SessionProps } from "../../types/session";
 const DEFAULT_WEB_APP_URL = "https://quadblitz.com";
 const WEB_APP_BASE_URL =
   (process.env.EXPO_PUBLIC_WEB_APP_URL ?? DEFAULT_WEB_APP_URL).replace(/\/$/, "");
+const MAP_EMBED_VERSION = "app-compact-v2";
 
 export const MapTab = ({ token, user }: SessionProps) => {
   const [isLoading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  const mapUrl = useMemo(() => `${WEB_APP_BASE_URL}/map?embedded=1`, []);
+  const mapUrl = useMemo(
+    () => `${WEB_APP_BASE_URL}/map?embedded=1&mobile=1&compact=1&v=${MAP_EMBED_VERSION}`,
+    []
+  );
   const injectedScript = useMemo(() => {
     const payload = { token, user };
     const serializedPayload = JSON.stringify(payload);
     const escapedPayload = JSON.stringify(serializedPayload);
     return `
       (function() {
+        var applyEmbeddedTweaks = function() {
+          try {
+            var header = document.querySelector("header");
+            if (header) {
+              header.style.display = "none";
+            }
+
+            var main = document.querySelector("main");
+            if (main) {
+              main.style.paddingTop = "0";
+              main.style.marginTop = "0";
+            }
+
+            var topControls = document.querySelector('div[class*="pointer-events-none"][class*="absolute"][class*="z-20"][class*="top-"]');
+            if (topControls) {
+              topControls.style.top = "10px";
+              topControls.style.right = "10px";
+              topControls.style.width = "210px";
+              topControls.style.gap = "8px";
+            }
+
+            var cards = document.querySelectorAll('div[class*="rounded-2xl"][class*="bg-white"]');
+            cards.forEach(function(card) {
+              var text = card.textContent || "";
+              if (
+                text.indexOf("Share my location") !== -1 ||
+                text.indexOf("Go ghost") !== -1 ||
+                text.indexOf("Go public") !== -1
+              ) {
+                card.style.padding = "10px";
+              }
+            });
+
+            var actionButtons = document.querySelectorAll("button");
+            actionButtons.forEach(function(button) {
+              var label = (button.textContent || "").trim();
+              if (
+                label === "Ghosted" ||
+                label === "Go ghost" ||
+                label === "Public" ||
+                label === "Private"
+              ) {
+                button.style.minHeight = "34px";
+                button.style.padding = "4px 10px";
+                button.style.fontSize = "11px";
+              }
+              if (label === "+" || label === "×") {
+                button.style.width = "48px";
+                button.style.height = "48px";
+                button.style.fontSize = "22px";
+              }
+              if (label.indexOf("View Events") === 0) {
+                button.style.position = "absolute";
+                button.style.left = "12px";
+                button.style.bottom = "96px";
+                button.style.padding = "8px 14px";
+                button.style.fontSize = "12px";
+              }
+            });
+
+            var mapButtons = document.querySelectorAll(
+              'button[aria-label="Go to my location"], button[aria-label="Go to campus"], button[aria-label="Zoom in"], button[aria-label="Zoom out"]'
+            );
+            mapButtons.forEach(function(button) {
+              button.style.width = "40px";
+              button.style.height = "40px";
+            });
+
+            var mapDock = document.querySelector('div[class*="absolute"][class*="right-4"][class*="z-20"]');
+            if (mapDock) {
+              mapDock.style.right = "12px";
+              mapDock.style.bottom = "96px";
+            }
+          } catch (error) {}
+        };
+
         try {
           window.localStorage.setItem("lockedin_auth", ${escapedPayload});
         } catch (error) {}
+        applyEmbeddedTweaks();
+        window.addEventListener("load", applyEmbeddedTweaks);
+        setTimeout(applyEmbeddedTweaks, 200);
+        setTimeout(applyEmbeddedTweaks, 800);
+        setTimeout(applyEmbeddedTweaks, 1600);
+        var observer = new MutationObserver(function() {
+          applyEmbeddedTweaks();
+        });
+        observer.observe(document.documentElement, { childList: true, subtree: true });
         true;
       })();
     `;
@@ -35,6 +124,7 @@ export const MapTab = ({ token, user }: SessionProps) => {
         javaScriptEnabled
         domStorageEnabled
         geolocationEnabled
+        cacheEnabled={false}
         setSupportMultipleWindows={false}
         injectedJavaScriptBeforeContentLoaded={injectedScript}
         onLoadStart={() => {
