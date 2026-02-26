@@ -1,11 +1,15 @@
-"use client";
-
-import { useSearchParams } from "next/navigation";
 import { MapCanvas } from "@/features/map";
 
-export default function MapPage() {
-  const searchParams = useSearchParams();
-  const isEmbedded = searchParams.get("embedded") === "1";
+type MapPageProps = {
+  searchParams?: {
+    embedded?: string | string[];
+  };
+};
+
+export default function MapPage({ searchParams }: MapPageProps) {
+  const embeddedParam = searchParams?.embedded;
+  const isEmbedded =
+    embeddedParam === "1" || (Array.isArray(embeddedParam) && embeddedParam.includes("1"));
 
   return (
     <div

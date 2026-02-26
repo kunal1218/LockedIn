@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google";
+import { Suspense } from "react";
 import { BackgroundDecor } from "@/components/BackgroundDecor";
 import { SiteHeader } from "@/components/SiteHeader";
 import { AuthModal, AuthProvider } from "@/features/auth";
@@ -33,7 +34,9 @@ export default function RootLayout({
         <AuthProvider>
           <div className="relative min-h-screen overflow-x-hidden">
             <BackgroundDecor />
-            <SiteHeader />
+            <Suspense fallback={null}>
+              <SiteHeader />
+            </Suspense>
             <main className="relative">{children}</main>
           </div>
           <AuthModal />
