@@ -126,19 +126,16 @@ export const styles = StyleSheet.create({
   body: {
     flex: 1,
   },
-  bottomNavOuter: {
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 10,
-    backgroundColor: "#f3f4f6",
+  bodyWithBottomInset: {
+    paddingBottom: 92,
   },
-  bottomNavOuterFloating: {
+  bottomNavOuter: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
     zIndex: 40,
-    backgroundColor: "transparent",
+    backgroundColor: "#6200ea",
   },
   bottomNav: {
     flexDirection: "row",
@@ -146,15 +143,12 @@ export const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 4,
     paddingHorizontal: 8,
-    paddingTop: 10,
-    paddingBottom: 8,
-    borderRadius: 24,
+    paddingTop: 6,
+    paddingBottom: 16,
+    borderRadius: 0,
     backgroundColor: "#6200ea",
-    shadowColor: "#1f0a48",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.24,
-    shadowRadius: 12,
-    elevation: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.18)",
   },
   bottomTab: {
     flex: 1,
@@ -162,14 +156,15 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-end",
     gap: 2,
+    marginBottom: 4,
   },
   bottomTabCenter: {
-    marginTop: -16,
+    marginTop: -10,
   },
   bottomCenterIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#7f39fb",
@@ -188,6 +183,10 @@ export const styles = StyleSheet.create({
   },
   bottomTabIconActive: {
     color: "#ffffff",
+  },
+  bottomCenterTabIcon: {
+    fontSize: 17,
+    lineHeight: 19,
   },
   bottomTabLabel: {
     fontSize: 12,

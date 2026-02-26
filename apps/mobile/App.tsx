@@ -139,7 +139,7 @@ export default function App() {
 
   if (booting) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <StatusBar style="dark" />
         <View style={styles.loaderContainer}>
           <ActivityIndicator color="#2563eb" size="large" />
@@ -161,9 +161,9 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <StatusBar style="dark" />
-      <View style={styles.body}>
+      <View style={[styles.body, activeTab !== "map" ? styles.bodyWithBottomInset : null]}>
         {activeTab === "home" ? (
           <FeedTab
             token={activeSession.token}
@@ -203,12 +203,7 @@ export default function App() {
         ) : null}
       </View>
 
-      <View
-        style={[
-          styles.bottomNavOuter,
-          activeTab === "map" ? styles.bottomNavOuterFloating : null,
-        ]}
-      >
+      <View style={styles.bottomNavOuter}>
         <View style={styles.bottomNav}>
           {appTabs.map((tab) => {
             const isActive = activeTab === tab.id;
@@ -227,7 +222,13 @@ export default function App() {
                       isActive && styles.bottomCenterIconWrapActive,
                     ]}
                   >
-                    <Text style={[styles.bottomTabIcon, styles.bottomTabIconActive]}>
+                    <Text
+                      style={[
+                        styles.bottomTabIcon,
+                        styles.bottomTabIconActive,
+                        styles.bottomCenterTabIcon,
+                      ]}
+                    >
                       {isActive ? tab.iconActive : tab.icon}
                     </Text>
                   </View>
@@ -236,9 +237,11 @@ export default function App() {
                     {isActive ? tab.iconActive : tab.icon}
                   </Text>
                 )}
-                <Text style={[styles.bottomTabLabel, isActive && styles.bottomTabLabelActive]}>
-                  {tab.label}
-                </Text>
+                {!isCenterTab ? (
+                  <Text style={[styles.bottomTabLabel, isActive && styles.bottomTabLabelActive]}>
+                    {tab.label}
+                  </Text>
+                ) : null}
               </Pressable>
             );
           })}
