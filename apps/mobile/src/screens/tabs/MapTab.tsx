@@ -175,40 +175,51 @@ export const MapTab = ({ token, user }: SessionProps) => {
               toggleRow = document.createElement("div");
               toggleRow.id = "lockedin-mobile-map-toggles";
               toggleRow.style.position = "fixed";
-              toggleRow.style.top = "52px";
-              toggleRow.style.left = "12px";
               toggleRow.style.right = "12px";
+              toggleRow.style.bottom = "164px";
               toggleRow.style.zIndex = "45";
               toggleRow.style.display = "flex";
-              toggleRow.style.gap = "8px";
+              toggleRow.style.alignItems = "center";
+              toggleRow.style.justifyContent = "flex-end";
+              toggleRow.style.gap = "7px";
               toggleRow.style.pointerEvents = "auto";
 
               var shareBtn = document.createElement("button");
               shareBtn.id = "lockedin-mobile-toggle-share";
               shareBtn.type = "button";
-              shareBtn.textContent = "Share";
+              shareBtn.textContent = "📍";
+              shareBtn.setAttribute("aria-label", "Share location");
+              shareBtn.title = "Share location";
 
               var ghostBtn = document.createElement("button");
               ghostBtn.id = "lockedin-mobile-toggle-ghost";
               ghostBtn.type = "button";
-              ghostBtn.textContent = "Ghost";
+              ghostBtn.textContent = "👻";
+              ghostBtn.setAttribute("aria-label", "Ghost mode");
+              ghostBtn.title = "Ghost mode";
 
               var publicBtn = document.createElement("button");
               publicBtn.id = "lockedin-mobile-toggle-public";
               publicBtn.type = "button";
-              publicBtn.textContent = "Public";
+              publicBtn.textContent = "🌐";
+              publicBtn.setAttribute("aria-label", "Public mode");
+              publicBtn.title = "Public mode";
 
               [shareBtn, ghostBtn, publicBtn].forEach(function(btn) {
-                btn.style.flex = "1";
+                btn.style.width = "34px";
                 btn.style.height = "34px";
-                btn.style.borderRadius = "999px";
+                btn.style.borderRadius = "17px";
                 btn.style.border = "1px solid rgba(17,24,39,0.16)";
                 btn.style.background = "rgba(255,255,255,0.95)";
                 btn.style.color = "#111827";
-                btn.style.fontSize = "12px";
+                btn.style.fontSize = "16px";
                 btn.style.fontWeight = "700";
-                btn.style.letterSpacing = "0.2px";
+                btn.style.lineHeight = "16px";
                 btn.style.cursor = "pointer";
+                btn.style.display = "flex";
+                btn.style.alignItems = "center";
+                btn.style.justifyContent = "center";
+                btn.style.padding = "0";
               });
 
               toggleRow.appendChild(shareBtn);
@@ -329,8 +340,13 @@ export const MapTab = ({ token, user }: SessionProps) => {
             syncToggleButtons();
 
             var actionButtons = document.querySelectorAll("button");
+            var addEventButton = null;
             actionButtons.forEach(function(button) {
               var label = (button.textContent || "").trim();
+              var ariaLabel = (button.getAttribute("aria-label") || "").trim().toLowerCase();
+              if (ariaLabel === "create event" || ariaLabel === "cancel pin drop") {
+                addEventButton = button;
+              }
               if (label === "+" || label === "×") {
                 button.style.width = "48px";
                 button.style.height = "48px";
@@ -369,6 +385,30 @@ export const MapTab = ({ token, user }: SessionProps) => {
                 button.style.height = "40px";
               });
             }
+
+            var positionToggleRow = function() {
+              if (!toggleRow) {
+                return;
+              }
+              var targetButton = addEventButton || document.querySelector('button[aria-label="Create event"], button[aria-label="Cancel pin drop"]');
+              if (!targetButton) {
+                toggleRow.style.right = "12px";
+                toggleRow.style.bottom = "164px";
+                toggleRow.style.left = "auto";
+                toggleRow.style.top = "auto";
+                return;
+              }
+              var targetRect = targetButton.getBoundingClientRect();
+              var rowRect = toggleRow.getBoundingClientRect();
+              var rowWidth = rowRect.width || 116;
+              var computedLeft = Math.max(10, targetRect.right - rowWidth);
+              var computedTop = Math.max(56, targetRect.top - 42);
+              toggleRow.style.left = computedLeft + "px";
+              toggleRow.style.top = computedTop + "px";
+              toggleRow.style.right = "auto";
+              toggleRow.style.bottom = "auto";
+            };
+            positionToggleRow();
 
             window.dispatchEvent(new Event("resize"));
           } catch (error) {}
