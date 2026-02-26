@@ -3,7 +3,7 @@
 import type { MouseEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/features/auth";
 import { Avatar } from "@/components/Avatar";
 import { apiGet } from "@/lib/api";
@@ -65,6 +65,7 @@ const BrandMark = ({
 export const SiteHeader = () => {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { isAuthenticated, user, token } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [brandLabel, setBrandLabel] = useState(BRAND_LABEL);
@@ -155,6 +156,11 @@ export const SiteHeader = () => {
   const displayBrandLabel = pathname === "/" ? brandLabel : BRAND_LABEL;
   const badgeCount = unreadCount > 99 ? "99+" : `${unreadCount}`;
   const coinCount = user?.coins ?? 0;
+  const isEmbedded = searchParams.get("embedded") === "1";
+
+  if (isEmbedded) {
+    return null;
+  }
 
   return (
     <header className="relative z-10 pointer-events-auto">

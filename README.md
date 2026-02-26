@@ -29,6 +29,7 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:4001
 Mobile (`apps/mobile/.env`)
 ```
 EXPO_PUBLIC_API_BASE_URL=https://api-production-ccb1.up.railway.app
+EXPO_PUBLIC_WEB_APP_URL=https://quadblitz.com
 ```
 
 API (`apps/api/.env`)

@@ -95,7 +95,7 @@ const distanceKmBetween = (from: mapboxgl.LngLat, to: mapboxgl.LngLat) => {
   return earthRadiusKm * c;
 };
 
-export const MapCanvas = () => {
+export const MapCanvas = ({ embedded = false }: { embedded?: boolean }) => {
   const { token, isAuthenticated, openAuthModal, user } = useAuth();
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -1722,6 +1722,7 @@ export const MapCanvas = () => {
         shareLocation={settings.shareLocation}
         ghostMode={settings.ghostMode}
         publicMode={settings.publicMode}
+        isEmbedded={embedded}
         isPlacingPin={isPlacingPin}
         onToggleShare={handleToggleShare}
         onToggleGhost={handleToggleGhost}
@@ -1737,9 +1738,13 @@ export const MapCanvas = () => {
         <button
           type="button"
           onClick={() => setShowEventsSidebar(true)}
-          className="pointer-events-auto fixed bottom-6 left-6 z-30 flex items-center gap-2 rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(255,107,53,0.3)] transition hover:bg-orange-600"
+          className={`pointer-events-auto z-30 flex items-center gap-2 rounded-full bg-orange-500 text-white shadow-[0_4px_12px_rgba(255,107,53,0.3)] transition hover:bg-orange-600 ${
+            embedded
+              ? "absolute bottom-24 left-3 px-4 py-2 text-xs font-semibold"
+              : "fixed bottom-6 left-6 px-6 py-3 text-sm font-semibold"
+          }`}
         >
-          <span className="text-xl">📍</span>
+          <span className={embedded ? "text-base" : "text-xl"}>📍</span>
           View Events{events.length > 0 ? ` (${events.length})` : ""}
         </button>
       )}
@@ -1748,12 +1753,18 @@ export const MapCanvas = () => {
           📍 Click anywhere on the map to place your event
         </div>
       )}
-      <div className="absolute bottom-6 right-4 z-20 flex flex-col gap-2 pointer-events-none">
+      <div
+        className={`absolute right-4 z-20 flex flex-col gap-2 pointer-events-none ${
+          embedded ? "bottom-24" : "bottom-6"
+        }`}
+      >
         <div className="flex flex-col gap-2 pointer-events-auto">
           <button
             type="button"
             aria-label={userLocation ? "Go to my location" : "Go to campus"}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#F3F4F6]"
+            className={`flex items-center justify-center rounded-full border border-black/10 bg-white text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#F3F4F6] ${
+              embedded ? "h-10 w-10" : "h-11 w-11"
+            }`}
             onClick={handleHomeClick}
           >
             <svg
@@ -1774,7 +1785,9 @@ export const MapCanvas = () => {
             <button
               type="button"
               aria-label="Zoom in"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#F3F4F6]"
+              className={`flex items-center justify-center rounded-full border border-black/10 bg-white text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#F3F4F6] ${
+                embedded ? "h-10 w-10" : "h-11 w-11"
+              }`}
               onClick={zoomIn}
             >
               <svg
@@ -1792,7 +1805,9 @@ export const MapCanvas = () => {
             <button
               type="button"
               aria-label="Zoom out"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#F3F4F6]"
+              className={`flex items-center justify-center rounded-full border border-black/10 bg-white text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-[#F3F4F6] ${
+                embedded ? "h-10 w-10" : "h-11 w-11"
+              }`}
               onClick={zoomOut}
             >
               <svg

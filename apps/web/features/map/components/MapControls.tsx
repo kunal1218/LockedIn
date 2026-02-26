@@ -9,6 +9,7 @@ type MapControlsProps = {
   shareLocation: boolean;
   ghostMode: boolean;
   publicMode: boolean;
+  isEmbedded?: boolean;
   isPlacingPin?: boolean;
   onToggleShare: () => void;
   onToggleGhost: () => void;
@@ -26,6 +27,7 @@ export const MapControls = ({
   shareLocation,
   ghostMode,
   publicMode,
+  isEmbedded = false,
   isPlacingPin,
   onToggleShare,
   onToggleGhost,
@@ -71,9 +73,15 @@ export const MapControls = ({
       : status === "connecting"
         ? "Connecting..."
         : "Disconnected";
+  const shellClass = isEmbedded
+    ? "pointer-events-none absolute right-3 top-3 z-20 flex w-[210px] flex-col gap-2 sm:w-[220px]"
+    : "pointer-events-none absolute right-4 top-4 z-20 flex w-[260px] flex-col gap-3";
+  const cardClass = isEmbedded
+    ? "pointer-events-auto rounded-2xl border border-black/10 bg-white/95 p-3 text-[10px] text-[#6B7280] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur"
+    : "pointer-events-auto rounded-2xl border border-black/10 bg-white/95 p-4 text-xs text-[#6B7280] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur";
 
   return (
-    <div className="pointer-events-none absolute right-4 top-4 z-20 flex w-[260px] flex-col gap-3">
+    <div className={shellClass}>
       <div className="pointer-events-auto flex items-center justify-end">
         <span
           title={statusLabel}
@@ -81,42 +89,52 @@ export const MapControls = ({
           style={{ backgroundColor: statusColor }}
         />
       </div>
-      <div className="pointer-events-auto rounded-2xl border border-black/10 bg-white/95 p-4 text-xs text-[#6B7280] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur">
+      <div className={cardClass}>
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-[#1F2937]">Share my location</p>
-            <p className="mt-1 text-[11px] text-[#6B7280]">
+            <p className={isEmbedded ? "text-[13px] font-semibold text-[#1F2937]" : "text-sm font-semibold text-[#1F2937]"}>
+              Share my location
+            </p>
+            <p className={isEmbedded ? "mt-0.5 text-[10px] text-[#6B7280]" : "mt-1 text-[11px] text-[#6B7280]"}>
               Your friends can see your latest shared location.
             </p>
           </div>
           <button
             type="button"
             aria-pressed={shareLocation}
-            className={`relative h-11 w-16 rounded-full transition ${
+            className={`relative rounded-full transition ${
+              isEmbedded ? "h-8 w-12" : "h-11 w-16"
+            } ${
               shareLocation ? "bg-accent" : "bg-ink/10"
             }`}
             onClick={onToggleShare}
           >
             <span
-              className={`absolute top-2 h-7 w-7 rounded-full bg-white transition ${
-                shareLocation ? "left-8" : "left-2"
+              className={`absolute rounded-full bg-white transition ${
+                isEmbedded ? "top-1.5 h-5 w-5" : "top-2 h-7 w-7"
+              } ${
+                shareLocation ? (isEmbedded ? "left-6" : "left-8") : (isEmbedded ? "left-1.5" : "left-2")
               }`}
             />
           </button>
         </div>
       </div>
 
-      <div className="pointer-events-auto rounded-2xl border border-black/10 bg-white/95 p-4 text-xs text-[#6B7280] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur">
+      <div className={cardClass}>
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-[#1F2937]">Go ghost 👻</p>
-            <p className="mt-1 text-[11px] text-[#6B7280]">
+            <p className={isEmbedded ? "text-[13px] font-semibold text-[#1F2937]" : "text-sm font-semibold text-[#1F2937]"}>
+              Go ghost 👻
+            </p>
+            <p className={isEmbedded ? "mt-0.5 text-[10px] text-[#6B7280]" : "mt-1 text-[11px] text-[#6B7280]"}>
               Hide instantly without toggling sharing off.
             </p>
           </div>
           <button
             type="button"
-            className={`min-h-[44px] rounded-full border px-4 py-2 text-[11px] font-semibold transition ${
+            className={`rounded-full border font-semibold transition ${
+              isEmbedded ? "min-h-[34px] px-3 py-1 text-[10px]" : "min-h-[44px] px-4 py-2 text-[11px]"
+            } ${
               ghostMode
                 ? "border-accent bg-accent/15 text-accent"
                 : "border-black/10 text-[#6B7280] hover:border-accent/40"
@@ -128,17 +146,21 @@ export const MapControls = ({
         </div>
       </div>
 
-      <div className="pointer-events-auto rounded-2xl border border-black/10 bg-white/95 p-4 text-xs text-[#6B7280] shadow-[0_2px_8px_rgba(0,0,0,0.12)] backdrop-blur">
+      <div className={cardClass}>
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-[#1F2937]">Go public 🌍</p>
-            <p className="mt-1 text-[11px] text-[#6B7280]">
+            <p className={isEmbedded ? "text-[13px] font-semibold text-[#1F2937]" : "text-sm font-semibold text-[#1F2937]"}>
+              Go public 🌍
+            </p>
+            <p className={isEmbedded ? "mt-0.5 text-[10px] text-[#6B7280]" : "mt-1 text-[11px] text-[#6B7280]"}>
               Let anyone on campus see you.
             </p>
           </div>
           <button
             type="button"
-            className={`min-h-[44px] rounded-full border px-4 py-2 text-[11px] font-semibold transition ${
+            className={`rounded-full border font-semibold transition ${
+              isEmbedded ? "min-h-[34px] px-3 py-1 text-[10px]" : "min-h-[44px] px-4 py-2 text-[11px]"
+            } ${
               publicMode
                 ? "border-accent bg-accent/15 text-accent"
                 : "border-black/10 text-[#6B7280] hover:border-accent/40"
@@ -157,7 +179,9 @@ export const MapControls = ({
           <button
             type="button"
             onClick={onToggleCreateEvent}
-            className={`flex h-14 w-14 items-center justify-center rounded-full text-2xl font-bold text-white shadow-lg transition-all duration-200 ${
+            className={`flex items-center justify-center rounded-full font-bold text-white shadow-lg transition-all duration-200 ${
+              isEmbedded ? "h-12 w-12 text-xl" : "h-14 w-14 text-2xl"
+            } ${
               isPlacingPin
                 ? "bg-red-500 hover:bg-red-600"
                 : "bg-orange-500 hover:bg-orange-600"
