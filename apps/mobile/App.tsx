@@ -1,7 +1,7 @@
 import { StatusBar } from "expo-status-bar";
-import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, SafeAreaView, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { type AuthPayload, type AuthUser, getMe, login, signup } from "./src/api/actions";
 import { AuthScreen } from "./src/screens/AuthScreen";
 import { FeedTab } from "./src/screens/tabs/FeedTab";
@@ -14,11 +14,11 @@ import { persistAuth, readStoredAuth } from "./src/lib/storage";
 import { styles } from "./src/styles/ui";
 
 const appTabs = [
-  { id: "home", label: "Home", icon: "home-outline", iconActive: "home" },
-  { id: "friends", label: "Friends", icon: "people-outline", iconActive: "people" },
-  { id: "map", label: "Map", icon: "map-outline", iconActive: "map" },
-  { id: "requests", label: "Requests", icon: "mail-outline", iconActive: "mail" },
-  { id: "profile", label: "Profile", icon: "person-outline", iconActive: "person" },
+  { id: "home", label: "Home", icon: "⌂", iconActive: "⌂" },
+  { id: "friends", label: "Friends", icon: "☻", iconActive: "☻" },
+  { id: "map", label: "Map", icon: "⌖", iconActive: "⌖" },
+  { id: "requests", label: "Requests", icon: "✉", iconActive: "✉" },
+  { id: "profile", label: "Profile", icon: "◉", iconActive: "◉" },
 ] as const;
 
 type AppTab = (typeof appTabs)[number]["id"];
@@ -208,7 +208,6 @@ export default function App() {
           {appTabs.map((tab) => {
             const isActive = activeTab === tab.id;
             const isCenterTab = tab.id === "map";
-            const iconColor = isActive ? "#ffffff" : "rgba(255,255,255,0.72)";
 
             return (
               <Pressable
@@ -223,14 +222,14 @@ export default function App() {
                       isActive && styles.bottomCenterIconWrapActive,
                     ]}
                   >
-                    <Ionicons
-                      name={isActive ? tab.iconActive : tab.icon}
-                      size={22}
-                      color="#ffffff"
-                    />
+                    <Text style={[styles.bottomTabIcon, styles.bottomTabIconActive]}>
+                      {isActive ? tab.iconActive : tab.icon}
+                    </Text>
                   </View>
                 ) : (
-                  <Ionicons name={isActive ? tab.iconActive : tab.icon} size={20} color={iconColor} />
+                  <Text style={[styles.bottomTabIcon, isActive && styles.bottomTabIconActive]}>
+                    {isActive ? tab.iconActive : tab.icon}
+                  </Text>
                 )}
                 <Text style={[styles.bottomTabLabel, isActive && styles.bottomTabLabelActive]}>
                   {tab.label}

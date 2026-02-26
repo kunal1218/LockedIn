@@ -1,12 +1,12 @@
 import { useState } from "react";
 import {
-  SafeAreaView,
   ScrollView,
   Text,
   TextInput,
   Pressable,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { API_BASE_URL } from "../api/client";
 import { ActionButton } from "../components/ActionButton";
 import { Card } from "../components/Card";

@@ -172,6 +172,15 @@ export const styles = StyleSheet.create({
     backgroundColor: "#8b5cf6",
     borderColor: "#ffffff",
   },
+  bottomTabIcon: {
+    fontSize: 20,
+    color: "rgba(255,255,255,0.72)",
+    fontWeight: "700",
+    lineHeight: 22,
+  },
+  bottomTabIconActive: {
+    color: "#ffffff",
+  },
   bottomTabLabel: {
     fontSize: 12,
     fontWeight: "700",
