@@ -5,6 +5,7 @@ MVP social campus app for meeting friends, collaborators, and cofounders (not da
 ## Repo layout
 - `apps/web` - Next.js frontend (App Router + Tailwind)
 - `apps/api` - Express API (routes/controllers/services/db)
+- `apps/mobile` - Expo React Native app
 - `packages/shared` - Shared TypeScript types
 
 ## Local development
@@ -14,6 +15,8 @@ MVP social campus app for meeting friends, collaborators, and cofounders (not da
    - `npm run dev:web`
 3. Start API
    - `npm run dev:api`
+4. Start mobile (Expo Go)
+   - `npm run dev:mobile`
 
 ## Environment variables
 Create `.env` files or copy from `.env.example`.
@@ -21,6 +24,11 @@ Create `.env` files or copy from `.env.example`.
 Frontend (`apps/web/.env.local`)
 ```
 NEXT_PUBLIC_API_BASE_URL=http://localhost:4001
+```
+
+Mobile (`apps/mobile/.env`)
+```
+EXPO_PUBLIC_API_BASE_URL=http://localhost:4001
 ```
 
 API (`apps/api/.env`)
@@ -47,4 +55,3 @@ Backend + DB (Railway)
 - Chat and map provider data are intentionally stubbed for MVP speed.
 - Mock data lives in `apps/web/features/*/mock.ts` and `apps/api/src/services/mockData.ts`.
 - Auth uses a `users` table in Postgres and stores sessions in Redis.
-

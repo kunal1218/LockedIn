@@ -1,0 +1,299 @@
+import { StyleSheet } from "react-native";
+
+export const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#f3f4f6",
+  },
+  loaderContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  authContainer: {
+    padding: 20,
+    gap: 16,
+  },
+  brandTitle: {
+    fontSize: 30,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  subtitle: {
+    fontSize: 14,
+    color: "#374151",
+  },
+  card: {
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    padding: 14,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#4b5563",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 10,
+    backgroundColor: "#f9fafb",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: "#111827",
+  },
+  multilineInput: {
+    minHeight: 88,
+    textAlignVertical: "top",
+  },
+  compactInput: {
+    minHeight: 40,
+    textAlignVertical: "top",
+  },
+  errorText: {
+    fontSize: 13,
+    color: "#b91c1c",
+    fontWeight: "600",
+  },
+  configText: {
+    fontSize: 12,
+    color: "#1f2937",
+    fontWeight: "600",
+  },
+  configSubtext: {
+    fontSize: 12,
+    color: "#4b5563",
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+    backgroundColor: "#ffffff",
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: "#4b5563",
+    marginTop: 2,
+  },
+  tabBar: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+  },
+  tabButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#ffffff",
+  },
+  tabButtonActive: {
+    backgroundColor: "#2563eb",
+    borderColor: "#2563eb",
+  },
+  tabButtonLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#374151",
+  },
+  tabButtonLabelActive: {
+    color: "#ffffff",
+  },
+  body: {
+    flex: 1,
+  },
+  tabContainer: {
+    padding: 12,
+    gap: 10,
+    paddingBottom: 28,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  cardBody: {
+    fontSize: 14,
+    color: "#1f2937",
+    lineHeight: 20,
+  },
+  cardPrice: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#1d4ed8",
+  },
+  mutedText: {
+    fontSize: 13,
+    color: "#4b5563",
+  },
+  timestamp: {
+    fontSize: 11,
+    color: "#6b7280",
+  },
+  rowBetween: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  inlineActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  button: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#2563eb",
+    backgroundColor: "#2563eb",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  buttonLabel: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  buttonMuted: {
+    backgroundColor: "#eef2ff",
+    borderColor: "#c7d2fe",
+  },
+  buttonLabelMuted: {
+    color: "#3730a3",
+  },
+  buttonDanger: {
+    backgroundColor: "#fee2e2",
+    borderColor: "#fecaca",
+  },
+  buttonLabelDanger: {
+    color: "#991b1b",
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: "#6b7280",
+    fontStyle: "italic",
+  },
+  modeSwitchRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  modePill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: "#ffffff",
+  },
+  modePillActive: {
+    borderColor: "#2563eb",
+    backgroundColor: "#eff6ff",
+  },
+  modePillLabel: {
+    fontSize: 13,
+    color: "#4b5563",
+    fontWeight: "700",
+  },
+  modePillLabelActive: {
+    color: "#1d4ed8",
+  },
+  chip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#ffffff",
+  },
+  chipActive: {
+    borderColor: "#2563eb",
+    backgroundColor: "#dbeafe",
+  },
+  chipLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#4b5563",
+  },
+  chipLabelActive: {
+    color: "#1d4ed8",
+  },
+  friendRow: {
+    paddingVertical: 6,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+  },
+  commentsContainer: {
+    marginTop: 8,
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+    paddingTop: 8,
+  },
+  commentCard: {
+    backgroundColor: "#f9fafb",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 10,
+    padding: 10,
+    gap: 6,
+  },
+  commentText: {
+    fontSize: 13,
+    color: "#111827",
+    lineHeight: 18,
+  },
+  composeRow: {
+    gap: 8,
+  },
+  messageList: {
+    gap: 8,
+    maxHeight: 320,
+  },
+  messageBubble: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    backgroundColor: "#ffffff",
+    padding: 10,
+    gap: 6,
+  },
+  messageBubbleMine: {
+    borderColor: "#bfdbfe",
+    backgroundColor: "#eff6ff",
+  },
+  messageMeta: {
+    fontSize: 11,
+    color: "#6b7280",
+  },
+  messageBody: {
+    fontSize: 14,
+    color: "#111827",
+    lineHeight: 18,
+  },
+});
