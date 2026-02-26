@@ -171,6 +171,7 @@ export default function App() {
 
       <ScrollView
         horizontal
+        style={styles.tabBarScroll}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.tabBar}
       >

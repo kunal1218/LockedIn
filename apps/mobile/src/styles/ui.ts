@@ -88,13 +88,19 @@ export const styles = StyleSheet.create({
     color: "#4b5563",
     marginTop: 2,
   },
+  tabBarScroll: {
+    height: 60,
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+    flexGrow: 0,
+    flexShrink: 0,
+  },
   tabBar: {
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 8,
-    backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    alignItems: "center",
   },
   tabButton: {
     borderRadius: 999,
@@ -103,6 +109,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     backgroundColor: "#ffffff",
+    justifyContent: "center",
   },
   tabButtonActive: {
     backgroundColor: "#2563eb",
