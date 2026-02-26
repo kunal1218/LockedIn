@@ -1,11 +1,12 @@
 import { StatusBar } from "expo-status-bar";
+import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, SafeAreaView, Text, View } from "react-native";
 import { type AuthPayload, type AuthUser, getMe, login, signup } from "./src/api/actions";
 import { AuthScreen } from "./src/screens/AuthScreen";
 import { FeedTab } from "./src/screens/tabs/FeedTab";
 import { FriendsTab } from "./src/screens/tabs/FriendsTab";
-import { MarketplaceTab } from "./src/screens/tabs/MarketplaceTab";
+import { MapTab } from "./src/screens/tabs/MapTab";
 import { ProfileTab } from "./src/screens/tabs/ProfileTab";
 import { RequestsTab } from "./src/screens/tabs/RequestsTab";
 import { formatError } from "./src/lib/errors";
@@ -13,18 +14,18 @@ import { persistAuth, readStoredAuth } from "./src/lib/storage";
 import { styles } from "./src/styles/ui";
 
 const appTabs = [
-  { id: "feed", label: "Feed" },
-  { id: "requests", label: "Requests" },
-  { id: "marketplace", label: "Marketplace" },
-  { id: "friends", label: "Friends" },
-  { id: "profile", label: "Profile" },
+  { id: "home", label: "Home", icon: "home-outline", iconActive: "home" },
+  { id: "friends", label: "Friends", icon: "people-outline", iconActive: "people" },
+  { id: "map", label: "Map", icon: "map-outline", iconActive: "map" },
+  { id: "requests", label: "Requests", icon: "mail-outline", iconActive: "mail" },
+  { id: "profile", label: "Profile", icon: "person-outline", iconActive: "person" },
 ] as const;
 
 type AppTab = (typeof appTabs)[number]["id"];
 
 export default function App() {
   const [auth, setAuth] = useState<AuthPayload | null>(null);
-  const [activeTab, setActiveTab] = useState<AppTab>("feed");
+  const [activeTab, setActiveTab] = useState<AppTab>("home");
   const [booting, setBooting] = useState(true);
   const [authPending, setAuthPending] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -105,7 +106,7 @@ export default function App() {
 
   const handleLogout = useCallback(async () => {
     await updateAuth(null);
-    setActiveTab("feed");
+    setActiveTab("home");
   }, [updateAuth]);
 
   const handleAuthExpired = useCallback(() => {
@@ -162,39 +163,8 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>LockedIn</Text>
-          <Text style={styles.headerSubtitle}>{activeSession.user.handle}</Text>
-        </View>
-      </View>
-
-      <ScrollView
-        horizontal
-        style={styles.tabBarScroll}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabBar}
-      >
-        {appTabs.map((tab) => (
-          <Pressable
-            key={tab.id}
-            onPress={() => setActiveTab(tab.id)}
-            style={[styles.tabButton, activeTab === tab.id && styles.tabButtonActive]}
-          >
-            <Text
-              style={[
-                styles.tabButtonLabel,
-                activeTab === tab.id && styles.tabButtonLabelActive,
-              ]}
-            >
-              {tab.label}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
       <View style={styles.body}>
-        {activeTab === "feed" ? (
+        {activeTab === "home" ? (
           <FeedTab
             token={activeSession.token}
             user={activeSession.user}
@@ -208,8 +178,8 @@ export default function App() {
             onAuthExpired={handleAuthExpired}
           />
         ) : null}
-        {activeTab === "marketplace" ? (
-          <MarketplaceTab
+        {activeTab === "map" ? (
+          <MapTab
             token={activeSession.token}
             user={activeSession.user}
             onAuthExpired={handleAuthExpired}
@@ -231,6 +201,44 @@ export default function App() {
             onUserRefresh={handleUserRefresh}
           />
         ) : null}
+      </View>
+
+      <View style={styles.bottomNavOuter}>
+        <View style={styles.bottomNav}>
+          {appTabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            const isCenterTab = tab.id === "map";
+            const iconColor = isActive ? "#ffffff" : "rgba(255,255,255,0.72)";
+
+            return (
+              <Pressable
+                key={tab.id}
+                onPress={() => setActiveTab(tab.id)}
+                style={[styles.bottomTab, isCenterTab && styles.bottomTabCenter]}
+              >
+                {isCenterTab ? (
+                  <View
+                    style={[
+                      styles.bottomCenterIconWrap,
+                      isActive && styles.bottomCenterIconWrapActive,
+                    ]}
+                  >
+                    <Ionicons
+                      name={isActive ? tab.iconActive : tab.icon}
+                      size={22}
+                      color="#ffffff"
+                    />
+                  </View>
+                ) : (
+                  <Ionicons name={isActive ? tab.iconActive : tab.icon} size={20} color={iconColor} />
+                )}
+                <Text style={[styles.bottomTabLabel, isActive && styles.bottomTabLabelActive]}>
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     </SafeAreaView>
   );
