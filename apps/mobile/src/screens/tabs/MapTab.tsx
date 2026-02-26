@@ -25,6 +25,15 @@ export const MapTab = ({ token, user }: SessionProps) => {
       (function() {
         var applyEmbeddedTweaks = function() {
           try {
+            document.documentElement.style.margin = "0";
+            document.documentElement.style.padding = "0";
+            document.documentElement.style.height = "100%";
+            document.documentElement.style.overflow = "hidden";
+            document.body.style.margin = "0";
+            document.body.style.padding = "0";
+            document.body.style.height = "100%";
+            document.body.style.overflow = "hidden";
+
             var header = document.querySelector("header");
             if (header) {
               header.style.display = "none";
@@ -34,14 +43,43 @@ export const MapTab = ({ token, user }: SessionProps) => {
             if (main) {
               main.style.paddingTop = "0";
               main.style.marginTop = "0";
+              main.style.height = "100%";
+              main.style.minHeight = "100%";
+              main.style.overflow = "hidden";
+            }
+
+            var appRoot = document.querySelector("body > div");
+            if (appRoot) {
+              appRoot.style.height = "100%";
+              appRoot.style.minHeight = "100%";
+              appRoot.style.overflow = "hidden";
+            }
+
+            var mapbox = document.querySelector(".mapboxgl-map");
+            if (mapbox && mapbox.parentElement && mapbox.parentElement.parentElement) {
+              var mapRoot = mapbox.parentElement.parentElement;
+              mapRoot.style.position = "fixed";
+              mapRoot.style.left = "0";
+              mapRoot.style.top = "0";
+              mapRoot.style.right = "0";
+              mapRoot.style.bottom = "0";
+              mapRoot.style.width = "100vw";
+              mapRoot.style.height = "100vh";
+              mapRoot.style.minHeight = "100vh";
+              mapRoot.style.maxHeight = "100vh";
+              mapRoot.style.margin = "0";
+              mapRoot.style.padding = "0";
+              mapRoot.style.overflow = "hidden";
             }
 
             var topControls = document.querySelector('div[class*="pointer-events-none"][class*="absolute"][class*="z-20"][class*="top-"]');
             if (topControls) {
               topControls.style.top = "10px";
               topControls.style.right = "10px";
-              topControls.style.width = "210px";
+              topControls.style.width = "225px";
               topControls.style.gap = "8px";
+              topControls.style.transform = "scale(0.86)";
+              topControls.style.transformOrigin = "top right";
             }
 
             var cards = document.querySelectorAll('div[class*="rounded-2xl"][class*="bg-white"]');
@@ -52,7 +90,8 @@ export const MapTab = ({ token, user }: SessionProps) => {
                 text.indexOf("Go ghost") !== -1 ||
                 text.indexOf("Go public") !== -1
               ) {
-                card.style.padding = "10px";
+                card.style.padding = "8px";
+                card.style.maxWidth = "225px";
               }
             });
 
@@ -77,7 +116,7 @@ export const MapTab = ({ token, user }: SessionProps) => {
               if (label.indexOf("View Events") === 0) {
                 button.style.position = "absolute";
                 button.style.left = "12px";
-                button.style.bottom = "96px";
+                button.style.bottom = "104px";
                 button.style.padding = "8px 14px";
                 button.style.fontSize = "12px";
               }
@@ -94,7 +133,7 @@ export const MapTab = ({ token, user }: SessionProps) => {
             var mapDock = document.querySelector('div[class*="absolute"][class*="right-4"][class*="z-20"]');
             if (mapDock) {
               mapDock.style.right = "12px";
-              mapDock.style.bottom = "96px";
+              mapDock.style.bottom = "104px";
             }
           } catch (error) {}
         };
