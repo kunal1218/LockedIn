@@ -6,10 +6,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { type AuthPayload, type AuthUser, getMe, login, signup } from "./src/api/actions";
 import { AuthScreen } from "./src/screens/AuthScreen";
 import { FeedTab } from "./src/screens/tabs/FeedTab";
-import { FriendsTab } from "./src/screens/tabs/FriendsTab";
+import { GroupsTab } from "./src/screens/tabs/GroupsTab";
+import { MarketplaceTab } from "./src/screens/tabs/MarketplaceTab";
 import { MapTab } from "./src/screens/tabs/MapTab";
 import { ProfileTab } from "./src/screens/tabs/ProfileTab";
-import { RequestsTab } from "./src/screens/tabs/RequestsTab";
 import { formatError } from "./src/lib/errors";
 import { persistAuth, readStoredAuth } from "./src/lib/storage";
 import { styles } from "./src/styles/ui";
@@ -17,15 +17,20 @@ import { styles } from "./src/styles/ui";
 type TabIconName = ComponentProps<typeof Ionicons>["name"];
 
 const appTabs: ReadonlyArray<{
-  id: "home" | "friends" | "map" | "requests" | "profile";
+  id: "home" | "groups" | "map" | "marketplace" | "profile";
   label: string;
   icon: TabIconName;
   iconActive: TabIconName;
 }> = [
   { id: "home", label: "Home", icon: "home-outline", iconActive: "home" },
-  { id: "friends", label: "Friends", icon: "people-outline", iconActive: "people" },
+  { id: "groups", label: "Groups", icon: "people-outline", iconActive: "people" },
   { id: "map", label: "Map", icon: "locate-outline", iconActive: "locate" },
-  { id: "requests", label: "Requests", icon: "mail-outline", iconActive: "mail" },
+  {
+    id: "marketplace",
+    label: "Marketplace",
+    icon: "storefront-outline",
+    iconActive: "storefront",
+  },
   { id: "profile", label: "Profile", icon: "person-circle-outline", iconActive: "person-circle" },
 ] as const;
 
@@ -182,8 +187,8 @@ export default function App() {
             onAuthExpired={handleAuthExpired}
           />
         ) : null}
-        {activeTab === "requests" ? (
-          <RequestsTab
+        {activeTab === "marketplace" ? (
+          <MarketplaceTab
             token={activeSession.token}
             user={activeSession.user}
             onAuthExpired={handleAuthExpired}
@@ -196,8 +201,8 @@ export default function App() {
             onAuthExpired={handleAuthExpired}
           />
         ) : null}
-        {activeTab === "friends" ? (
-          <FriendsTab
+        {activeTab === "groups" ? (
+          <GroupsTab
             token={activeSession.token}
             user={activeSession.user}
             onAuthExpired={handleAuthExpired}
