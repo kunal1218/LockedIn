@@ -14,16 +14,14 @@ Then scan the QR code in Expo Go.
 
 ## API base URL
 
-Set this env var so your phone can reach the API server:
+Default is production Railway (same backend as web):
 
 ```bash
-EXPO_PUBLIC_API_BASE_URL=http://<YOUR-LAN-IP>:4001
+EXPO_PUBLIC_API_BASE_URL=https://api-production-ccb1.up.railway.app
 ```
 
-Example:
+Override only if needed (for local API work):
 
 ```bash
 EXPO_PUBLIC_API_BASE_URL=http://192.168.1.42:4001 npm run dev:mobile
 ```
-
-If not set, the app falls back to the current dev host (`:4001`) and then `http://localhost:4001`.

@@ -1,5 +1,3 @@
-import { NativeModules } from "react-native";
-
 export class ApiError extends Error {
   readonly status: number;
 
@@ -21,32 +19,19 @@ type ApiRequestOptions = {
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 
-const extractHostFromScriptUrl = (scriptUrl: string | undefined): string | null => {
-  if (!scriptUrl) {
-    return null;
-  }
-
-  const match = scriptUrl.match(/^https?:\/\/([^/:]+)/i);
-  return match?.[1] ?? null;
-};
+const DEFAULT_PRODUCTION_API_BASE_URL = "https://api-production-ccb1.up.railway.app";
 
 const inferApiBaseUrl = (): string => {
   const explicit =
-    process.env.EXPO_PUBLIC_API_BASE_URL ?? process.env.EXPO_PUBLIC_API_URL;
+    process.env.EXPO_PUBLIC_API_BASE_URL ??
+    process.env.EXPO_PUBLIC_API_URL ??
+    process.env.NEXT_PUBLIC_API_BASE_URL ??
+    process.env.NEXT_PUBLIC_API_URL;
 
   if (explicit && explicit.trim()) {
     return trimTrailingSlash(explicit.trim());
   }
-
-  const sourceCode = (NativeModules as { SourceCode?: { scriptURL?: string } })
-    .SourceCode;
-  const host = extractHostFromScriptUrl(sourceCode?.scriptURL);
-
-  if (host) {
-    return `http://${host}:4001`;
-  }
-
-  return "http://localhost:4001";
+  return DEFAULT_PRODUCTION_API_BASE_URL;
 };
 
 export const API_BASE_URL = inferApiBaseUrl();

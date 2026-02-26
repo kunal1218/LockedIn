@@ -28,7 +28,7 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:4001
 
 Mobile (`apps/mobile/.env`)
 ```
-EXPO_PUBLIC_API_BASE_URL=http://localhost:4001
+EXPO_PUBLIC_API_BASE_URL=https://api-production-ccb1.up.railway.app
 ```
 
 API (`apps/api/.env`)

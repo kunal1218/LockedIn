@@ -179,8 +179,8 @@ export const AuthScreen = ({
 
         <Text style={styles.configText}>API base: {API_BASE_URL}</Text>
         <Text style={styles.configSubtext}>
-          For physical devices, set `EXPO_PUBLIC_API_BASE_URL` to your machine IP,
-          e.g. `http://192.168.x.x:4001`.
+          Mobile defaults to the production Railway backend. Override
+          `EXPO_PUBLIC_API_BASE_URL` only when testing a local API server.
         </Text>
       </ScrollView>
     </SafeAreaView>
